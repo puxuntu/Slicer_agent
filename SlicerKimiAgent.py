@@ -1,0 +1,800 @@
+import os
+import queue
+import threading
+import unittest
+import logging
+import vtk
+import qt
+import ctk
+import slicer
+from slicer.ScriptedLoadableModule import *
+from slicer.util import VTKObservationMixin
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+#------------------------------------------------------------------
+# Module Class
+#------------------------------------------------------------------
+class SlicerKimiAgent(ScriptedLoadableModule):
+    """AI-powered assistant for 3D Slicer using KIMI API."""
+
+    def __init__(self, parent):
+        ScriptedLoadableModule.__init__(self, parent)
+        self.parent.title = "Slicer KIMI Agent"
+        self.parent.categories = ["AI"]
+        self.parent.dependencies = []
+        self.parent.contributors = ["Puxun (Agent Developer)"]
+        self.parent.helpText = """
+        An AI-powered assistant that helps you control 3D Slicer using natural language.
+
+        Features:
+        - Natural language to Python code generation
+        - Scene manipulation and analysis
+        - Guided workflows for common tasks
+        - Integration with Slicer's skill knowledge base
+
+        Usage:
+        1. Enter your KIMI API key in Settings
+        2. Type your request in the chat box
+        3. Review and execute the generated code
+        """
+        self.parent.acknowledgementText = """
+        This extension uses the KIMI API for code generation.
+        Thanks to the 3D Slicer community for the comprehensive skill knowledge base.
+        """
+        moduleDir = os.path.dirname(__file__)
+        iconPath = os.path.join(moduleDir, 'Resources', 'Icons', 'SlicerKimiAgent.png')
+        if os.path.exists(iconPath):
+            self.parent.icon = qt.QIcon(iconPath)
+
+#------------------------------------------------------------------
+# Widget Class
+#------------------------------------------------------------------
+class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+    """Main UI widget for SlicerKimiAgent."""
+
+    def __init__(self, parent=None):
+        ScriptedLoadableModuleWidget.__init__(self, parent)
+        VTKObservationMixin.__init__(self)
+        self.logic = None
+        self._parameterNode = None
+        self._updatingGUIFromParameterNode = False
+        self._chatEntriesHtml = []
+        # Streaming state
+        self._streamReasoning = ""
+        self._streamContent = ""
+        self._streaming = False
+        # Thread-safe queue for streaming events (filled by worker, drained on main thread)
+        self._streamQueue = queue.Queue()
+        self._streamPollTimer = None
+
+    def setup(self):
+        ScriptedLoadableModuleWidget.setup(self)
+
+        uiFilePath = os.path.join(os.path.dirname(__file__), 'Resources', 'UI', 'SlicerKimiAgent.ui')
+        if os.path.exists(uiFilePath):
+            self.ui = slicer.util.loadUI(uiFilePath)
+            self.layout.addWidget(self.ui)
+            self._connectUIWidgets()
+            self.setupConnections()
+        else:
+            self.setupUIProgrammatically()
+
+        self.logic = SlicerKimiAgentLogic()
+        self.loadSettings()
+
+        self._streamPollTimer = qt.QTimer()
+        self._streamPollTimer.setInterval(50)
+        self._streamPollTimer.timeout.connect(self._drainStreamQueue)
+        self._streamPollTimer.start()
+
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
+
+        logger.info("SlicerKimiAgent widget setup complete")
+
+    def _connectUIWidgets(self):
+        self.apiKeyInput = self.ui.findChild(qt.QLineEdit, "apiKeyInput")
+        self.modelSelector = self.ui.findChild(qt.QComboBox, "modelSelector")
+        self.saveSettingsButton = self.ui.findChild(qt.QPushButton, "saveSettingsButton")
+        self.testConnectionButton = self.ui.findChild(qt.QPushButton, "testConnectionButton")
+        self.chatHistory = self.ui.findChild(qt.QTextEdit, "chatHistory")
+        self.codeDisplay = self.ui.findChild(qt.QTextEdit, "codeDisplay")
+        self.executeButton = self.ui.findChild(qt.QPushButton, "executeButton")
+        self.copyButton = self.ui.findChild(qt.QPushButton, "copyButton")
+        self.clearChatButton = self.ui.findChild(qt.QPushButton, "clearChatButton")
+        self.promptInput = self.ui.findChild(qt.QTextEdit, "promptInput")
+        self.sendButton = self.ui.findChild(qt.QPushButton, "sendButton")
+        self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
+        self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
+
+    def setupUIProgrammatically(self):
+        self.ui = ctk.ctkCollapsibleButton()
+        self.ui.text = "Slicer KIMI Agent"
+        self.layout.addWidget(self.ui)
+
+        mainLayout = qt.QVBoxLayout(self.ui)
+
+        settingsGroup = ctk.ctkCollapsibleGroupBox()
+        settingsGroup.title = "Settings"
+        settingsGroup.collapsed = True
+        mainLayout.addWidget(settingsGroup)
+
+        settingsLayout = qt.QFormLayout(settingsGroup)
+
+        self.apiKeyInput = qt.QLineEdit()
+        self.apiKeyInput.setEchoMode(qt.QLineEdit.Password)
+        self.apiKeyInput.setPlaceholderText("Enter your KIMI API key")
+        settingsLayout.addRow("API Key:", self.apiKeyInput)
+
+        modelLayout = qt.QHBoxLayout()
+        self.modelSelector = qt.QComboBox()
+        self.modelSelector.setEditable(True)
+        self.modelSelector.setToolTip("K2.5 models: kimi-k2.5 (default), kimi-k2-thinking, kimi-k2-turbo-preview")
+        self.modelSelector.addItems(["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"])
+        modelLayout.addWidget(self.modelSelector)
+
+        self.testConnectionButton = qt.QPushButton("Test")
+        self.testConnectionButton.setToolTip("Test API connection")
+        modelLayout.addWidget(self.testConnectionButton)
+        settingsLayout.addRow("Model:", modelLayout)
+
+        self.saveSettingsButton = qt.QPushButton("Save Settings")
+        settingsLayout.addRow(self.saveSettingsButton)
+
+        chatLabel = qt.QLabel("Conversation:")
+        mainLayout.addWidget(chatLabel)
+
+        self.chatHistory = qt.QTextEdit()
+        self.chatHistory.setReadOnly(True)
+        self.chatHistory.setMinimumHeight(300)
+        mainLayout.addWidget(self.chatHistory)
+
+        codeLabel = qt.QLabel("Generated Code:")
+        mainLayout.addWidget(codeLabel)
+
+        self.codeDisplay = qt.QTextEdit()
+        self.codeDisplay.setReadOnly(True)
+        self.codeDisplay.setMinimumHeight(150)
+        self.codeDisplay.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: Consolas, monospace;")
+        mainLayout.addWidget(self.codeDisplay)
+
+        codeButtonLayout = qt.QHBoxLayout()
+        self.executeButton = qt.QPushButton("Execute Code")
+        self.executeButton.setEnabled(False)
+        self.copyButton = qt.QPushButton("Copy to Clipboard")
+        self.clearChatButton = qt.QPushButton("Clear Chat")
+        codeButtonLayout.addWidget(self.executeButton)
+        codeButtonLayout.addWidget(self.copyButton)
+        codeButtonLayout.addWidget(self.clearChatButton)
+        mainLayout.addLayout(codeButtonLayout)
+
+        inputLayout = qt.QHBoxLayout()
+        self.promptInput = qt.QTextEdit()
+        self.promptInput.setPlaceholderText("Type your request here... (e.g., 'Load a sample volume and create a volume rendering')")
+        self.promptInput.setMaximumHeight(80)
+        self.sendButton = qt.QPushButton("Send")
+        self.sendButton.setMinimumHeight(80)
+        inputLayout.addWidget(self.promptInput, stretch=1)
+        inputLayout.addWidget(self.sendButton)
+        mainLayout.addLayout(inputLayout)
+
+        self.statusLabel = qt.QLabel("Ready")
+        mainLayout.addWidget(self.statusLabel)
+
+        self.tokenLabel = qt.QLabel("Tokens: 0 | Cost: $0.000")
+        mainLayout.addWidget(self.tokenLabel)
+
+        self.setupConnections()
+
+    def setupConnections(self):
+        if hasattr(self, 'sendButton') and self.sendButton is not None:
+            self.sendButton.clicked.connect(self.onSendButtonClicked)
+        if hasattr(self, 'promptInput') and self.promptInput is not None:
+            self.promptInput.textChanged.connect(self.onPromptTextChanged)
+        if hasattr(self, 'executeButton') and self.executeButton is not None:
+            self.executeButton.clicked.connect(self.onExecuteButtonClicked)
+        if hasattr(self, 'copyButton') and self.copyButton is not None:
+            self.copyButton.clicked.connect(self.onCopyButtonClicked)
+        if hasattr(self, 'clearChatButton') and self.clearChatButton is not None:
+            self.clearChatButton.clicked.connect(self.onClearChatButtonClicked)
+        if hasattr(self, 'saveSettingsButton') and self.saveSettingsButton is not None:
+            self.saveSettingsButton.clicked.connect(self.onSaveSettings)
+        if hasattr(self, 'testConnectionButton') and self.testConnectionButton is not None:
+            self.testConnectionButton.clicked.connect(self.onTestConnection)
+
+    def disconnect(self):
+        self.removeObservers()
+        try:
+            if hasattr(self, 'sendButton') and self.sendButton is not None:
+                self.sendButton.clicked.disconnect()
+            if hasattr(self, 'promptInput') and self.promptInput is not None:
+                self.promptInput.textChanged.disconnect()
+            if hasattr(self, 'executeButton') and self.executeButton is not None:
+                self.executeButton.clicked.disconnect()
+            if hasattr(self, 'copyButton') and self.copyButton is not None:
+                self.copyButton.clicked.disconnect()
+            if hasattr(self, 'clearChatButton') and self.clearChatButton is not None:
+                self.clearChatButton.clicked.disconnect()
+        except RuntimeError:
+            pass
+
+    def cleanup(self):
+        self.disconnect()
+        if self._streamPollTimer:
+            self._streamPollTimer.stop()
+        if self.logic:
+            self.logic.cleanup()
+        logger.info("SlicerKimiAgent widget cleaned up")
+
+    def enter(self):
+        if (hasattr(self, 'chatHistory') and self.chatHistory is not None and
+            self.logic and not self.logic.hasApiKey()):
+            self.appendToChat("System", "Please configure your KIMI API key in Settings before using the agent.")
+
+    def exit(self):
+        pass
+
+    def onSceneStartClose(self, caller, event):
+        if self.logic:
+            self.logic.pauseProcessing()
+
+    def onSceneEndClose(self, caller, event):
+        if self.logic:
+            self.logic.resumeProcessing()
+
+    # ------------------------------------------------------------------
+    # Streaming chat display helpers
+    # ------------------------------------------------------------------
+    def _setChatHtml(self, html):
+        """Replace the chat box contents and keep it scrolled to the bottom."""
+        self.chatHistory.setHtml(html)
+        scrollbar = self.chatHistory.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum)
+
+    def _buildStreamingEntryHtml(self):
+        """Build HTML for the current streaming assistant entry."""
+        timestamp = getattr(self, '_streamTimestamp', '')
+        parts = []
+        if self._streamReasoning:
+            escaped_reasoning = self.escapeHtml(self._streamReasoning).replace(chr(10), '<br>')
+            parts.append(
+                f'<div style="margin-left: 10px; margin-top: 5px; color: #888; '
+                f'border-left: 3px solid #ccc; padding-left: 8px;">'
+                f'<b>[Thinking]</b><br>{escaped_reasoning}</div>'
+            )
+        if self._streamContent:
+            escaped_content = self.escapeHtml(self._streamContent).replace(chr(10), '<br>')
+            parts.append(
+                f'<div style="margin-left: 10px; margin-top: 5px;">{escaped_content}</div>'
+            )
+
+        if not parts:
+            parts.append('<div style="margin-left: 10px; margin-top: 5px; color: #aaa;">...</div>')
+
+        body = ''.join(parts)
+        return (
+            f'<div style="margin: 10px 0;">'
+            f'<span style="color: #999; font-size: 10px;">[{timestamp}]</span> '
+            f'<span style="color: #009900; font-weight: bold;">Assistant:</span>'
+            f'{body}'
+            f'</div>'
+            f'<hr style="border: none; border-top: 1px solid #eee; margin: 5px 0;">'
+        )
+
+    def _renderStreamingEntry(self):
+        """Re-render the current streaming assistant entry in the chat box."""
+        if not hasattr(self, 'chatHistory') or self.chatHistory is None:
+            return
+        self._setChatHtml(''.join(self._chatEntriesHtml) + self._buildStreamingEntryHtml())
+
+    def _finalizeStreamingEntry(self):
+        """Commit the current streaming assistant entry into chat history."""
+        if self._streaming or self._streamReasoning or self._streamContent:
+            self._chatEntriesHtml.append(self._buildStreamingEntryHtml())
+            self._setChatHtml(''.join(self._chatEntriesHtml))
+
+    def _drainStreamQueue(self):
+        """Drain queued streaming events on the Qt main thread."""
+        while True:
+            try:
+                event_type, payload = self._streamQueue.get_nowait()
+            except queue.Empty:
+                break
+
+            if event_type == 'delta':
+                self._onStreamDelta(payload)
+            elif event_type == 'complete':
+                self._onStreamComplete(payload)
+            elif event_type == 'error':
+                self._onStreamError(payload)
+
+    def _onStreamDelta(self, delta):
+        """Apply one streamed delta on the main thread."""
+        self._streamReasoning += delta.get('reasoning_content', '')
+        self._streamContent += delta.get('content', '')
+        self._renderStreamingEntry()
+        slicer.app.processEvents()
+
+    def _onStreamComplete(self, response):
+        """Called on the main thread when streaming finishes successfully."""
+        self._streaming = False
+        self._finalizeStreamingEntry()
+
+        # Display generated code if any
+        if response.get("code"):
+            self.currentCode = response["code"]
+            self.codeDisplay.setPlainText(response["code"])
+            self.executeButton.setEnabled(True)
+            self.appendToChat("System", "Generated code is ready for execution. Review before running.")
+
+        # Update token usage
+        if response.get("tokens"):
+            tokens = response["tokens"]
+            cost = response.get("cost", 0)
+            self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
+
+        self.statusLabel.text = "Ready"
+        self.sendButton.setEnabled(True)
+
+    def _onStreamError(self, error_msg):
+        """Called on the main thread when the streaming request fails."""
+        self._streaming = False
+        self._finalizeStreamingEntry()
+        logger.error(f"Error generating response: {error_msg}")
+
+        if "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
+            self.appendToChat("Error",
+                f"Request timed out.\n\n"
+                f"Please check:\n"
+                f"1. Your network connection\n"
+                f"2. The model name is correct (use 'kimi-k2.5')\n"
+                f"3. Your API key has access to K2.5 models\n\n"
+                f"Technical details: {error_msg}")
+        else:
+            self.appendToChat("Error", f"Failed to generate response: {error_msg}")
+
+        self.statusLabel.text = "Ready"
+        self.sendButton.setEnabled(True)
+
+    def onSendButtonClicked(self):
+        prompt = self.promptInput.toPlainText().strip()
+        if not prompt:
+            return
+
+        self.promptInput.clear()
+        self.appendToChat("You", prompt)
+
+        self.statusLabel.text = "Generating..."
+        self.sendButton.setEnabled(False)
+        slicer.app.processEvents()
+
+        # Reset streaming accumulators
+        self._streamReasoning = ""
+        self._streamContent = ""
+        self._streaming = True
+        self._streamTimestamp = qt.QDateTime.currentDateTime().toString("hh:mm:ss")
+        self._renderStreamingEntry()
+
+        # Build context on the main thread (it reads the MRML scene)
+        context = self.logic._buildContext(prompt) if self.logic else None
+
+        # Launch the streaming request in a background thread
+        def _backgroundStream():
+            try:
+                def _onDelta(delta):
+                    self._streamQueue.put(('delta', dict(delta)))
+
+                response = self.logic.generateResponseStream(prompt, context, _onDelta)
+                self._streamQueue.put(('complete', dict(response)))
+            except Exception as e:
+                self._streamQueue.put(('error', str(e)))
+
+        thread = threading.Thread(target=_backgroundStream, daemon=True)
+        thread.start()
+
+    def onPromptTextChanged(self):
+        hasText = bool(self.promptInput.toPlainText().strip())
+        self.sendButton.setEnabled(hasText)
+
+    def generateResponse(self, prompt):
+        """Legacy non-streaming path (kept for backward compatibility)."""
+        try:
+            response = self.logic.generateResponse(prompt)
+            self.appendToChat("Assistant", response["message"])
+
+            if response.get("code"):
+                self.currentCode = response["code"]
+                self.codeDisplay.setPlainText(response["code"])
+                self.executeButton.setEnabled(True)
+                self.appendToChat("System", "Generated code is ready for execution. Review before running.")
+
+            if response.get("tokens"):
+                tokens = response["tokens"]
+                cost = response.get("cost", 0)
+                self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
+
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            self.appendToChat("Error", f"Failed to generate response: {str(e)}")
+        finally:
+            self.statusLabel.text = "Ready"
+            self.sendButton.setEnabled(True)
+
+    def onExecuteButtonClicked(self):
+        if not hasattr(self, 'currentCode') or not self.currentCode:
+            return
+
+        msgBox = qt.QMessageBox()
+        msgBox.setWindowTitle("Confirm Code Execution")
+        msgBox.setText("Are you sure you want to execute this code?")
+        msgBox.setInformativeText("This will run Python code in your Slicer environment. Only execute code you trust.")
+        msgBox.setStandardButtons(qt.QMessageBox.Yes | qt.QMessageBox.No)
+        msgBox.setDefaultButton(qt.QMessageBox.No)
+        msgBox.setIcon(qt.QMessageBox.Warning)
+
+        if msgBox.exec_() == qt.QMessageBox.Yes:
+            self.statusLabel.text = "Executing..."
+            self.executeButton.setEnabled(False)
+            slicer.app.processEvents()
+            
+            def onExecutionComplete(result):
+                self.statusLabel.text = "Ready"
+                self.executeButton.setEnabled(True)
+                
+                if result.get("timed_out", False):
+                    self.appendToChat("Warning", 
+                        f"Code execution timed out after {result.get('execution_time', 30):.1f}s.\n"
+                        f"Output: {result.get('output', 'No output')}")
+                elif result["success"]:
+                    output = result.get('output', 'No output')
+                    execution_time = result.get('execution_time', 0)
+                    msg = f"Code executed successfully in {execution_time:.2f}s."
+                    if output:
+                        msg += f"\nOutput: {output}"
+                    self.appendToChat("System", msg)
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    self.appendToChat("Error", f"Execution failed:\n{error_msg}")
+            
+            # Execute asynchronously using QTimer (main thread, non-blocking)
+            self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
+
+    def onCopyButtonClicked(self):
+        if hasattr(self, 'currentCode') and self.currentCode:
+            clipboard = qt.QApplication.clipboard()
+            clipboard.setText(self.currentCode)
+            self.statusLabel.text = "Code copied to clipboard"
+            qt.QTimer.singleShot(2000, lambda: setattr(self.statusLabel, 'text', 'Ready'))
+
+    def onClearChatButtonClicked(self):
+        self.chatHistory.clear()
+        self._chatEntriesHtml = []
+        if self.logic:
+            self.logic.clearConversation()
+        self.codeDisplay.clear()
+        self.currentCode = None
+        self.executeButton.setEnabled(False)
+
+    def appendToChat(self, sender, message):
+        if not hasattr(self, 'chatHistory') or self.chatHistory is None:
+            logger.warning(f"Chat history not ready, message from {sender} discarded")
+            return
+
+        timestamp = qt.QDateTime.currentDateTime().toString("hh:mm:ss")
+
+        if sender == "You":
+            color = "#0066cc"
+        elif sender == "Assistant":
+            color = "#009900"
+        elif sender == "System":
+            color = "#666666"
+        else:
+            color = "#cc0000"
+
+        html = f"""
+        <div style="margin: 10px 0;">
+            <span style="color: #999; font-size: 10px;">[{timestamp}]</span>
+            <span style="color: {color}; font-weight: bold;">{sender}:</span>
+            <div style="margin-left: 10px; margin-top: 5px;">{self.escapeHtml(message).replace(chr(10), '<br>')}</div>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 5px 0;">
+        """
+
+        self._chatEntriesHtml.append(html)
+        self._setChatHtml(''.join(self._chatEntriesHtml))
+
+    def escapeHtml(self, text):
+        return (text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&#x27;"))
+
+    def onSaveSettings(self):
+        if not hasattr(self, 'apiKeyInput') or self.apiKeyInput is None:
+            return
+
+        settings = qt.QSettings()
+        settings.beginGroup("SlicerKimiAgent")
+        settings.setValue("apiKey", self.apiKeyInput.text)
+        if hasattr(self, 'modelSelector') and self.modelSelector is not None:
+            settings.setValue("model", self.modelSelector.currentText)
+        settings.endGroup()
+
+        if self.logic:
+            self.logic.setApiKey(self.apiKeyInput.text)
+            if hasattr(self, 'modelSelector') and self.modelSelector is not None:
+                self.logic.setModel(self.modelSelector.currentText)
+
+        slicer.util.infoDisplay("Settings saved successfully!")
+
+    def onTestConnection(self):
+        if not self.logic:
+            slicer.util.warningDisplay("Logic not initialized")
+            return
+
+        apiKey = self.apiKeyInput.text if hasattr(self, 'apiKeyInput') else ""
+        model = self.modelSelector.currentText if hasattr(self, 'modelSelector') else "kimi-k2.5"
+
+        if not apiKey:
+            slicer.util.warningDisplay("Please enter an API key first")
+            return
+
+        originalKey = self.logic.apiKey
+        originalModel = self.logic.model
+
+        self.logic.setApiKey(apiKey)
+        self.logic.setModel(model)
+
+        self.statusLabel.text = "Testing connection..."
+        slicer.app.processEvents()
+
+        try:
+            if self.logic.kimiClient.validateModel(model):
+                slicer.util.infoDisplay(f"Connection successful!\n\nModel '{model}' is valid and accessible.")
+            else:
+                slicer.util.warningDisplay(f"Model '{model}' not found.\n\nTry one of these:\n- kimi-k2.5\n- kimi-k2-thinking\n- kimi-k2-turbo-preview")
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg:
+                slicer.util.warningDisplay(f"Model '{model}' not found (404).\n\nTry these K2.5 model names:\n- kimi-k2.5 (standard)\n- kimi-k2-thinking (with thinking)\n- kimi-k2-turbo-preview (faster)\n\nOr check your API key.")
+            elif "401" in error_msg:
+                slicer.util.warningDisplay("Invalid API key (401).\n\nPlease check your API key.")
+            else:
+                slicer.util.warningDisplay(f"Connection failed:\n{error_msg}")
+        finally:
+            self.statusLabel.text = "Ready"
+            self.logic.setApiKey(originalKey)
+            self.logic.setModel(originalModel)
+
+    def loadSettings(self):
+        settings = qt.QSettings()
+        settings.beginGroup("SlicerKimiAgent")
+
+        apiKey = settings.value("apiKey", "")
+        model = settings.value("model", "kimi-k2.5")
+
+        if hasattr(self, 'apiKeyInput') and self.apiKeyInput is not None:
+            self.apiKeyInput.text = apiKey
+        if hasattr(self, 'modelSelector') and self.modelSelector is not None:
+            self.modelSelector.setCurrentText(model)
+
+        settings.endGroup()
+
+        if self.logic:
+            self.logic.setApiKey(apiKey)
+            self.logic.setModel(model)
+
+#------------------------------------------------------------------
+# Logic Class
+#------------------------------------------------------------------
+class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
+    """
+    Business logic for SlicerKimiAgent.
+    Handles AI interactions, code generation, and execution.
+    """
+
+    def __init__(self):
+        ScriptedLoadableModuleLogic.__init__(self)
+        self.apiKey = None
+        self.model = "kimi-k2.5"
+        self.kimiClient = None
+        self.skillManager = None
+        self.codeValidator = None
+        self.executor = None
+        self.conversationStore = None
+        self._processing = False
+        self._initializeComponents()
+
+    def _initializeComponents(self):
+        try:
+            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
+
+            self.conversationStore = ConversationStore()
+            self.kimiClient = KimiClient()
+            self.skillManager = SkillContextManager()
+            self.codeValidator = CodeValidator()
+            self.executor = SafeExecutor()
+
+            logger.info("SlicerKimiAgent logic components initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize components: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def setApiKey(self, apiKey):
+        self.apiKey = apiKey
+        if self.kimiClient:
+            self.kimiClient.setApiKey(apiKey)
+
+    def setModel(self, model):
+        self.model = model
+        if self.kimiClient:
+            self.kimiClient.setModel(model)
+
+    def hasApiKey(self):
+        return bool(self.apiKey)
+
+    def generateResponse(self, prompt):
+        """
+        Generate AI response (non-streaming).
+
+        Args:
+            prompt: User's natural language request
+
+        Returns:
+            dict with keys: message, reasoning_content, code, tokens, cost
+        """
+        if not self.kimiClient:
+            raise RuntimeError("KIMI client not initialized")
+        if not self.apiKey:
+            raise RuntimeError("API key not configured")
+
+        context = self._buildContext(prompt)
+        response = self.kimiClient.chat(prompt, context=context)
+        self.conversationStore.addExchange(prompt, response)
+        return response
+
+    def generateResponseStream(self, prompt, context=None, on_delta=None):
+        """
+        Generate AI response using streaming.
+
+        This runs the actual HTTP request (blocking I/O).  Callers should
+        invoke this from a background thread.
+
+        Args:
+            prompt: User's natural language request
+            context: Pre-built skill context (or None to build here)
+            on_delta: Callback for incremental updates
+
+        Returns:
+            dict with keys: message, reasoning_content, code, tokens, cost
+        """
+        if not self.kimiClient:
+            raise RuntimeError("KIMI client not initialized")
+        if not self.apiKey:
+            raise RuntimeError("API key not configured")
+
+        if context is None:
+            context = self._buildContext(prompt)
+
+        response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+        self.conversationStore.addExchange(prompt, response)
+        return response
+
+    def _buildContext(self, prompt):
+        if not self.skillManager:
+            return None
+        return self.skillManager.buildContext(prompt)
+
+    def executeCode(self, code):
+        validation = self.codeValidator.validate(code)
+        if not validation["valid"]:
+            return {
+                "success": False,
+                "error": f"Code validation failed: {validation['reason']}"
+            }
+        return self.executor.execute(code)
+    
+    def executeCodeAsync(self, code, callback=None):
+        """
+        Execute code asynchronously without blocking the UI.
+        
+        Note: Due to Qt thread constraints, execution happens in the main thread
+        but is scheduled via QTimer to allow the current event loop to process.
+        
+        Args:
+            code: Python code to execute
+            callback: Function to call with result dict when complete
+        """
+        validation = self.codeValidator.validate(code)
+        if not validation["valid"]:
+            if callback:
+                callback({
+                    "success": False,
+                    "error": f"Code validation failed: {validation['reason']}"
+                })
+            return
+        
+        self.executor.executeAsync(code, callback)
+
+    def clearConversation(self):
+        if self.conversationStore:
+            self.conversationStore.clear()
+        if self.kimiClient:
+            self.kimiClient.clearHistory()
+
+    def pauseProcessing(self):
+        self._processing = False
+
+    def resumeProcessing(self):
+        self._processing = True
+
+    def cleanup(self):
+        if self.kimiClient:
+            self.kimiClient.cleanup()
+        if self.executor:
+            self.executor.cleanup()
+
+#------------------------------------------------------------------
+# Test Class
+#------------------------------------------------------------------
+class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
+    """Unit tests for SlicerKimiAgent."""
+
+    def setUp(self):
+        slicer.mrmlScene.Clear(0)
+
+    def runTest(self):
+        self.setUp()
+        self.test_ModuleImport()
+        self.test_CodeValidator()
+        self.test_SafeExecutor()
+        self.test_SkillContextManager()
+
+    def test_ModuleImport(self):
+        try:
+            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
+            self.delayDisplay("Module import test passed")
+        except Exception as e:
+            self.delayDisplay(f"Module import test failed: {e}")
+            raise
+
+    def test_CodeValidator(self):
+        from SlicerKimiAgentLib import CodeValidator
+
+        validator = CodeValidator.CodeValidator()
+
+        safe_code = "volume = slicer.util.loadVolume('test.nrrd')"
+        result = validator.validate(safe_code)
+        self.assertTrue(result["valid"], "Safe code should pass validation")
+
+        unsafe_code = "import os; os.system('rm -rf /')"
+        result = validator.validate(unsafe_code)
+        self.assertFalse(result["valid"], "Unsafe code should fail validation")
+
+        self.delayDisplay("Code validator test passed")
+
+    def test_SafeExecutor(self):
+        from SlicerKimiAgentLib import SafeExecutor
+
+        executor = SafeExecutor.SafeExecutor()
+
+        code = "result = 2 + 2"
+        result = executor.execute(code)
+        self.assertTrue(result["success"], "Simple code should execute successfully")
+
+        self.delayDisplay("Safe executor test passed")
+
+    def test_SkillContextManager(self):
+        from SlicerKimiAgentLib import SkillContextManager
+
+        manager = SkillContextManager.SkillContextManager()
+        context = manager.buildContext("load a volume")
+
+        self.assertIsNotNone(context, "Context should be built")
+        self.delayDisplay("Skill context manager test passed")

@@ -1,0 +1,11 @@
+# SlicerKimiAgent Python Dependencies
+# These packages will be installed in Slicer's Python environment
+
+# HTTP client for KIMI API
+httpx>=0.24.0
+
+# For embedding-based retrieval (optional, can use simple text search)
+numpy>=1.21.0
+
+# For JSON schema validation
+jsonschema>=4.0.0
