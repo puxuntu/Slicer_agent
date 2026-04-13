@@ -102,18 +102,12 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.testConnectionButton = self.ui.findChild(qt.QPushButton, "testConnectionButton")
         self.chatHistory = self.ui.findChild(qt.QTextEdit, "chatHistory")
         self.codeDisplay = self.ui.findChild(qt.QTextEdit, "codeDisplay")
-        self.executeButton = self.ui.findChild(qt.QPushButton, "executeButton")
-        self.copyButton = self.ui.findChild(qt.QPushButton, "copyButton")
+        # Note: executeButton and copyButton removed - code is auto-executed
         self.clearChatButton = self.ui.findChild(qt.QPushButton, "clearChatButton")
         self.promptInput = self.ui.findChild(qt.QTextEdit, "promptInput")
         self.sendButton = self.ui.findChild(qt.QPushButton, "sendButton")
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
-        # Online knowledge search widgets
-        self.onlineSearchCheckbox = self.ui.findChild(qt.QCheckBox, "onlineSearchCheckbox")
-        self.githubTokenInput = self.ui.findChild(qt.QLineEdit, "githubTokenInput")
-        self.testGitHubButton = self.ui.findChild(qt.QPushButton, "testGitHubButton")
-        self.saveOnlineSettingsButton = self.ui.findChild(qt.QPushButton, "saveOnlineSettingsButton")
 
     def setupUIProgrammatically(self):
         self.ui = ctk.ctkCollapsibleButton()
@@ -148,34 +142,6 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.saveSettingsButton = qt.QPushButton("Save Settings")
         settingsLayout.addRow(self.saveSettingsButton)
-        
-        # Online Knowledge Settings
-        onlineGroup = ctk.ctkCollapsibleGroupBox()
-        onlineGroup.title = "Online Knowledge Search (Optional)"
-        onlineGroup.collapsed = True
-        mainLayout.addWidget(onlineGroup)
-        
-        onlineLayout = qt.QFormLayout(onlineGroup)
-        
-        self.onlineSearchCheckbox = qt.QCheckBox("Enable online knowledge search")
-        self.onlineSearchCheckbox.setChecked(True)
-        self.onlineSearchCheckbox.setToolTip("Search Slicer GitHub repository for additional code examples (requires internet)")
-        onlineLayout.addRow("Online Search:", self.onlineSearchCheckbox)
-        
-        tokenLayout = qt.QHBoxLayout()
-        self.githubTokenInput = qt.QLineEdit()
-        self.githubTokenInput.setEchoMode(qt.QLineEdit.Password)
-        self.githubTokenInput.setPlaceholderText("Required for code search - get at github.com/settings/tokens")
-        self.githubTokenInput.setToolTip("GitHub personal access token (classic) with 'public_repo' scope")
-        tokenLayout.addWidget(self.githubTokenInput)
-        
-        self.testGitHubButton = qt.QPushButton("Test")
-        self.testGitHubButton.setToolTip("Test GitHub connection")
-        tokenLayout.addWidget(self.testGitHubButton)
-        onlineLayout.addRow("GitHub Token:", tokenLayout)
-        
-        self.saveOnlineSettingsButton = qt.QPushButton("Save Online Search Settings")
-        onlineLayout.addRow(self.saveOnlineSettingsButton)
 
         chatLabel = qt.QLabel("Conversation:")
         mainLayout.addWidget(chatLabel)
@@ -227,21 +193,16 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.sendButton.clicked.connect(self.onSendButtonClicked)
         if hasattr(self, 'promptInput') and self.promptInput is not None:
             self.promptInput.textChanged.connect(self.onPromptTextChanged)
-        if hasattr(self, 'executeButton') and self.executeButton is not None:
-            self.executeButton.clicked.connect(self.onExecuteButtonClicked)
-        if hasattr(self, 'copyButton') and self.copyButton is not None:
-            self.copyButton.clicked.connect(self.onCopyButtonClicked)
+            # Add Ctrl+Enter shortcut for sending
+            self.sendShortcut = qt.QShortcut(qt.QKeySequence("Ctrl+Return"), self.promptInput)
+            self.sendShortcut.connect('activated()', self.onSendButtonClicked)
+        # Note: Button connections removed - code is auto-executed
         if hasattr(self, 'clearChatButton') and self.clearChatButton is not None:
             self.clearChatButton.clicked.connect(self.onClearChatButtonClicked)
         if hasattr(self, 'saveSettingsButton') and self.saveSettingsButton is not None:
             self.saveSettingsButton.clicked.connect(self.onSaveSettings)
         if hasattr(self, 'testConnectionButton') and self.testConnectionButton is not None:
             self.testConnectionButton.clicked.connect(self.onTestConnection)
-        # Online knowledge search connections
-        if hasattr(self, 'testGitHubButton') and self.testGitHubButton is not None:
-            self.testGitHubButton.clicked.connect(self.onTestGitHubConnection)
-        if hasattr(self, 'saveOnlineSettingsButton') and self.saveOnlineSettingsButton is not None:
-            self.saveOnlineSettingsButton.clicked.connect(self.onSaveOnlineSettings)
 
     def disconnect(self):
         self.removeObservers()
@@ -250,10 +211,8 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.sendButton.clicked.disconnect()
             if hasattr(self, 'promptInput') and self.promptInput is not None:
                 self.promptInput.textChanged.disconnect()
-            if hasattr(self, 'executeButton') and self.executeButton is not None:
-                self.executeButton.clicked.disconnect()
-            if hasattr(self, 'copyButton') and self.copyButton is not None:
-                self.copyButton.clicked.disconnect()
+            if hasattr(self, 'sendShortcut') and self.sendShortcut is not None:
+                self.sendShortcut.disconnect()
             if hasattr(self, 'clearChatButton') and self.clearChatButton is not None:
                 self.clearChatButton.clicked.disconnect()
         except RuntimeError:
@@ -361,12 +320,12 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streaming = False
         self._finalizeStreamingEntry()
 
-        # Display generated code if any
+        # Display generated code if any and auto-execute
         if response.get("code"):
             self.currentCode = response["code"]
             self.codeDisplay.setPlainText(response["code"])
-            self.executeButton.setEnabled(True)
-            self.appendToChat("System", "Generated code is ready for execution. Review before running.")
+            # Auto-execute the generated code
+            self._autoExecuteCode()
 
         # Update token usage
         if response.get("tokens"):
@@ -446,8 +405,8 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if response.get("code"):
                 self.currentCode = response["code"]
                 self.codeDisplay.setPlainText(response["code"])
-                self.executeButton.setEnabled(True)
-                self.appendToChat("System", "Generated code is ready for execution. Review before running.")
+                # Auto-execute the generated code
+                self._autoExecuteCode()
 
             if response.get("tokens"):
                 tokens = response["tokens"]
@@ -461,51 +420,104 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.statusLabel.text = "Ready"
             self.sendButton.setEnabled(True)
 
-    def onExecuteButtonClicked(self):
+    def _autoExecuteCode(self, attempt=1, max_attempts=5):
+        """Auto-execute generated code with pre-validation and self-correction on failure."""
         if not hasattr(self, 'currentCode') or not self.currentCode:
             return
 
-        msgBox = qt.QMessageBox()
-        msgBox.setWindowTitle("Confirm Code Execution")
-        msgBox.setText("Are you sure you want to execute this code?")
-        msgBox.setInformativeText("This will run Python code in your Slicer environment. Only execute code you trust.")
-        msgBox.setStandardButtons(qt.QMessageBox.Yes | qt.QMessageBox.No)
-        msgBox.setDefaultButton(qt.QMessageBox.No)
-        msgBox.setIcon(qt.QMessageBox.Warning)
+        # Pre-validation: check for syntax errors and common issues
+        if self.logic and hasattr(self.logic, 'codeValidator'):
+            validation = self.logic.codeValidator.validate(self.currentCode)
+            if not validation['valid']:
+                # Syntax error detected before execution
+                error_msg = validation['reason']
+                self.appendToChat("System", 
+                    f"Pre-validation failed (attempt {attempt}/{max_attempts}).\n"
+                    f"Error: {error_msg}\n"
+                    f"Auto-correcting...")
+                self._selfCorrectCode(error_msg, attempt, max_attempts)
+                return
 
-        if msgBox.exec_() == qt.QMessageBox.Yes:
-            self.statusLabel.text = "Executing..."
-            self.executeButton.setEnabled(False)
-            slicer.app.processEvents()
-            
-            def onExecutionComplete(result):
+        self.statusLabel.text = f"Executing (attempt {attempt}/{max_attempts})..."
+        slicer.app.processEvents()
+        
+        def onExecutionComplete(result):
+            if result.get("timed_out", False):
                 self.statusLabel.text = "Ready"
-                self.executeButton.setEnabled(True)
-                
-                if result.get("timed_out", False):
-                    self.appendToChat("Warning", 
-                        f"Code execution timed out after {result.get('execution_time', 30):.1f}s.\n"
-                        f"Output: {result.get('output', 'No output')}")
-                elif result["success"]:
-                    output = result.get('output', 'No output')
-                    execution_time = result.get('execution_time', 0)
-                    msg = f"Code executed successfully in {execution_time:.2f}s."
-                    if output:
-                        msg += f"\nOutput: {output}"
-                    self.appendToChat("System", msg)
+                self.appendToChat("Warning", 
+                    f"Code execution timed out after {result.get('execution_time', 30):.1f}s.\n"
+                    f"Output: {result.get('output', 'No output')}")
+            elif result["success"]:
+                self.statusLabel.text = "Ready"
+                output = result.get('output', 'No output')
+                execution_time = result.get('execution_time', 0)
+                msg = f"Code executed successfully in {execution_time:.2f}s."
+                if output:
+                    msg += f"\nOutput: {output}"
+                self.appendToChat("System", msg)
+            else:
+                # Execution failed - try self-correction
+                error_msg = result.get('error', 'Unknown error')
+                if attempt < max_attempts:
+                    self.appendToChat("System", 
+                        f"Execution failed (attempt {attempt}/{max_attempts}).\n"
+                        f"Error: {error_msg[:200]}\n"
+                        f"Auto-correcting...")
+                    self._selfCorrectCode(error_msg, attempt, max_attempts)
                 else:
-                    error_msg = result.get('error', 'Unknown error')
-                    self.appendToChat("Error", f"Execution failed:\n{error_msg}")
-            
-            # Execute asynchronously using QTimer (main thread, non-blocking)
-            self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
+                    self.statusLabel.text = "Ready"
+                    self.appendToChat("Error", 
+                        f"Execution failed after {max_attempts} attempts.\n"
+                        f"Final error: {error_msg}")
+        
+        # Execute asynchronously
+        self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
+    
+    def _selfCorrectCode(self, error_msg, attempt, max_attempts):
+        """Generate corrected code based on error feedback."""
+        if not self.currentCode:
+            return
+        
+        # Build correction prompt
+        correction_prompt = f"""The previous code failed with this error:
+```
+{error_msg}
+```
 
-    def onCopyButtonClicked(self):
-        if hasattr(self, 'currentCode') and self.currentCode:
-            clipboard = qt.QApplication.clipboard()
-            clipboard.setText(self.currentCode)
-            self.statusLabel.text = "Code copied to clipboard"
-            qt.QTimer.singleShot(2000, lambda: setattr(self.statusLabel, 'text', 'Ready'))
+Previous code:
+```python
+{self.currentCode}
+```
+
+Please fix the error and provide the corrected code. 
+Analyze the error carefully and make minimal changes to fix it.
+Only output the complete corrected Python code in a single code block."""
+
+        self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
+        
+        # Generate corrected code in background
+        def generateCorrection():
+            try:
+                context = self.logic._buildContext(correction_prompt) if self.logic else None
+                response = self.logic.generateResponse(correction_prompt, context=context)
+                
+                if response.get("code"):
+                    self.currentCode = response["code"]
+                    self.codeDisplay.setPlainText(response["code"])
+                    # Recursively execute with incremented attempt counter
+                    self._autoExecuteCode(attempt + 1, max_attempts)
+                else:
+                    self.appendToChat("Error", "No corrected code generated.")
+                    self.statusLabel.text = "Ready"
+            except Exception as e:
+                self.appendToChat("Error", f"Self-correction failed: {str(e)}")
+                self.statusLabel.text = "Ready"
+        
+        # Run correction in background thread
+        import threading
+        threading.Thread(target=generateCorrection, daemon=True).start()
+
+    # Note: onCopyButtonClicked removed - copy functionality not needed with auto-execution
 
     def onClearChatButtonClicked(self):
         self.chatHistory.clear()
@@ -514,7 +526,6 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.logic.clearConversation()
         self.codeDisplay.clear()
         self.currentCode = None
-        self.executeButton.setEnabled(False)
 
     def appendToChat(self, sender, message):
         if not hasattr(self, 'chatHistory') or self.chatHistory is None:
@@ -562,25 +573,12 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             settings.setValue("model", self.modelSelector.currentText)
         
-        # Save online knowledge settings
-        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
-            settings.setValue("onlineSearchEnabled", self.onlineSearchCheckbox.isChecked())
-        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
-            settings.setValue("githubToken", self.githubTokenInput.text)
-        
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(self.apiKeyInput.text)
             if hasattr(self, 'modelSelector') and self.modelSelector is not None:
                 self.logic.setModel(self.modelSelector.currentText)
-            # Update online knowledge settings
-            if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
-                self.logic.setOnlineEnabled(self.onlineSearchCheckbox.isChecked())
-            if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
-                token = self.githubTokenInput.text.strip()
-                if token:
-                    self.logic.setGitHubToken(token)
 
         slicer.util.infoDisplay("Settings saved successfully!")
 
@@ -623,107 +621,23 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.logic.setApiKey(originalKey)
             self.logic.setModel(originalModel)
 
-    def onTestGitHubConnection(self):
-        """Test GitHub connection and token validity."""
-        if not self.logic or not self.logic.skillManager:
-            slicer.util.warningDisplay("Skill manager not initialized")
-            return
-        
-        token = self.githubTokenInput.text.strip() if hasattr(self, 'githubTokenInput') else ""
-        
-        self.statusLabel.text = "Testing GitHub connection..."
-        slicer.app.processEvents()
-        
-        try:
-            from SlicerKimiAgentLib import OnlineKnowledgeClient
-            
-            # Create a temporary client with current token
-            temp_client = OnlineKnowledgeClient(github_token=token if token else None, enabled=True)
-            status = temp_client.get_status()
-            
-            # Test actual connectivity
-            _, error = temp_client.github.get_file_content("Slicer", "Slicer", "README.md", "main")
-            
-            if error and "HTTP error 404" not in str(error):  # 404 is OK, just means file not found
-                slicer.util.warningDisplay(f"GitHub connection failed:\n{error}")
-                return
-            
-            # Build status message
-            messages = []
-            messages.append("GitHub Connection: OK")
-            
-            if status.get("has_code_search"):
-                messages.append("Code Search: Available (with token)")
-                rate_limit = status.get("rate_limit", {})
-                remaining = rate_limit.get("remaining", "unknown")
-                limit = rate_limit.get("limit", "unknown")
-                messages.append(f"Rate Limit: {remaining}/{limit} requests remaining")
-            else:
-                messages.append("Code Search: Not available (no token)")
-                messages.append("Limited Mode: Can fetch official docs only")
-                messages.append("")
-                messages.append("To enable full code search:")
-                messages.append("1. Get a token at github.com/settings/tokens")
-                messages.append("2. Select 'public_repo' scope")
-                messages.append("3. Enter token above and Save")
-            
-            slicer.util.infoDisplay("\n".join(messages))
-            
-        except Exception as e:
-            slicer.util.warningDisplay(f"GitHub test failed:\n{str(e)}")
-        finally:
-            self.statusLabel.text = "Ready"
-    
-    def onSaveOnlineSettings(self):
-        """Save online knowledge search settings."""
-        settings = qt.QSettings()
-        settings.beginGroup("SlicerKimiAgent")
-        
-        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
-            settings.setValue("onlineSearchEnabled", self.onlineSearchCheckbox.isChecked())
-        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
-            settings.setValue("githubToken", self.githubTokenInput.text)
-        
-        settings.endGroup()
-        
-        # Apply to logic
-        if self.logic:
-            if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
-                self.logic.setOnlineEnabled(self.onlineSearchCheckbox.isChecked())
-            if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
-                token = self.githubTokenInput.text.strip()
-                if token:
-                    self.logic.setGitHubToken(token)
-        
-        slicer.util.infoDisplay("Online search settings saved!")
-
     def loadSettings(self):
         settings = qt.QSettings()
         settings.beginGroup("SlicerKimiAgent")
 
         apiKey = settings.value("apiKey", "")
         model = settings.value("model", "kimi-k2.5")
-        onlineSearchEnabled = settings.value("onlineSearchEnabled", True)
-        githubToken = settings.value("githubToken", "")
 
         if hasattr(self, 'apiKeyInput') and self.apiKeyInput is not None:
             self.apiKeyInput.text = apiKey
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             self.modelSelector.setCurrentText(model)
-        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
-            self.onlineSearchCheckbox.setChecked(onlineSearchEnabled in [True, "true", "True", 1, "1"])
-        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
-            self.githubTokenInput.text = githubToken
 
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(apiKey)
             self.logic.setModel(model)
-            # Load online knowledge settings
-            self.logic.setOnlineEnabled(onlineSearchEnabled in [True, "true", "True", 1, "1"])
-            if githubToken:
-                self.logic.setGitHubToken(githubToken)
 
 #------------------------------------------------------------------
 # Logic Class
@@ -748,12 +662,15 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
 
     def _initializeComponents(self):
         try:
-            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
+            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore, SkillTools
 
             self.conversationStore = ConversationStore()
             self.kimiClient = KimiClient()
-            # Initialize skill manager with online search enabled by default
-            self.skillManager = SkillContextManager(enable_online=True)
+            # Initialize skill manager
+            self.skillManager = SkillContextManager()
+            # Initialize tool executor for skill searching
+            self.toolExecutor = SkillTools.SkillToolExecutor(self.skillManager.SKILL_PATH)
+            self.skillTools = SkillTools.get_skill_tools()
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
 
@@ -762,18 +679,6 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
             logger.error(f"Failed to initialize components: {e}")
             import traceback
             traceback.print_exc()
-    
-    def setOnlineEnabled(self, enabled: bool):
-        """Enable or disable online knowledge search."""
-        if self.skillManager:
-            self.skillManager.set_online_enabled(enabled)
-            logger.info(f"Online knowledge search: {enabled}")
-    
-    def setGitHubToken(self, token: str):
-        """Set GitHub API token for online search."""
-        if self.skillManager:
-            self.skillManager.set_github_token(token)
-            logger.info("GitHub token updated")
 
     def setApiKey(self, apiKey):
         self.apiKey = apiKey
@@ -808,9 +713,9 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         self.conversationStore.addExchange(prompt, response)
         return response
 
-    def generateResponseStream(self, prompt, context=None, on_delta=None):
+    def generateResponseStream(self, prompt, context=None, on_delta=None, use_tools=True):
         """
-        Generate AI response using streaming.
+        Generate AI response using streaming with optional tool calling.
 
         This runs the actual HTTP request (blocking I/O).  Callers should
         invoke this from a background thread.
@@ -819,6 +724,7 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
             prompt: User's natural language request
             context: Pre-built skill context (or None to build here)
             on_delta: Callback for incremental updates
+            use_tools: Whether to use tool calling for skill search
 
         Returns:
             dict with keys: message, reasoning_content, code, tokens, cost
@@ -831,9 +737,71 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         if context is None:
             context = self._buildContext(prompt)
 
-        response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+        if use_tools and self.toolExecutor and self.skillTools:
+            # Use tool calling for skill search
+            try:
+                # Progress callback to show tool execution in real-time
+                def _on_progress(progress):
+                    if on_delta:
+                        on_delta(progress)
+                
+                response = self.kimiClient.chatWithTools(
+                    prompt,
+                    tools=self.skillTools,
+                    tool_executor=self._executeTool,
+                    context=context,
+                    on_progress=_on_progress,
+                )
+                
+                # Show final thinking content and message
+                if on_delta and response:
+                    # Stream final thinking content (reasoning from AI)
+                    if response.get('reasoning_content'):
+                        on_delta({'reasoning_content': '\n[Thinking]\n', 'content': ''})
+                        for line in response['reasoning_content'].split('\n'):
+                            on_delta({'reasoning_content': line + '\n', 'content': ''})
+                    
+                    # Then stream the main content
+                    if response.get('message'):
+                        message = response['message']
+                        chunk_size = 10
+                        for i in range(0, len(message), chunk_size):
+                            chunk = message[i:i+chunk_size]
+                            on_delta({'content': chunk, 'reasoning_content': ''})
+                            import time
+                            time.sleep(0.01)
+            except Exception as e:
+                logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
+                response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+        else:
+            # Fallback to regular streaming
+            response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+        
         self.conversationStore.addExchange(prompt, response)
         return response
+    
+    def _executeTool(self, tool_name, tool_args):
+        """
+        Execute a tool call.
+        
+        Args:
+            tool_name: Name of the tool (Grep, ReadFile, Glob)
+            tool_args: Tool arguments dict
+            
+        Returns:
+            Tool execution result dict
+        """
+        if not self.toolExecutor:
+            return {"error": "Tool executor not initialized"}
+        
+        try:
+            result = self.toolExecutor.execute(tool_name, tool_args)
+            # Log tool execution for debugging
+            logger.info(f"Tool {tool_name} executed: {tool_args.get('pattern', tool_args.get('path', 'N/A'))}")
+            return result
+        except Exception as e:
+            logger.error(f"Tool execution failed: {tool_name} - {e}")
+            return {"error": str(e)}
 
     def _buildContext(self, prompt):
         if not self.skillManager:

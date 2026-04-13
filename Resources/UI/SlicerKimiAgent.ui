@@ -116,80 +116,43 @@
     </widget>
    </item>
    
-   <!-- Online Knowledge Search Group -->
+   <!-- Conversation History (Collapsible) -->
    <item>
-    <widget class="ctkCollapsibleGroupBox" name="onlineSearchGroupBox">
+    <widget class="ctkCollapsibleGroupBox" name="chatHistoryGroupBox">
      <property name="title">
-      <string>Online Knowledge Search (Optional)</string>
+      <string>Conversation History</string>
      </property>
      <property name="collapsed">
       <bool>true</bool>
      </property>
-     <property name="toolTip">
-      <string>Search Slicer GitHub repository for additional code examples (requires internet)</string>
-     </property>
-     <layout class="QFormLayout" name="onlineSearchFormLayout">
-      <item row="0" column="0">
-       <widget class="QLabel" name="onlineSearchLabel">
-        <property name="text">
-         <string>Online Search:</string>
+     <layout class="QVBoxLayout" name="chatHistoryLayout">
+      <item>
+       <widget class="QTextEdit" name="chatHistory">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>200</height>
+         </size>
         </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QCheckBox" name="onlineSearchCheckbox">
-        <property name="text">
-         <string>Enable online knowledge search</string>
-        </property>
-        <property name="checked">
+        <property name="readOnly">
          <bool>true</bool>
         </property>
-        <property name="toolTip">
-         <string>Search Slicer GitHub repository for additional code examples. Requires GitHub token for code search.</string>
+        <property name="styleSheet">
+         <string notr="true">QTextEdit {
+    background-color: #f5f5f5;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+}</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="githubTokenLabel">
+      <item>
+       <widget class="QPushButton" name="clearChatButton">
         <property name="text">
-         <string>GitHub Token:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="githubTokenLayout">
-        <item>
-         <widget class="QLineEdit" name="githubTokenInput">
-          <property name="echoMode">
-           <enum>QLineEdit::Password</enum>
-          </property>
-          <property name="placeholderText">
-           <string>Required for code search - get at github.com/settings/tokens</string>
-          </property>
-          <property name="toolTip">
-           <string>GitHub personal access token (classic) with 'public_repo' scope. Code search requires authentication.</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="testGitHubButton">
-          <property name="text">
-           <string>Test</string>
-          </property>
-          <property name="toolTip">
-           <string>Test GitHub connection and token validity</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0" colspan="2">
-       <widget class="QPushButton" name="saveOnlineSettingsButton">
-        <property name="text">
-         <string>Save Online Search Settings</string>
+         <string>Clear Chat</string>
         </property>
         <property name="toolTip">
-         <string>Save online knowledge search settings</string>
+         <string>Clear conversation history</string>
         </property>
        </widget>
       </item>
@@ -197,60 +160,29 @@
     </widget>
    </item>
    
-   <!-- Chat History Label -->
+   <!-- Generated Code (Collapsible) -->
    <item>
-    <widget class="QLabel" name="chatLabel">
-     <property name="text">
-      <string>Conversation:</string>
+    <widget class="ctkCollapsibleGroupBox" name="codeDisplayGroupBox">
+     <property name="title">
+      <string>Generated Code (Auto-executed)</string>
      </property>
-    </widget>
-   </item>
-   
-   <!-- Chat History Display -->
-   <item>
-    <widget class="QTextEdit" name="chatHistory">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>300</height>
-      </size>
-     </property>
-     <property name="readOnly">
+     <property name="collapsed">
       <bool>true</bool>
      </property>
-     <property name="styleSheet">
-      <string notr="true">QTextEdit {
-    background-color: #f5f5f5;
-    border: 1px solid #cccccc;
-    border-radius: 4px;
-}</string>
-     </property>
-    </widget>
-   </item>
-   
-   <!-- Generated Code Label -->
-   <item>
-    <widget class="QLabel" name="codeLabel">
-     <property name="text">
-      <string>Generated Code:</string>
-     </property>
-    </widget>
-   </item>
-   
-   <!-- Code Display -->
-   <item>
-    <widget class="QTextEdit" name="codeDisplay">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>150</height>
-      </size>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QTextEdit {
+     <layout class="QVBoxLayout" name="codeDisplayLayout">
+      <item>
+       <widget class="QTextEdit" name="codeDisplay">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>100</height>
+         </size>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QTextEdit {
     background-color: #1e1e1e;
     color: #d4d4d4;
     font-family: Consolas, Monaco, monospace;
@@ -258,69 +190,11 @@
     border: 1px solid #333333;
     border-radius: 4px;
 }</string>
-     </property>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
-   </item>
-   
-   <!-- Code Action Buttons -->
-   <item>
-    <layout class="QHBoxLayout" name="codeButtonLayout">
-     <item>
-      <widget class="QPushButton" name="executeButton">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string>Execute Code</string>
-       </property>
-       <property name="toolTip">
-        <string>Execute the generated Python code</string>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QPushButton {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 5px 15px;
-    border-radius: 4px;
-}
-QPushButton:hover {
-    background-color: #45a049;
-}
-QPushButton:disabled {
-    background-color: #cccccc;
-}</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="copyButton">
-       <property name="text">
-        <string>Copy to Clipboard</string>
-       </property>
-       <property name="toolTip">
-        <string>Copy the generated code to clipboard</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="codeButtonSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="clearChatButton">
-       <property name="text">
-        <string>Clear Chat</string>
-       </property>
-       <property name="toolTip">
-        <string>Clear conversation history</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
    </item>
    
    <!-- Input Area -->
@@ -331,11 +205,17 @@ QPushButton:disabled {
        <property name="maximumSize">
         <size>
          <width>16777215</width>
-         <height>80</height>
+         <height>120</height>
+        </size>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>100</height>
         </size>
        </property>
        <property name="placeholderText">
-        <string>Type your request here... (e.g., 'Load a sample volume and create a volume rendering')</string>
+        <string>Type your request here and press Enter... (e.g., 'Load a sample volume and create a volume rendering')</string>
        </property>
       </widget>
      </item>
@@ -392,6 +272,21 @@ QPushButton:disabled {
       <string notr="true">color: #999999; font-size: 10px;</string>
      </property>
     </widget>
+   </item>
+   
+   <!-- Spacer at the very bottom -->
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
    </item>
    
   </layout>

@@ -1,7 +1,7 @@
 """
 KimiClient - HTTP client for KIMI API communication.
 
-Supports streaming responses, conversation history, and token tracking.
+Supports streaming responses, conversation history, token tracking, and tool calling.
 System prompt is loaded from external markdown file.
 """
 
@@ -12,7 +12,7 @@ import re
 import socket
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class KimiClient:
     DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
     DEFAULT_MODEL = "kimi-k2.5"
     DEFAULT_TIMEOUT = None  # No client-side timeout for API requests
-    MAX_RETRIES = 3  # Retry up to 3 times for transient errors
+    MAX_RETRIES = 5  # Retry up to 5 times for transient errors
     LEGACY_MODEL_ALIASES = {
         "kimi-latest": DEFAULT_MODEL,
         "kimi-k2-16k": DEFAULT_MODEL,
@@ -137,13 +137,13 @@ class KimiClient:
         system_content = self._buildSystemPrompt(context)
         messages.append({"role": "system", "content": system_content})
 
-        history_to_include = self.conversation_history[-20:]
+        history_to_include = self.conversation_history[-50:]  # Keep last 50 messages for context
         messages.extend(history_to_include)
 
         messages.append({"role": "user", "content": prompt})
         return messages
 
-    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False) -> Dict[str, Any]:
+    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Build the API payload for chat completion requests."""
         payload: Dict[str, Any] = {
             "model": self.model,
@@ -153,6 +153,8 @@ class KimiClient:
             payload["stream"] = True
         if self._supportsThinking():
             payload["thinking"] = {"type": "enabled"}
+        if tools:
+            payload["tools"] = tools
         return payload
 
     def _loadSystemPromptTemplate(self) -> str:
@@ -207,7 +209,7 @@ Output format:
         Loads base prompt from external file and appends dynamic context.
 
         Args:
-            context: Skill-based context with relevant examples from script repository
+            context: Skill-based context with API hints, scene information, and tool availability
 
         Returns:
             System prompt string
@@ -217,24 +219,28 @@ Output format:
         
         # Add dynamic context from SkillContextManager
         if context:
-            # Add formatted context from the new SkillContextManager
-            if context.get('file_descriptions'):
-                base_prompt += "\n\n## RELEVANT TOPICS FOR THIS QUERY:\n"
-                for filename, description in context['file_descriptions'].items():
-                    base_prompt += f"- {filename.replace('.md', '')}: {description}\n"
+            # Add skill location for reference
+            if context.get('skill_path'):
+                base_prompt += f"\n\n## SKILL LOCATION\n"
+                base_prompt += f"Base path: {context['skill_path']}\n"
+                base_prompt += f"Key locations:\n"
+                base_prompt += f"  - Script repository: slicer-source/Docs/developer_guide/script_repository/\n"
+                base_prompt += f"  - Slicer util: slicer-source/Base/Python/slicer/util.py\n"
+                base_prompt += f"  - Volume rendering: slicer-source/Modules/Loadable/VolumeRendering/\n"
+                base_prompt += f"  - Segmentations: slicer-source/Modules/Loadable/Segmentations/\n"
             
-            if context.get('examples'):
-                base_prompt += "\n\n## RELEVANT CODE EXAMPLES FROM SLICER SCRIPT REPOSITORY:\n"
-                for i, example in enumerate(context['examples'][:3], 1):
-                    source = example.get('source', 'unknown')
-                    code = example.get('code', '')
-                    base_prompt += f"\n### Example {i} (from {source}):\n```python\n{code}\n```\n"
+            # Add API guidance hints
+            if context.get('api_hints'):
+                base_prompt += "\n## API GUIDANCE\n"
+                for hint in context['api_hints']:
+                    base_prompt += f"- {hint}\n"
 
+            # Add scene context
             if context.get('scene'):
                 scene = context['scene']
-                base_prompt += "\n## CURRENT SLICER SCENE STATE:\n"
+                base_prompt += "\n## CURRENT SLICER SCENE:\n"
                 if scene.get('node_counts'):
-                    base_prompt += "Node counts:\n"
+                    base_prompt += "Nodes in scene:\n"
                     for node_type, count in scene['node_counts'].items():
                         base_prompt += f"  - {node_type}: {count}\n"
                 if scene.get('sample_node_names'):
@@ -567,6 +573,160 @@ Output format:
                 time.sleep(2 ** attempt)
 
         raise RuntimeError(f"Failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
+
+    def chatWithTools(
+        self,
+        prompt: str,
+        tools: List[Dict],
+        tool_executor: Callable[[str, Dict], Dict],
+        context: Optional[Dict] = None,
+        max_tool_rounds: int = 20,
+        on_progress: Optional[Callable[[Dict], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Send a chat request with tool calling support.
+        
+        This method handles the multi-turn conversation for tool use:
+        1. Send prompt with tools registered
+        2. If AI requests tool calls, execute them
+        3. Return tool results to AI
+        4. Get final response with generated code
+        
+        Args:
+            prompt: User's input prompt
+            tools: List of tool definitions for the AI
+            tool_executor: Function that executes tool calls (name, args) -> result
+            context: Optional skill-based context
+            max_tool_rounds: Maximum number of tool call rounds
+            on_progress: Callback for progress updates (reasoning_content, content, round_info)
+            
+        Returns:
+            Dictionary with final response, code, tokens, cost, and tool call history
+        """
+        if not self.api_key:
+            raise RuntimeError("API key not configured")
+        
+        messages = self._buildMessages(prompt, context)
+        url = f"{self.base_url}/chat/completions"
+        tool_calls_history = []
+        
+        for round_num in range(max_tool_rounds):
+            logger.info(f"Tool calling round {round_num + 1}")
+            payload = self._buildPayload(messages, stream=False, tools=tools)
+            
+            # Log payload for debugging (truncate for readability)
+            logger.debug(f"Payload messages count: {len(messages)}")
+            
+            try:
+                request = self._buildRequest(url, payload)
+                with self._openRequest(request) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                
+                assistant_message = data['choices'][0]['message']
+                content = self._coerceText(assistant_message.get('content', ''))
+                reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
+                
+                # Check if there are tool calls
+                tool_calls = assistant_message.get('tool_calls')
+                
+                if not tool_calls:
+                    # No tool calls, we have the final response
+                    self._appendConversation(prompt, content, reasoning_content)
+                    response = self._buildResponse(
+                        content,
+                        reasoning_content,
+                        data.get('usage', {}),
+                        data,
+                    )
+                    response['tool_calls_history'] = tool_calls_history
+                    return response
+                
+                # Execute tool calls
+                tool_results = []
+                for tool_call in tool_calls:
+                    tool_id = tool_call.get('id')
+                    function = tool_call.get('function', {})
+                    tool_name = function.get('name')
+                    tool_args_str = function.get('arguments', '{}')
+                    
+                    try:
+                        tool_args = json.loads(tool_args_str)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                    
+                    # Execute the tool
+                    logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                    try:
+                        result = tool_executor(tool_name, tool_args)
+                        # Tool message format: role, tool_call_id, content
+                        tool_results.append({
+                            "role": "tool",
+                            "tool_call_id": tool_id,
+                            "content": json.dumps(result, ensure_ascii=False, default=str),
+                        })
+                        tool_calls_history.append({
+                            "tool": tool_name,
+                            "args": tool_args,
+                            "result": result,
+                        })
+                    except Exception as e:
+                        tool_results.append({
+                            "role": "tool",
+                            "tool_call_id": tool_id,
+                            "content": json.dumps({"error": str(e)}, ensure_ascii=False),
+                        })
+                
+                # Add assistant message with tool_calls to conversation
+                # Must include content (can be empty string), tool_calls, and reasoning_content for k2 models
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": content if content else "",
+                    "tool_calls": tool_calls,
+                }
+                # Add reasoning_content if present (required for thinking-enabled models)
+                if reasoning_content:
+                    assistant_msg["reasoning_content"] = reasoning_content
+                messages.append(assistant_msg)
+                # Add tool results
+                messages.extend(tool_results)
+                # Add reminder for AI to provide final answer (not another tool call)
+                messages.append({
+                    "role": "system",
+                    "content": "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
+                })
+                
+                # Report progress (simplified format)
+                if on_progress:
+                    tool_names = [tc['tool'] for tc in tool_calls_history[-len(tool_results):]]
+                    progress_msg = f"🔍 Tools: {', '.join(tool_names)}\n"
+                    on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1})
+                
+                logger.info(f"Round {round_num + 1} complete. Added {len(tool_results)} tool results. Proceeding to next round.")
+                
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode('utf-8', errors='ignore')
+                logger.error(f"HTTP Error {e.code} in chatWithTools round {round_num + 1}: {error_body}")
+                # Log messages for debugging
+                try:
+                    debug_msgs = json.dumps(messages, indent=2, default=str, ensure_ascii=False)[:3000]
+                    logger.debug(f"Messages sent: {debug_msgs}")
+                except:
+                    pass
+                raise RuntimeError(f"API Error {e.code}: {error_body}")
+            except Exception as e:
+                logger.error(f"Error in chatWithTools round {round_num + 1}: {e}")
+                raise
+        
+        # Max rounds reached, return last response
+        logger.warning(f"Max tool rounds ({max_tool_rounds}) reached")
+        response = self._buildResponse(
+            content,
+            reasoning_content,
+            data.get('usage', {}),
+            data,
+        )
+        response['tool_calls_history'] = tool_calls_history
+        return response
 
     def _extractCode(self, message: str) -> Optional[str]:
         """

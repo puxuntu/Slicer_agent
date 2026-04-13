@@ -1,429 +1,340 @@
 """
 SkillContextManager - Manages skill-based context for LLM prompts.
 
-Hybrid retrieval system combining:
-1. Local script repository (fast, reliable, works offline)
-2. Online knowledge base (GitHub code search, up-to-date)
+Integrates with the external slicer-skill-full knowledge base located at:
+    C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full
 
-Reads code examples from the bundled Slicer script repository and 
-supplements with online search when enabled.
+The AI agent uses tools (Grep, Glob, ReadFile) to search the skill directly.
+This manager provides:
+1. Skill mode detection (full/lightweight/web)
+2. API guidance hints based on prompt keywords
+3. Current Slicer MRML scene context
 """
 
 import json
 import logging
 import os
-import re
-from typing import Dict, List, Optional, Set, Tuple
-from pathlib import Path
+from typing import Dict, List, Optional
 
 import slicer
-
-# Import online knowledge client (optional dependency)
-try:
-    from .OnlineKnowledgeClient import OnlineKnowledgeClient
-    ONLINE_AVAILABLE = True
-except ImportError:
-    ONLINE_AVAILABLE = False
-    OnlineKnowledgeClient = None
 
 logger = logging.getLogger(__name__)
 
 
 class SkillContextManager:
     """
-    Manages context from local script repository and online sources.
+    Manages context for the Slicer skill-based knowledge system.
     
     Features:
-    - Reads from bundled script repository markdown files (local)
-    - Online code search from Slicer GitHub repositories (optional)
-    - Keyword-based topic matching covering 15 major Slicer topics
-    - Scene-aware context enrichment
-    - Smart result merging and deduplication
+    - Detects skill mode from .setup-stamp.json
+    - Provides API guidance hints for the AI
+    - Provides current MRML scene context
     """
     
-    # Path to bundled script repository
-    SCRIPT_REPO_PATH = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'Resources', 'Skills', 'script_repository'
-    )
+    # Path to the external skill directory
+    SKILL_PATH = "C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full"
     
-    # Topic to file mapping
-    TOPIC_FILE_MAPPING = {
-        "volume": "volumes.md",
-        "volumes": "volumes.md",
-        "image": "volumes.md",
-        "nrrd": "volumes.md",
-        "nifti": "volumes.md",
-        "dicom": "volumes.md",
-        "load": "volumes.md",
-        "save": "volumes.md",
-        "export": "volumes.md",
-        "voxel": "volumes.md",
-        "slice": "volumes.md",
-        "rendering": "volumes.md",
-        "volume rendering": "volumes.md",
-        "mip": "volumes.md",
-        "window": "volumes.md",
-        "level": "volumes.md",
-        "colormap": "volumes.md",
-        "dti": "volumes.md",
-        "tensor": "volumes.md",
-        "simpleitk": "volumes.md",
-        "sitk": "volumes.md",
-        "slab": "volumes.md",
-        "clone": "volumes.md",
-        "numpy": "volumes.md",
-        "array": "volumes.md",
-        "modify": "volumes.md",
+    # API guidance hints based on keywords
+    # These tell the AI which Slicer APIs to use - NOT search commands
+    TOPIC_SEARCH_HINTS = {
+        # Volumes
+        "volume": [
+            "Use SampleData.SampleDataLogic().downloadMRHead() for example volumes",
+            "Or use slicer.util.loadVolume(filepath) for loading from file"
+        ],
+        "volumes": [
+            "Use slicer.util.loadVolume() to load volumes",
+            "Use slicer.util.arrayFromVolume() for numpy access - call arrayFromVolumeModified() after changes"
+        ],
+        "image": [
+            "Use slicer.util.loadVolume() for image volumes"
+        ],
+        "nrrd": [
+            "Use slicer.util.loadVolume('path.nrrd') for NRRD files"
+        ],
+        "nifti": [
+            "Use slicer.util.loadVolume('path.nii.gz') for NIfTI files"
+        ],
+        "load": [
+            "Use slicer.util.loadVolume(), loadModel(), loadSegmentation(), loadTransform()",
+            "Or use SampleData.SampleDataLogic().downloadMRHead() for examples"
+        ],
+        "save": [
+            "Use slicer.util.saveNode(node) or slicer.util.exportNode(node, filepath)"
+        ],
+        "export": [
+            "Use slicer.util.exportNode(node, filepath) to export to new file"
+        ],
+        "rendering": [
+            "Use slicer.modules.volumerendering.logic() for volume rendering"
+        ],
+        "volume rendering": [
+            "Create vtkMRMLVolumeRenderingDisplayNode, set volume and property"
+        ],
+        "numpy": [
+            "Use slicer.util.arrayFromVolume() to get numpy array view (KJI order)",
+            "IMPORTANT: Call slicer.util.arrayFromVolumeModified(volumeNode) after modifying"
+        ],
+        "array": [
+            "Volume arrays are in KJI order (slice, row, column)",
+            "Always call slicer.util.arrayFromVolumeModified() after modifying arrays"
+        ],
         
-        "segmentation": "segmentations.md",
-        "segmentations": "segmentations.md",
-        "segment": "segmentations.md",
-        "segments": "segmentations.md",
-        "labelmap": "segmentations.md",
-        "label": "segmentations.md",
-        "mask": "segmentations.md",
-        "contour": "segmentations.md",
-        "3d": "segmentations.md",
-        "surface": "segmentations.md",
-        "editor": "segmentations.md",
-        "segment editor": "segmentations.md",
-        "effect": "segmentations.md",
-        "threshold": "segmentations.md",
-        "paint": "segmentations.md",
-        "draw": "segmentations.md",
-        "scissors": "segmentations.md",
-        "level tracing": "segmentations.md",
-        "grow from seeds": "segmentations.md",
-        "statistics": "segmentations.md",
-        "centroid": "segmentations.md",
-        "bounding box": "segmentations.md",
-        "obb": "segmentations.md",
-        "hollow": "segmentations.md",
-        "slicerio": "segmentations.md",
+        # Segmentations
+        "segmentation": [
+            "Create vtkMRMLSegmentationNode, use segmentations.logic() for import/export",
+            "Use slicer.modules.segmenteditor.widgetRepresentation() for editor effects"
+        ],
+        "segmentations": [
+            "Use slicer.modules.segmentations.logic() for segmentation operations",
+            "Create vtkMRMLSegmentationNode for new segmentations"
+        ],
+        "segment": [
+            "Use segmentation.AddSegmentFromClosedSurfaceRepresentation() or similar"
+        ],
+        "labelmap": [
+            "Use slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode()"
+        ],
+        "mask": [
+            "Use segmentation operations or numpy array masking on volume arrays"
+        ],
+        "editor": [
+            "Use slicer.modules.segmenteditor.widgetRepresentation().self().editor"
+        ],
+        "segment editor": [
+            "Access editor via slicer.modules.segmenteditor.widgetRepresentation()",
+            "Use editor.setActiveEffectByName() to select effects"
+        ],
+        "effect": [
+            "Use segment editor effects via setActiveEffectByName()",
+            "Effects: Threshold, Paint, Draw, LevelTracing, GrowFromSeeds, etc."
+        ],
+        "threshold": [
+            "Use Threshold effect in Segment Editor: setActiveEffectByName('Threshold')"
+        ],
         
-        "markups": "markups.md",
-        "markup": "markups.md",
-        "fiducial": "markups.md",
-        "fiducials": "markups.md",
-        "point list": "markups.md",
-        "control point": "markups.md",
-        "control points": "markups.md",
-        "curve": "markups.md",
-        "curves": "markups.md",
-        "line": "markups.md",
-        "lines": "markups.md",
-        "plane": "markups.md",
-        "planes": "markups.md",
-        "roi": "markups.md",
-        "region of interest": "markups.md",
-        "placement": "markups.md",
-        "angle": "markups.md",
-        "distance": "markups.md",
-        "measurement": "markups.md",
-        "measure": "markups.md",
-        "json": "markups.md",
-        "fcsv": "markups.md",
-        "csv": "markups.md",
+        # Markups
+        "markups": [
+            "Use slicer.mrmlScene.AddNewNodeByClass('vtkMRMLMarkupsFiducialNode', 'Name')",
+            "Or use slicer.util.loadMarkups() for loading from file"
+        ],
+        "fiducial": [
+            "Create vtkMRMLMarkupsFiducialNode, use AddControlPoint([x,y,z], 'name')"
+        ],
+        "point list": [
+            "Use vtkMRMLMarkupsFiducialNode for point lists",
+            "Use GetNumberOfControlPoints() and GetNthControlPointPosition()"
+        ],
+        "control point": [
+            "Use AddControlPoint(), SetNthControlPointPosition(), RemoveNthControlPoint()"
+        ],
+        "curve": [
+            "Create vtkMRMLMarkupsCurveNode for curves"
+        ],
+        "plane": [
+            "Create vtkMRMLMarkupsPlaneNode for planes"
+        ],
+        "roi": [
+            "Create vtkMRMLMarkupsROINode for ROI"
+        ],
         
-        "model": "models.md",
-        "models": "models.md",
-        "mesh": "models.md",
-        "polydata": "models.md",
-        "stl": "models.md",
-        "obj": "models.md",
-        "gltf": "models.md",
-        "vrml": "models.md",
-        "ply": "models.md",
-        "vertex": "models.md",
-        "vertices": "models.md",
-        "triangle": "models.md",
-        "cell": "models.md",
-        "cells": "models.md",
-        "texture": "models.md",
-        "curvature": "models.md",
-        "filter": "models.md",
-        "decimate": "models.md",
-        "smooth": "models.md",
-        "distance": "models.md",
-        "comparison": "models.md",
-        "rasterize": "models.md",
+        # Models
+        "model": [
+            "Use slicer.util.loadModel(filepath) for loading models",
+            "Or use slicer.mrmlScene.AddNewNodeByClass('vtkMRMLModelNode')"
+        ],
+        "models": [
+            "Use slicer.util.loadModel() for STL, OBJ, PLY files"
+        ],
+        "mesh": [
+            "Models are vtkPolyData - access via modelNode.GetMesh()",
+            "Use slicer.util.arrayFromModelPoints() for point arrays"
+        ],
+        "stl": [
+            "Use slicer.util.loadModel('path.stl') for STL files"
+        ],
+        "polydata": [
+            "Use modelNode.GetMesh() to get vtkPolyData",
+            "Use slicer.util.arrayFromModelPoints() for points array"
+        ],
         
-        "transform": "transforms.md",
-        "transforms": "transforms.md",
-        "linear": "transforms.md",
-        "grid": "transforms.md",
-        "displacement": "transforms.md",
-        "rotation": "transforms.md",
-        "translate": "transforms.md",
-        "translation": "transforms.md",
-        "rigid": "transforms.md",
-        "affine": "transforms.md",
-        "bspline": "transforms.md",
-        "matrix": "transforms.md",
-        "harden": "transforms.md",
-        "itk": "transforms.md",
-        "lps": "transforms.md",
-        "ras": "transforms.md",
-        "trajectory": "transforms.md",
+        # Transforms
+        "transform": [
+            "Create vtkMRMLTransformNode, use SetMatrixTransformToParent()",
+            "Use slicer.modules.transforms.logic().hardenTransform(node) to apply"
+        ],
+        "transforms": [
+            "Use slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode')",
+            "Apply to nodes via node.SetAndObserveTransformNodeID(transform.GetID())"
+        ],
+        "registration": [
+            "Use BRAINSFit, Elastix, or ANTs modules for registration",
+            "Check Modules/CLI/ for registration CLI modules"
+        ],
+        "linear": [
+            "Use vtkMatrix4x4 for linear transforms, set via transformNode.SetMatrixTransformToParent()"
+        ],
+        "harden": [
+            "Use slicer.modules.transforms.logic().hardenTransform(node) to bake transform"
+        ],
         
-        "registration": "registration.md",
-        "register": "registration.md",
-        "align": "registration.md",
-        "alignment": "registration.md",
-        "brainsfit": "registration.md",
-        "elastix": "registration.md",
-        "ants": "registration.md",
-        "resample": "registration.md",
+        # DICOM
+        "dicom": [
+            "Use DICOM module: slicer.modules.DICOM.widgetRepresentation()",
+            "Or use slicer.util.loadVolume() if already imported to database"
+        ],
+        "pacs": [
+            "Use DICOMweb or DIMSE for PACS - check DICOM module"
+        ],
+        "import": [
+            "Use slicer.util.loadVolume() for files, DICOM module for DICOM"
+        ],
         
-        "pacs": "dicom.md",
-        "dicomweb": "dicom.md",
-        "import": "dicom.md",
-        "tags": "dicom.md",
-        "query": "dicom.md",
-        "retrieve": "dicom.md",
-        "dimse": "dicom.md",
-        "study": "dicom.md",
-        "studies": "dicom.md",
-        "series": "dicom.md",
-        "patient": "dicom.md",
-        "patients": "dicom.md",
-        "orthanc": "dicom.md",
-        "kheops": "dicom.md",
-        "database": "dicom.md",
-        "browser": "dicom.md",
-        "export dicom": "dicom.md",
-        "dcmtk": "dicom.md",
+        # GUI
+        "gui": [
+            "Use slicer.util.selectModule('ModuleName') to switch modules",
+            "Use slicer.app.layoutManager() for layout operations"
+        ],
+        "layout": [
+            "Use slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayout...)"
+        ],
+        "view": [
+            "Use slicer.app.layoutManager().sliceWidget('Red') for slice views",
+            "Use threeDWidget for 3D views"
+        ],
+        "module": [
+            "Use slicer.util.selectModule('ModuleName') to switch modules"
+        ],
+        "extension": [
+            "Use Extension Manager or slicer.app.applicationLogic().GetExtensionManager()"
+        ],
         
-        "gui": "gui.md",
-        "ui": "gui.md",
-        "layout": "gui.md",
-        "view": "gui.md",
-        "views": "gui.md",
-        "3d view": "gui.md",
-        "slice view": "gui.md",
-        "crosshair": "gui.md",
-        "mouse": "gui.md",
-        "keyboard": "gui.md",
-        "shortcut": "gui.md",
-        "color": "gui.md",
-        "legend": "gui.md",
-        "hanging protocol": "gui.md",
-        "module": "gui.md",
-        "select module": "gui.md",
-        "install": "gui.md",
-        "extension": "gui.md",
-        "pip": "gui.md",
-        "scene": "gui.md",
-        "mrml": "gui.md",
+        # Plots
+        "plot": [
+            "Create vtkMRMLPlotSeriesNode and vtkMRMLPlotChartNode",
+            "Add to scene and set in layout"
+        ],
+        "chart": [
+            "Use vtkMRMLPlotChartNode and vtkMRMLPlotSeriesNode for plotting"
+        ],
         
-        "plot": "plots.md",
-        "plots": "plots.md",
-        "chart": "plots.md",
-        "charts": "plots.md",
-        "graph": "plots.md",
-        "histogram": "plots.md",
-        "matplotlib": "plots.md",
-        "svg": "plots.md",
-        "series": "plots.md",
-        "table": "plots.md",
+        # Other topics
+        "screenshot": [
+            "Use slicer.util.captureScreenshot() or slicer.app.layoutManager().capture()"
+        ],
+        "sequence": [
+            "Use vtkMRMLSequenceNode for 4D data",
+            "Use SequenceBrowser module for playback"
+        ],
+        "subject hierarchy": [
+            "Use slicer.mrmlScene.GetSubjectHierarchyNode() for hierarchy operations"
+        ],
+        "tractography": [
+            "Use vtkMRMLFiberBundleNode for DTI tractography",
+            "Load via slicer.util.loadFiberBundle()"
+        ],
+        "batch": [
+            "Use Python loops with slicer.util.loadVolume() etc. for batch processing",
+            "Call slicer.app.processEvents() periodically to keep UI responsive"
+        ],
+        "web": [
+            "Use slicer.modules.webserver for web server functionality"
+        ],
         
-        "screenshot": "screencapture.md",
-        "capture": "screencapture.md",
-        "image": "screencapture.md",
-        "png": "screencapture.md",
-        "video": "screencapture.md",
-        "animation": "screencapture.md",
-        "sweep": "screencapture.md",
-        "transparent": "screencapture.md",
-        "background": "screencapture.md",
+        # MRML
+        "mrml": [
+            "Use slicer.mrmlScene for scene operations",
+            "Node types: vtkMRMLScalarVolumeNode, vtkMRMLModelNode, etc."
+        ],
+        "scene": [
+            "Use slicer.mrmlScene for scene-wide operations",
+            "Use GetNodesByClass() to find nodes"
+        ],
+        "node": [
+            "Use node.GetID() for unique identification (names are not unique!)",
+            "Use slicer.mrmlScene.GetNodeByID() to get by ID"
+        ],
         
-        "sequence": "sequences.md",
-        "sequences": "sequences.md",
-        "4d": "sequences.md",
-        "time series": "sequences.md",
-        "cine": "sequences.md",
-        "volume sequence": "sequences.md",
-        "browser": "sequences.md",
-        "temporal": "sequences.md",
-        "concatenate": "sequences.md",
-        "intensity plot": "sequences.md",
-        
-        "subject hierarchy": "subjecthierarchy.md",
-        "hierarchy": "subjecthierarchy.md",
-        "folder": "subjecthierarchy.md",
-        "folders": "subjecthierarchy.md",
-        "tree": "subjecthierarchy.md",
-        "organization": "subjecthierarchy.md",
-        "organize": "subjecthierarchy.md",
-        "reparent": "subjecthierarchy.md",
-        "item": "subjecthierarchy.md",
-        "items": "subjecthierarchy.md",
-        "children": "subjecthierarchy.md",
-        "parent": "subjecthierarchy.md",
-        "visibility": "subjecthierarchy.md",
-        
-        "tractography": "tractography.md",
-        "fiber": "tractography.md",
-        "fibers": "tractography.md",
-        "streamline": "tractography.md",
-        "streamlines": "tractography.md",
-        "dti": "tractography.md",
-        "dmri": "tractography.md",
-        "diffusion": "tractography.md",
-        "blender": "tractography.md",
-        
-        "batch": "batch.md",
-        "batch processing": "batch.md",
-        "iterate": "batch.md",
-        "loop": "batch.md",
-        "machine learning": "batch.md",
-        "ml": "batch.md",
-        "deep learning": "batch.md",
-        "patch": "batch.md",
-        "patches": "batch.md",
-        "monai": "batch.md",
-        "crop": "batch.md",
-        
-        "web": "webserver.md",
-        "web server": "webserver.md",
-        "http": "webserver.md",
-        "rest": "webserver.md",
-        "api": "webserver.md",
-        "endpoint": "webserver.md",
-        "static": "webserver.md",
-        "serve": "webserver.md",
+        # VTK/ITK
+        "vtk": [
+            "Use vtkSmartPointer for proper reference counting",
+            "Common classes: vtkMatrix4x4, vtkTransform, vtkPolyData"
+        ],
+        "itk": [
+            "Use via slicer.modules.SimpleITK or vtkITK bridge"
+        ],
     }
     
-    FILE_DESCRIPTIONS = {
-        "volumes.md": "Working with image volumes (load, save, render, numpy arrays)",
-        "segmentations.md": "Working with segmentations and Segment Editor",
-        "markups.md": "Working with fiducials, curves, lines, planes, ROIs",
-        "models.md": "Working with surface models and meshes",
-        "transforms.md": "Working with transforms and coordinate systems",
-        "registration.md": "Image registration and alignment",
-        "dicom.md": "DICOM import, export, and PACS integration",
-        "gui.md": "User interface, layouts, views, and interaction",
-        "plots.md": "Creating charts and plots",
-        "screencapture.md": "Screenshots, videos, and image export",
-        "sequences.md": "4D volume sequences and time series",
-        "subjecthierarchy.md": "Data organization and subject hierarchy",
-        "tractography.md": "Diffusion MRI and fiber tracking",
-        "batch.md": "Batch processing and machine learning",
-        "webserver.md": "Web server and REST API",
-    }
-    
-    def __init__(self, enable_online: bool = True, github_token: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the skill context manager.
+        """
+        self.skill_path = self.SKILL_PATH
+        self._skill_mode = self._detect_skill_mode()
+        
+        if not os.path.exists(self.skill_path):
+            logger.warning(f"Skill not found at {self.skill_path}")
+        else:
+            logger.info(f"SkillContextManager initialized with skill at: {self.skill_path}")
+            logger.info(f"Skill mode: {self._skill_mode}")
+    
+    def _detect_skill_mode(self) -> str:
+        """
+        Detect the skill mode by reading .setup-stamp.json.
+        
+        Returns:
+            "full", "lightweight", "web", or "unknown"
+        """
+        stamp_path = os.path.join(self.skill_path, ".setup-stamp.json")
+        if os.path.exists(stamp_path):
+            try:
+                with open(stamp_path, 'r', encoding='utf-8') as f:
+                    stamp = json.load(f)
+                return stamp.get("mode", "unknown")
+            except Exception as e:
+                logger.warning(f"Failed to read setup stamp: {e}")
+        return "unknown"
+    
+    def get_skill_mode(self) -> str:
+        """Get the current skill mode."""
+        return self._skill_mode
+    
+    def _generate_search_hints(self, prompt: str) -> List[str]:
+        """
+        Generate API guidance hints based on prompt keywords.
         
         Args:
-            enable_online: Whether to enable online knowledge search
-            github_token: GitHub API token for higher rate limits
+            prompt: User's input prompt
+            
+        Returns:
+            List of API guidance hints for the AI
         """
-        self.script_repo_path = self.SCRIPT_REPO_PATH
-        self._file_cache: Dict[str, str] = {}
-        self._code_cache: Dict[str, List[str]] = {}
-        
-        # Online knowledge client
-        self._online_client: Optional[OnlineKnowledgeClient] = None
-        self._online_enabled = enable_online and ONLINE_AVAILABLE
-        
-        if self._online_enabled:
-            try:
-                self._online_client = OnlineKnowledgeClient(
-                    github_token=github_token,
-                    enabled=True
-                )
-                logger.info("Online knowledge client initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize online client: {e}")
-                self._online_enabled = False
-        
-        # Verify local path
-        if not os.path.exists(self.script_repo_path):
-            logger.warning(f"Script repository not found at {self.script_repo_path}")
-        else:
-            logger.info(f"SkillContextManager initialized with path: {self.script_repo_path}")
-            self._preload_cache()
-    
-    def set_online_enabled(self, enabled: bool):
-        """Enable or disable online search."""
-        self._online_enabled = enabled and ONLINE_AVAILABLE
-        if self._online_client:
-            self._online_client.set_enabled(self._online_enabled)
-    
-    def set_github_token(self, token: str):
-        """Set GitHub API token."""
-        if self._online_client:
-            self._online_client.set_token(token)
-    
-    def _preload_cache(self):
-        """Preload all markdown files into cache."""
-        try:
-            for filename in os.listdir(self.script_repo_path):
-                if filename.endswith('.md'):
-                    filepath = os.path.join(self.script_repo_path, filename)
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            self._file_cache[filename] = f.read()
-                        self._code_cache[filename] = self._extract_code_blocks(self._file_cache[filename])
-                        logger.info(f"Cached {filename}: {len(self._code_cache[filename])} code examples")
-                    except Exception as e:
-                        logger.warning(f"Failed to cache {filename}: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to preload cache: {e}")
-    
-    def _extract_code_blocks(self, content: str) -> List[str]:
-        """Extract python code blocks from markdown content."""
-        code_blocks = []
-        
-        python_pattern = r'```python\s*\n(.*?)\n```'
-        matches = re.findall(python_pattern, content, re.DOTALL)
-        code_blocks.extend(matches)
-        
-        generic_pattern = r'```\s*\n(.*?)\n```'
-        generic_matches = re.findall(generic_pattern, content, re.DOTALL)
-        for match in generic_matches:
-            if any(keyword in match for keyword in ['slicer.', 'vtk.', 'import ', 'def ', 'class ']):
-                code_blocks.append(match)
-        
-        return code_blocks
-    
-    def _identify_topics(self, prompt: str) -> List[str]:
-        """Identify relevant topics from the prompt."""
         prompt_lower = prompt.lower()
-        matched_files = set()
+        hints = []
+        matched_topics = set()
         
-        for keyword, filename in sorted(self.TOPIC_FILE_MAPPING.items(), key=lambda x: -len(x[0])):
-            if keyword in prompt_lower:
-                matched_files.add(filename)
+        # Match keywords to hints
+        for keyword, hint_list in sorted(self.TOPIC_SEARCH_HINTS.items(), key=lambda x: -len(x[0])):
+            if keyword in prompt_lower and keyword not in matched_topics:
+                hints.extend(hint_list)
+                matched_topics.add(keyword)
         
-        return list(matched_files)
-    
-    def _get_code_examples(self, filename: str, max_examples: int = 5) -> List[str]:
-        """Get code examples from a local file."""
-        if filename in self._code_cache:
-            return self._code_cache[filename][:max_examples]
+        # Add default hints if no specific matches
+        if not hints:
+            hints = [
+                "Use slicer.util functions for common operations",
+                "Check if SampleData module has example data for your task"
+            ]
         
-        filepath = os.path.join(self.script_repo_path, filename)
-        if not os.path.exists(filepath):
-            return []
-        
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-            return self._extract_code_blocks(content)[:max_examples]
-        except Exception as e:
-            logger.warning(f"Failed to read {filepath}: {e}")
-            return []
-    
-    def _get_file_summary(self, filename: str) -> str:
-        """Get a brief summary of what the file covers."""
-        return self.FILE_DESCRIPTIONS.get(filename, "Slicer operations")
+        return hints[:10]  # Limit to top 10 hints
     
     def _get_scene_context(self) -> Optional[Dict]:
-        """Get context about the current Slicer scene."""
+        """
+        Get context about the current Slicer scene.
+        
+        Returns:
+            Dictionary with node counts and sample node names
+        """
         try:
             scene = slicer.mrmlScene
             
@@ -462,129 +373,27 @@ class SkillContextManager:
             logger.warning(f"Failed to get scene context: {e}")
             return None
     
-    def _search_online_knowledge(
-        self, 
-        prompt: str, 
-        local_topics: List[str],
-        max_results: int = 3
-    ) -> Tuple[List[Dict], List[str], Optional[str]]:
+    def buildContext(self, prompt: str) -> Dict:
         """
-        Search for additional examples from online sources.
+        Build context for a given prompt.
         
-        Returns:
-            Tuple of (examples, sources, error)
-        """
-        if not self._online_enabled or not self._online_client:
-            return [], [], "Online search disabled"
-        
-        try:
-            result = self._online_client.search_code_examples(
-                query=prompt,
-                context={"topics": local_topics},
-                max_results=max_results
-            )
-            
-            return (
-                result.get("examples", []),
-                result.get("sources", []),
-                result.get("error")
-            )
-        except Exception as e:
-            logger.warning(f"Online search failed: {e}")
-            return [], [], str(e)
-    
-    def _merge_examples(
-        self, 
-        local_examples: List[Dict], 
-        online_examples: List[Dict]
-    ) -> List[Dict]:
-        """
-        Merge local and online examples, removing duplicates.
-        Online examples are added after local ones.
-        """
-        seen_codes = set()
-        merged = []
-        
-        # Add local examples first
-        for ex in local_examples:
-            code = ex.get("code", "")
-            normalized = ' '.join(code.split())
-            code_hash = hash(normalized)
-            if code_hash not in seen_codes:
-                seen_codes.add(code_hash)
-                merged.append(ex)
-        
-        # Add online examples that aren't duplicates
-        for ex in online_examples:
-            code = ex.get("code", "")
-            normalized = ' '.join(code.split())
-            code_hash = hash(normalized)
-            if code_hash not in seen_codes:
-                seen_codes.add(code_hash)
-                merged.append(ex)
-        
-        return merged
-    
-    def buildContext(self, prompt: str, use_online: bool = True) -> Dict:
-        """
-        Build context for a given prompt using local and optional online sources.
+        The context includes:
+        - Skill path and mode
+        - API guidance hints
+        - Current MRML scene state
         
         Args:
             prompt: User's input prompt
-            use_online: Whether to supplement with online search
             
         Returns:
-            Dictionary with relevant examples, APIs, and scene context
+            Dictionary with skill info, hints, and scene context
         """
-        # Identify relevant topics/files
-        relevant_files = self._identify_topics(prompt)
-        
-        # Build base context
         context = {
-            "topics": [],
-            "examples": [],
-            "file_descriptions": {},
+            "skill_path": self.skill_path,
+            "skill_mode": self._skill_mode,
+            "api_hints": self._generate_search_hints(prompt),
             "scene": None,
-            "online_examples": [],
-            "online_sources": [],
-            "online_error": None,
         }
-        
-        # Collect local examples
-        local_examples = []
-        for filename in relevant_files[:3]:
-            context["topics"].append(filename.replace('.md', ''))
-            context["file_descriptions"][filename] = self._get_file_summary(filename)
-            
-            examples = self._get_code_examples(filename, max_examples=3)
-            for example in examples:
-                local_examples.append({
-                    "source": filename,
-                    "code": example.strip(),
-                    "type": "local"
-                })
-        
-        # Online search if enabled and needed
-        if use_online and self._online_enabled:
-            # Only search online if we have few local examples or query seems complex
-            should_search_online = (
-                len(local_examples) < 3 or
-                any(term in prompt.lower() for term in [
-                    'how to', 'example', 'sample', 'advanced', 'complex'
-                ])
-            )
-            
-            if should_search_online:
-                online_examples, sources, error = self._search_online_knowledge(
-                    prompt, relevant_files, max_results=3
-                )
-                context["online_examples"] = online_examples
-                context["online_sources"] = sources
-                context["online_error"] = error
-        
-        # Merge examples
-        all_examples = self._merge_examples(local_examples, context["online_examples"])
-        context["examples"] = all_examples[:5]  # Limit total examples
         
         # Add scene context
         scene_context = self._get_scene_context()
@@ -605,72 +414,37 @@ class SkillContextManager:
         """
         lines = []
         
-        # Add file descriptions
-        if context.get("file_descriptions"):
-            lines.append("## RELEVANT TOPICS:")
-            for filename, description in context["file_descriptions"].items():
-                lines.append(f"- {filename.replace('.md', '')}: {description}")
-            lines.append("")
-        
-        # Add local code examples
-        local_examples = [ex for ex in context.get("examples", []) if ex.get("type") == "local"]
-        if local_examples:
-            lines.append("## CODE EXAMPLES FROM SLICER SCRIPT REPOSITORY:")
-            for i, example in enumerate(local_examples[:3], 1):
-                lines.append(f"\n### Example {i} (from {example['source']}):")
-                lines.append("```python")
-                lines.append(example['code'])
-                lines.append("```")
-            lines.append("")
-        
-        # Add online code examples
-        online_examples = [ex for ex in context.get("examples", []) if ex.get("type") == "github"]
-        if online_examples:
-            lines.append("## ADDITIONAL CODE EXAMPLES FROM SLICER SOURCE:")
-            for i, example in enumerate(online_examples[:2], 1):
-                lines.append(f"\n### Example {i} (from {example.get('file', 'Slicer source')}):")
-                lines.append("```python")
-                lines.append(example['code'])
-                lines.append("```")
-                if example.get('url'):
-                    lines.append(f"[Source: {example['url']}]")
+        # Add API guidance
+        hints = context.get("api_hints", [])
+        if hints:
+            lines.append("## API GUIDANCE")
+            for hint in hints:
+                lines.append(f"- {hint}")
             lines.append("")
         
         # Add scene context
         if context.get("scene"):
             scene = context["scene"]
-            lines.append("## CURRENT SLICER SCENE:")
+            lines.append("## CURRENT SLICER SCENE")
             if scene.get("node_counts"):
-                lines.append("Node counts:")
+                lines.append("Nodes in scene:")
                 for node_type, count in scene["node_counts"].items():
                     lines.append(f"  - {node_type}: {count}")
             if scene.get("sample_node_names"):
-                lines.append(f"Sample nodes: {', '.join(scene['sample_node_names'][:3])}")
+                lines.append(f"Sample node names: {', '.join(scene['sample_node_names'][:3])}")
             lines.append("")
-        
-        # Add online search status if there was an error
-        if context.get("online_error") and self._online_enabled:
-            lines.append(f"<!-- Note: Online knowledge search unavailable: {context['online_error']} -->")
         
         return "\n".join(lines)
     
-    def refreshCache(self):
-        """Reload all files from disk into cache."""
-        self._file_cache.clear()
-        self._code_cache.clear()
-        self._preload_cache()
-        if self._online_client:
-            self._online_client.clear_cache()
-        logger.info("Skill cache refreshed")
-    
     def get_status(self) -> Dict:
-        """Get current status including online availability."""
-        status = {
-            "local_available": os.path.exists(self.script_repo_path),
-            "online_enabled": self._online_enabled,
+        """
+        Get current status of the skill context manager.
+        
+        Returns:
+            Dictionary with skill status information
+        """
+        return {
+            "skill_path": self.skill_path,
+            "skill_exists": os.path.exists(self.skill_path),
+            "skill_mode": self._skill_mode,
         }
-        
-        if self._online_client:
-            status["online_status"] = self._online_client.get_status()
-        
-        return status

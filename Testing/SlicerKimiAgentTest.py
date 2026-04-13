@@ -77,6 +77,7 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
             from SlicerKimiAgentLib import (
                 KimiClient,
                 SkillContextManager,
+                SkillTools,
                 CodeValidator,
                 SafeExecutor,
                 ConversationStore,
@@ -158,13 +159,15 @@ More text.
 
         # Test system prompt building with context
         context = {
-            "file_descriptions": {"volumes.md": "Volume operations"},
-            "examples": [{"source": "volumes.md", "code": "volume = slicer.util.loadVolume('test.nrrd')"}],
+            "skill_path": "C:/test/skill",
+            "skill_mode": "full",
+            "api_hints": ["Use slicer.util.loadVolume() for loading", "Use SampleData for examples"],
             "scene": {"node_counts": {"Volume": 1}, "sample_node_names": ["MRHead"]}
         }
         prompt = client._buildSystemPrompt(context)
-        self.assertIn("Volume operations", prompt)
-        self.assertIn("test.nrrd", prompt)
+        self.assertIn("CURRENT SLICER SCENE", prompt)
+        self.assertIn("SKILL LOCATION", prompt)
+        self.assertIn("loadVolume", prompt)
 
         self.delayDisplay("KimiClient tests passed")
 
@@ -257,29 +260,31 @@ More text.
         # Test context building for volume operations
         context = manager.buildContext("load a volume and render it")
         self.assertIsNotNone(context)
-        self.assertIn("volumes.md", context.get("topics", []))
+        self.assertIn("search_hints", context)
+        self.assertTrue(len(context.get("search_hints", [])) > 0)
         
         # Test context building for segmentation
         context = manager.buildContext("create a segmentation and threshold")
         self.assertIsNotNone(context)
-        self.assertIn("segmentations.md", context.get("topics", []))
+        hints = context.get("search_hints", [])
+        self.assertTrue(any("segment" in h.lower() for h in hints))
         
         # Test context building for markups
         context = manager.buildContext("add fiducial points")
         self.assertIsNotNone(context)
-        self.assertIn("markups.md", context.get("topics", []))
+        hints = context.get("search_hints", [])
+        self.assertTrue(any("markup" in h.lower() or "fiducial" in h.lower() for h in hints))
         
         # Test context formatting
         context = manager.buildContext("load volume")
         formatted = manager.formatContextForPrompt(context)
-        self.assertIn("RELEVANT TOPICS", formatted)
+        self.assertIn("SLICER SKILL CONTEXT", formatted)
+        self.assertIn("SEARCH HINTS", formatted)
         
-        # Test API help retrieval (now returns None for unknown APIs)
-        help_info = manager.getApiHelp("slicer.util.loadVolume")
-        # May be None if not in bundled index
-        
-        # Test cache refresh (should not raise)
-        manager.refreshCache()
+        # Test status
+        status = manager.get_status()
+        self.assertIn("skill_path", status)
+        self.assertIn("skill_mode", status)
         
         self.delayDisplay("SkillContextManager tests passed")
 

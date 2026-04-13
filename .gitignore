@@ -39,3 +39,7 @@ __pycache__
 verify_structure.py
 BUGFIXES.md
 CHANGES.md
+
+# Large skill data (external dependency - not version controlled)
+Resources/Skills/slicer-skill-full/
+Resources/Skills/slicer-skill-full/**
