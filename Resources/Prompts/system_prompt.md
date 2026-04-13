@@ -284,4 +284,17 @@ The following context will be dynamically added to this prompt based on the user
 
 - **RELEVANT TOPICS**: Which script repository files are relevant
 - **RELEVANT CODE EXAMPLES**: Specific examples from the script repository
+- **ADDITIONAL CODE EXAMPLES**: Real code examples from Slicer source code (GitHub)
 - **CURRENT SLICER SCENE STATE**: Information about nodes currently in the scene
+
+## ONLINE KNOWLEDGE REFERENCES
+
+When online knowledge examples are included in the context:
+- These are real code snippets from the official Slicer GitHub repository
+- They show actual production usage patterns
+- Source URLs are provided for reference
+- Prioritize these examples alongside local script repository examples
+
+The local script repository provides curated, well-documented examples.
+The online examples provide real-world usage patterns from the codebase.
+Use both sources to generate accurate, idiomatic Slicer code.

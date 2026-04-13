@@ -109,6 +109,11 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.sendButton = self.ui.findChild(qt.QPushButton, "sendButton")
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
+        # Online knowledge search widgets
+        self.onlineSearchCheckbox = self.ui.findChild(qt.QCheckBox, "onlineSearchCheckbox")
+        self.githubTokenInput = self.ui.findChild(qt.QLineEdit, "githubTokenInput")
+        self.testGitHubButton = self.ui.findChild(qt.QPushButton, "testGitHubButton")
+        self.saveOnlineSettingsButton = self.ui.findChild(qt.QPushButton, "saveOnlineSettingsButton")
 
     def setupUIProgrammatically(self):
         self.ui = ctk.ctkCollapsibleButton()
@@ -143,6 +148,34 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.saveSettingsButton = qt.QPushButton("Save Settings")
         settingsLayout.addRow(self.saveSettingsButton)
+        
+        # Online Knowledge Settings
+        onlineGroup = ctk.ctkCollapsibleGroupBox()
+        onlineGroup.title = "Online Knowledge Search (Optional)"
+        onlineGroup.collapsed = True
+        mainLayout.addWidget(onlineGroup)
+        
+        onlineLayout = qt.QFormLayout(onlineGroup)
+        
+        self.onlineSearchCheckbox = qt.QCheckBox("Enable online knowledge search")
+        self.onlineSearchCheckbox.setChecked(True)
+        self.onlineSearchCheckbox.setToolTip("Search Slicer GitHub repository for additional code examples (requires internet)")
+        onlineLayout.addRow("Online Search:", self.onlineSearchCheckbox)
+        
+        tokenLayout = qt.QHBoxLayout()
+        self.githubTokenInput = qt.QLineEdit()
+        self.githubTokenInput.setEchoMode(qt.QLineEdit.Password)
+        self.githubTokenInput.setPlaceholderText("Required for code search - get at github.com/settings/tokens")
+        self.githubTokenInput.setToolTip("GitHub personal access token (classic) with 'public_repo' scope")
+        tokenLayout.addWidget(self.githubTokenInput)
+        
+        self.testGitHubButton = qt.QPushButton("Test")
+        self.testGitHubButton.setToolTip("Test GitHub connection")
+        tokenLayout.addWidget(self.testGitHubButton)
+        onlineLayout.addRow("GitHub Token:", tokenLayout)
+        
+        self.saveOnlineSettingsButton = qt.QPushButton("Save Online Search Settings")
+        onlineLayout.addRow(self.saveOnlineSettingsButton)
 
         chatLabel = qt.QLabel("Conversation:")
         mainLayout.addWidget(chatLabel)
@@ -204,6 +237,11 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.saveSettingsButton.clicked.connect(self.onSaveSettings)
         if hasattr(self, 'testConnectionButton') and self.testConnectionButton is not None:
             self.testConnectionButton.clicked.connect(self.onTestConnection)
+        # Online knowledge search connections
+        if hasattr(self, 'testGitHubButton') and self.testGitHubButton is not None:
+            self.testGitHubButton.clicked.connect(self.onTestGitHubConnection)
+        if hasattr(self, 'saveOnlineSettingsButton') and self.saveOnlineSettingsButton is not None:
+            self.saveOnlineSettingsButton.clicked.connect(self.onSaveOnlineSettings)
 
     def disconnect(self):
         self.removeObservers()
@@ -523,12 +561,26 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         settings.setValue("apiKey", self.apiKeyInput.text)
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             settings.setValue("model", self.modelSelector.currentText)
+        
+        # Save online knowledge settings
+        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
+            settings.setValue("onlineSearchEnabled", self.onlineSearchCheckbox.isChecked())
+        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
+            settings.setValue("githubToken", self.githubTokenInput.text)
+        
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(self.apiKeyInput.text)
             if hasattr(self, 'modelSelector') and self.modelSelector is not None:
                 self.logic.setModel(self.modelSelector.currentText)
+            # Update online knowledge settings
+            if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
+                self.logic.setOnlineEnabled(self.onlineSearchCheckbox.isChecked())
+            if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
+                token = self.githubTokenInput.text.strip()
+                if token:
+                    self.logic.setGitHubToken(token)
 
         slicer.util.infoDisplay("Settings saved successfully!")
 
@@ -571,23 +623,107 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.logic.setApiKey(originalKey)
             self.logic.setModel(originalModel)
 
+    def onTestGitHubConnection(self):
+        """Test GitHub connection and token validity."""
+        if not self.logic or not self.logic.skillManager:
+            slicer.util.warningDisplay("Skill manager not initialized")
+            return
+        
+        token = self.githubTokenInput.text.strip() if hasattr(self, 'githubTokenInput') else ""
+        
+        self.statusLabel.text = "Testing GitHub connection..."
+        slicer.app.processEvents()
+        
+        try:
+            from SlicerKimiAgentLib import OnlineKnowledgeClient
+            
+            # Create a temporary client with current token
+            temp_client = OnlineKnowledgeClient(github_token=token if token else None, enabled=True)
+            status = temp_client.get_status()
+            
+            # Test actual connectivity
+            _, error = temp_client.github.get_file_content("Slicer", "Slicer", "README.md", "main")
+            
+            if error and "HTTP error 404" not in str(error):  # 404 is OK, just means file not found
+                slicer.util.warningDisplay(f"GitHub connection failed:\n{error}")
+                return
+            
+            # Build status message
+            messages = []
+            messages.append("GitHub Connection: OK")
+            
+            if status.get("has_code_search"):
+                messages.append("Code Search: Available (with token)")
+                rate_limit = status.get("rate_limit", {})
+                remaining = rate_limit.get("remaining", "unknown")
+                limit = rate_limit.get("limit", "unknown")
+                messages.append(f"Rate Limit: {remaining}/{limit} requests remaining")
+            else:
+                messages.append("Code Search: Not available (no token)")
+                messages.append("Limited Mode: Can fetch official docs only")
+                messages.append("")
+                messages.append("To enable full code search:")
+                messages.append("1. Get a token at github.com/settings/tokens")
+                messages.append("2. Select 'public_repo' scope")
+                messages.append("3. Enter token above and Save")
+            
+            slicer.util.infoDisplay("\n".join(messages))
+            
+        except Exception as e:
+            slicer.util.warningDisplay(f"GitHub test failed:\n{str(e)}")
+        finally:
+            self.statusLabel.text = "Ready"
+    
+    def onSaveOnlineSettings(self):
+        """Save online knowledge search settings."""
+        settings = qt.QSettings()
+        settings.beginGroup("SlicerKimiAgent")
+        
+        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
+            settings.setValue("onlineSearchEnabled", self.onlineSearchCheckbox.isChecked())
+        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
+            settings.setValue("githubToken", self.githubTokenInput.text)
+        
+        settings.endGroup()
+        
+        # Apply to logic
+        if self.logic:
+            if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
+                self.logic.setOnlineEnabled(self.onlineSearchCheckbox.isChecked())
+            if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
+                token = self.githubTokenInput.text.strip()
+                if token:
+                    self.logic.setGitHubToken(token)
+        
+        slicer.util.infoDisplay("Online search settings saved!")
+
     def loadSettings(self):
         settings = qt.QSettings()
         settings.beginGroup("SlicerKimiAgent")
 
         apiKey = settings.value("apiKey", "")
         model = settings.value("model", "kimi-k2.5")
+        onlineSearchEnabled = settings.value("onlineSearchEnabled", True)
+        githubToken = settings.value("githubToken", "")
 
         if hasattr(self, 'apiKeyInput') and self.apiKeyInput is not None:
             self.apiKeyInput.text = apiKey
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             self.modelSelector.setCurrentText(model)
+        if hasattr(self, 'onlineSearchCheckbox') and self.onlineSearchCheckbox is not None:
+            self.onlineSearchCheckbox.setChecked(onlineSearchEnabled in [True, "true", "True", 1, "1"])
+        if hasattr(self, 'githubTokenInput') and self.githubTokenInput is not None:
+            self.githubTokenInput.text = githubToken
 
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(apiKey)
             self.logic.setModel(model)
+            # Load online knowledge settings
+            self.logic.setOnlineEnabled(onlineSearchEnabled in [True, "true", "True", 1, "1"])
+            if githubToken:
+                self.logic.setGitHubToken(githubToken)
 
 #------------------------------------------------------------------
 # Logic Class
@@ -616,7 +752,8 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
 
             self.conversationStore = ConversationStore()
             self.kimiClient = KimiClient()
-            self.skillManager = SkillContextManager()
+            # Initialize skill manager with online search enabled by default
+            self.skillManager = SkillContextManager(enable_online=True)
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
 
@@ -625,6 +762,18 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
             logger.error(f"Failed to initialize components: {e}")
             import traceback
             traceback.print_exc()
+    
+    def setOnlineEnabled(self, enabled: bool):
+        """Enable or disable online knowledge search."""
+        if self.skillManager:
+            self.skillManager.set_online_enabled(enabled)
+            logger.info(f"Online knowledge search: {enabled}")
+    
+    def setGitHubToken(self, token: str):
+        """Set GitHub API token for online search."""
+        if self.skillManager:
+            self.skillManager.set_github_token(token)
+            logger.info("GitHub token updated")
 
     def setApiKey(self, apiKey):
         self.apiKey = apiKey

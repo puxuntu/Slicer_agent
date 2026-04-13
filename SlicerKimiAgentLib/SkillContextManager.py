@@ -1,11 +1,12 @@
 """
 SkillContextManager - Manages skill-based context for LLM prompts.
 
-Reads code examples from the bundled Slicer script repository located at:
-SlicerKimiAgent/Resources/Skills/script_repository/
+Hybrid retrieval system combining:
+1. Local script repository (fast, reliable, works offline)
+2. Online knowledge base (GitHub code search, up-to-date)
 
-This includes 15 markdown files covering all major Slicer operations:
-volumes, segmentations, markups, models, transforms, dicom, gui, etc.
+Reads code examples from the bundled Slicer script repository and 
+supplements with online search when enabled.
 """
 
 import json
@@ -17,33 +18,37 @@ from pathlib import Path
 
 import slicer
 
+# Import online knowledge client (optional dependency)
+try:
+    from .OnlineKnowledgeClient import OnlineKnowledgeClient
+    ONLINE_AVAILABLE = True
+except ImportError:
+    ONLINE_AVAILABLE = False
+    OnlineKnowledgeClient = None
+
 logger = logging.getLogger(__name__)
 
 
 class SkillContextManager:
     """
-    Manages context from the bundled Slicer script repository.
+    Manages context from local script repository and online sources.
     
     Features:
-    - Reads from bundled script repository markdown files (Resources/Skills/script_repository/)
-    - Extracts code examples from ```python blocks
+    - Reads from bundled script repository markdown files (local)
+    - Online code search from Slicer GitHub repositories (optional)
     - Keyword-based topic matching covering 15 major Slicer topics
     - Scene-aware context enrichment
-    
-    The script repository is bundled with the extension at:
-    SlicerKimiAgent/Resources/Skills/script_repository/
+    - Smart result merging and deduplication
     """
     
-    # Path to bundled script repository (relative to this file)
-    # Located at: SlicerKimiAgent/Resources/Skills/script_repository/
+    # Path to bundled script repository
     SCRIPT_REPO_PATH = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         'Resources', 'Skills', 'script_repository'
     )
     
-    # Topic to file mapping - COMPLETE mapping for all 15 script repository files
+    # Topic to file mapping
     TOPIC_FILE_MAPPING = {
-        # volumes.md
         "volume": "volumes.md",
         "volumes": "volumes.md",
         "image": "volumes.md",
@@ -71,7 +76,6 @@ class SkillContextManager:
         "array": "volumes.md",
         "modify": "volumes.md",
         
-        # segmentations.md
         "segmentation": "segmentations.md",
         "segmentations": "segmentations.md",
         "segment": "segmentations.md",
@@ -98,7 +102,6 @@ class SkillContextManager:
         "hollow": "segmentations.md",
         "slicerio": "segmentations.md",
         
-        # markups.md
         "markups": "markups.md",
         "markup": "markups.md",
         "fiducial": "markups.md",
@@ -123,11 +126,9 @@ class SkillContextManager:
         "fcsv": "markups.md",
         "csv": "markups.md",
         
-        # models.md
         "model": "models.md",
         "models": "models.md",
         "mesh": "models.md",
-        "surface": "models.md",
         "polydata": "models.md",
         "stl": "models.md",
         "obj": "models.md",
@@ -148,7 +149,6 @@ class SkillContextManager:
         "comparison": "models.md",
         "rasterize": "models.md",
         
-        # transforms.md
         "transform": "transforms.md",
         "transforms": "transforms.md",
         "linear": "transforms.md",
@@ -167,7 +167,6 @@ class SkillContextManager:
         "ras": "transforms.md",
         "trajectory": "transforms.md",
         
-        # registration.md
         "registration": "registration.md",
         "register": "registration.md",
         "align": "registration.md",
@@ -177,7 +176,6 @@ class SkillContextManager:
         "ants": "registration.md",
         "resample": "registration.md",
         
-        # dicom.md
         "pacs": "dicom.md",
         "dicomweb": "dicom.md",
         "import": "dicom.md",
@@ -197,7 +195,6 @@ class SkillContextManager:
         "export dicom": "dicom.md",
         "dcmtk": "dicom.md",
         
-        # gui.md
         "gui": "gui.md",
         "ui": "gui.md",
         "layout": "gui.md",
@@ -220,7 +217,6 @@ class SkillContextManager:
         "scene": "gui.md",
         "mrml": "gui.md",
         
-        # plots.md
         "plot": "plots.md",
         "plots": "plots.md",
         "chart": "plots.md",
@@ -232,7 +228,6 @@ class SkillContextManager:
         "series": "plots.md",
         "table": "plots.md",
         
-        # screencapture.md
         "screenshot": "screencapture.md",
         "capture": "screencapture.md",
         "image": "screencapture.md",
@@ -243,7 +238,6 @@ class SkillContextManager:
         "transparent": "screencapture.md",
         "background": "screencapture.md",
         
-        # sequences.md
         "sequence": "sequences.md",
         "sequences": "sequences.md",
         "4d": "sequences.md",
@@ -255,7 +249,6 @@ class SkillContextManager:
         "concatenate": "sequences.md",
         "intensity plot": "sequences.md",
         
-        # subjecthierarchy.md
         "subject hierarchy": "subjecthierarchy.md",
         "hierarchy": "subjecthierarchy.md",
         "folder": "subjecthierarchy.md",
@@ -270,7 +263,6 @@ class SkillContextManager:
         "parent": "subjecthierarchy.md",
         "visibility": "subjecthierarchy.md",
         
-        # tractography.md
         "tractography": "tractography.md",
         "fiber": "tractography.md",
         "fibers": "tractography.md",
@@ -281,7 +273,6 @@ class SkillContextManager:
         "diffusion": "tractography.md",
         "blender": "tractography.md",
         
-        # batch.md
         "batch": "batch.md",
         "batch processing": "batch.md",
         "iterate": "batch.md",
@@ -293,9 +284,7 @@ class SkillContextManager:
         "patches": "batch.md",
         "monai": "batch.md",
         "crop": "batch.md",
-        "bounding box": "batch.md",
         
-        # webserver.md
         "web": "webserver.md",
         "web server": "webserver.md",
         "http": "webserver.md",
@@ -306,7 +295,6 @@ class SkillContextManager:
         "serve": "webserver.md",
     }
     
-    # File descriptions for better context
     FILE_DESCRIPTIONS = {
         "volumes.md": "Working with image volumes (load, save, render, numpy arrays)",
         "segmentations.md": "Working with segmentations and Segment Editor",
@@ -325,24 +313,53 @@ class SkillContextManager:
         "webserver.md": "Web server and REST API",
     }
     
-    def __init__(self):
+    def __init__(self, enable_online: bool = True, github_token: Optional[str] = None):
         """
         Initialize the skill context manager.
-        Reads from the bundled script repository at Resources/Skills/script_repository/
+        
+        Args:
+            enable_online: Whether to enable online knowledge search
+            github_token: GitHub API token for higher rate limits
         """
         self.script_repo_path = self.SCRIPT_REPO_PATH
-        self._file_cache: Dict[str, str] = {}  # Cache for file contents
-        self._code_cache: Dict[str, List[str]] = {}  # Cache for extracted code
+        self._file_cache: Dict[str, str] = {}
+        self._code_cache: Dict[str, List[str]] = {}
         
-        # Verify path exists
+        # Online knowledge client
+        self._online_client: Optional[OnlineKnowledgeClient] = None
+        self._online_enabled = enable_online and ONLINE_AVAILABLE
+        
+        if self._online_enabled:
+            try:
+                self._online_client = OnlineKnowledgeClient(
+                    github_token=github_token,
+                    enabled=True
+                )
+                logger.info("Online knowledge client initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize online client: {e}")
+                self._online_enabled = False
+        
+        # Verify local path
         if not os.path.exists(self.script_repo_path):
             logger.warning(f"Script repository not found at {self.script_repo_path}")
         else:
             logger.info(f"SkillContextManager initialized with path: {self.script_repo_path}")
-            self._preloadCache()
+            self._preload_cache()
     
-    def _preloadCache(self):
-        """Preload all markdown files into cache for faster access."""
+    def set_online_enabled(self, enabled: bool):
+        """Enable or disable online search."""
+        self._online_enabled = enabled and ONLINE_AVAILABLE
+        if self._online_client:
+            self._online_client.set_enabled(self._online_enabled)
+    
+    def set_github_token(self, token: str):
+        """Set GitHub API token."""
+        if self._online_client:
+            self._online_client.set_token(token)
+    
+    def _preload_cache(self):
+        """Preload all markdown files into cache."""
         try:
             for filename in os.listdir(self.script_repo_path):
                 if filename.endswith('.md'):
@@ -350,76 +367,45 @@ class SkillContextManager:
                     try:
                         with open(filepath, 'r', encoding='utf-8') as f:
                             self._file_cache[filename] = f.read()
-                        # Pre-extract code blocks
-                        self._code_cache[filename] = self._extractCodeBlocks(self._file_cache[filename])
+                        self._code_cache[filename] = self._extract_code_blocks(self._file_cache[filename])
                         logger.info(f"Cached {filename}: {len(self._code_cache[filename])} code examples")
                     except Exception as e:
                         logger.warning(f"Failed to cache {filename}: {e}")
         except Exception as e:
             logger.warning(f"Failed to preload cache: {e}")
     
-    def _extractCodeBlocks(self, content: str) -> List[str]:
-        """
-        Extract python code blocks from markdown content.
-        
-        Args:
-            content: Markdown file content
-            
-        Returns:
-            List of code strings
-        """
+    def _extract_code_blocks(self, content: str) -> List[str]:
+        """Extract python code blocks from markdown content."""
         code_blocks = []
         
-        # Match ```python ... ``` blocks
         python_pattern = r'```python\s*\n(.*?)\n```'
         matches = re.findall(python_pattern, content, re.DOTALL)
         code_blocks.extend(matches)
         
-        # Also match ``` ... ``` blocks (without language specifier)
         generic_pattern = r'```\s*\n(.*?)\n```'
         generic_matches = re.findall(generic_pattern, content, re.DOTALL)
-        # Filter out non-Python blocks (heuristic: check for common Python patterns)
         for match in generic_matches:
             if any(keyword in match for keyword in ['slicer.', 'vtk.', 'import ', 'def ', 'class ']):
                 code_blocks.append(match)
         
         return code_blocks
     
-    def _identifyTopics(self, prompt: str) -> List[str]:
-        """
-        Identify relevant topics from the prompt.
-        
-        Args:
-            prompt: User's input prompt (lowercase)
-            
-        Returns:
-            List of matching filenames
-        """
+    def _identify_topics(self, prompt: str) -> List[str]:
+        """Identify relevant topics from the prompt."""
         prompt_lower = prompt.lower()
         matched_files = set()
         
-        # Check for multi-word matches first (to prioritize "segment editor" over "editor")
         for keyword, filename in sorted(self.TOPIC_FILE_MAPPING.items(), key=lambda x: -len(x[0])):
             if keyword in prompt_lower:
                 matched_files.add(filename)
         
         return list(matched_files)
     
-    def _getCodeExamples(self, filename: str, max_examples: int = 5) -> List[str]:
-        """
-        Get code examples from a file.
-        
-        Args:
-            filename: Markdown filename
-            max_examples: Maximum number of examples to return
-            
-        Returns:
-            List of code example strings
-        """
+    def _get_code_examples(self, filename: str, max_examples: int = 5) -> List[str]:
+        """Get code examples from a local file."""
         if filename in self._code_cache:
             return self._code_cache[filename][:max_examples]
         
-        # Fallback: read from disk
         filepath = os.path.join(self.script_repo_path, filename)
         if not os.path.exists(filepath):
             return []
@@ -427,16 +413,16 @@ class SkillContextManager:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
-            return self._extractCodeBlocks(content)[:max_examples]
+            return self._extract_code_blocks(content)[:max_examples]
         except Exception as e:
             logger.warning(f"Failed to read {filepath}: {e}")
             return []
     
-    def _getFileSummary(self, filename: str) -> str:
+    def _get_file_summary(self, filename: str) -> str:
         """Get a brief summary of what the file covers."""
         return self.FILE_DESCRIPTIONS.get(filename, "Slicer operations")
     
-    def _getSceneContext(self) -> Optional[Dict]:
+    def _get_scene_context(self) -> Optional[Dict]:
         """Get context about the current Slicer scene."""
         try:
             scene = slicer.mrmlScene
@@ -446,7 +432,6 @@ class SkillContextManager:
                 "sample_node_names": [],
             }
             
-            # Count nodes by class
             node_classes = [
                 ("vtkMRMLScalarVolumeNode", "Volume"),
                 ("vtkMRMLLabelMapVolumeNode", "LabelMap"),
@@ -465,7 +450,6 @@ class SkillContextManager:
                 if count > 0:
                     context["node_counts"][display_name] = count
             
-            # Get a few sample node names
             all_nodes = scene.GetNodes()
             for i in range(min(5, all_nodes.GetNumberOfItems())):
                 node = all_nodes.GetItemAsObject(i)
@@ -478,53 +462,132 @@ class SkillContextManager:
             logger.warning(f"Failed to get scene context: {e}")
             return None
     
-    def buildContext(self, prompt: str) -> Dict:
+    def _search_online_knowledge(
+        self, 
+        prompt: str, 
+        local_topics: List[str],
+        max_results: int = 3
+    ) -> Tuple[List[Dict], List[str], Optional[str]]:
         """
-        Build context for a given prompt by reading relevant script repository files.
+        Search for additional examples from online sources.
+        
+        Returns:
+            Tuple of (examples, sources, error)
+        """
+        if not self._online_enabled or not self._online_client:
+            return [], [], "Online search disabled"
+        
+        try:
+            result = self._online_client.search_code_examples(
+                query=prompt,
+                context={"topics": local_topics},
+                max_results=max_results
+            )
+            
+            return (
+                result.get("examples", []),
+                result.get("sources", []),
+                result.get("error")
+            )
+        except Exception as e:
+            logger.warning(f"Online search failed: {e}")
+            return [], [], str(e)
+    
+    def _merge_examples(
+        self, 
+        local_examples: List[Dict], 
+        online_examples: List[Dict]
+    ) -> List[Dict]:
+        """
+        Merge local and online examples, removing duplicates.
+        Online examples are added after local ones.
+        """
+        seen_codes = set()
+        merged = []
+        
+        # Add local examples first
+        for ex in local_examples:
+            code = ex.get("code", "")
+            normalized = ' '.join(code.split())
+            code_hash = hash(normalized)
+            if code_hash not in seen_codes:
+                seen_codes.add(code_hash)
+                merged.append(ex)
+        
+        # Add online examples that aren't duplicates
+        for ex in online_examples:
+            code = ex.get("code", "")
+            normalized = ' '.join(code.split())
+            code_hash = hash(normalized)
+            if code_hash not in seen_codes:
+                seen_codes.add(code_hash)
+                merged.append(ex)
+        
+        return merged
+    
+    def buildContext(self, prompt: str, use_online: bool = True) -> Dict:
+        """
+        Build context for a given prompt using local and optional online sources.
         
         Args:
             prompt: User's input prompt
+            use_online: Whether to supplement with online search
             
         Returns:
             Dictionary with relevant examples, APIs, and scene context
         """
         # Identify relevant topics/files
-        relevant_files = self._identifyTopics(prompt)
+        relevant_files = self._identify_topics(prompt)
         
-        # Build context
+        # Build base context
         context = {
             "topics": [],
             "examples": [],
             "file_descriptions": {},
             "scene": None,
+            "online_examples": [],
+            "online_sources": [],
+            "online_error": None,
         }
         
-        # Collect examples from relevant files
-        for filename in relevant_files[:3]:  # Limit to top 3 files
+        # Collect local examples
+        local_examples = []
+        for filename in relevant_files[:3]:
             context["topics"].append(filename.replace('.md', ''))
-            context["file_descriptions"][filename] = self._getFileSummary(filename)
+            context["file_descriptions"][filename] = self._get_file_summary(filename)
             
-            examples = self._getCodeExamples(filename, max_examples=3)
+            examples = self._get_code_examples(filename, max_examples=3)
             for example in examples:
-                context["examples"].append({
+                local_examples.append({
                     "source": filename,
-                    "code": example.strip()
+                    "code": example.strip(),
+                    "type": "local"
                 })
         
-        # Deduplicate examples (by full code content, normalized)
-        seen_codes = set()
-        unique_examples = []
-        for ex in context["examples"]:
-            # Normalize code: strip whitespace and use full content for hashing
-            normalized = ' '.join(ex["code"].split())
-            code_hash = hash(normalized)
-            if code_hash not in seen_codes:
-                seen_codes.add(code_hash)
-                unique_examples.append(ex)
-        context["examples"] = unique_examples[:5]  # Limit total examples
+        # Online search if enabled and needed
+        if use_online and self._online_enabled:
+            # Only search online if we have few local examples or query seems complex
+            should_search_online = (
+                len(local_examples) < 3 or
+                any(term in prompt.lower() for term in [
+                    'how to', 'example', 'sample', 'advanced', 'complex'
+                ])
+            )
+            
+            if should_search_online:
+                online_examples, sources, error = self._search_online_knowledge(
+                    prompt, relevant_files, max_results=3
+                )
+                context["online_examples"] = online_examples
+                context["online_sources"] = sources
+                context["online_error"] = error
         
-        # Add scene context if available
-        scene_context = self._getSceneContext()
+        # Merge examples
+        all_examples = self._merge_examples(local_examples, context["online_examples"])
+        context["examples"] = all_examples[:5]  # Limit total examples
+        
+        # Add scene context
+        scene_context = self._get_scene_context()
         if scene_context:
             context["scene"] = scene_context
         
@@ -549,14 +612,28 @@ class SkillContextManager:
                 lines.append(f"- {filename.replace('.md', '')}: {description}")
             lines.append("")
         
-        # Add code examples
-        if context.get("examples"):
-            lines.append("## RELEVANT CODE EXAMPLES:")
-            for i, example in enumerate(context["examples"][:3], 1):
+        # Add local code examples
+        local_examples = [ex for ex in context.get("examples", []) if ex.get("type") == "local"]
+        if local_examples:
+            lines.append("## CODE EXAMPLES FROM SLICER SCRIPT REPOSITORY:")
+            for i, example in enumerate(local_examples[:3], 1):
                 lines.append(f"\n### Example {i} (from {example['source']}):")
                 lines.append("```python")
-                lines.append(example["code"])
+                lines.append(example['code'])
                 lines.append("```")
+            lines.append("")
+        
+        # Add online code examples
+        online_examples = [ex for ex in context.get("examples", []) if ex.get("type") == "github"]
+        if online_examples:
+            lines.append("## ADDITIONAL CODE EXAMPLES FROM SLICER SOURCE:")
+            for i, example in enumerate(online_examples[:2], 1):
+                lines.append(f"\n### Example {i} (from {example.get('file', 'Slicer source')}):")
+                lines.append("```python")
+                lines.append(example['code'])
+                lines.append("```")
+                if example.get('url'):
+                    lines.append(f"[Source: {example['url']}]")
             lines.append("")
         
         # Add scene context
@@ -571,11 +648,29 @@ class SkillContextManager:
                 lines.append(f"Sample nodes: {', '.join(scene['sample_node_names'][:3])}")
             lines.append("")
         
+        # Add online search status if there was an error
+        if context.get("online_error") and self._online_enabled:
+            lines.append(f"<!-- Note: Online knowledge search unavailable: {context['online_error']} -->")
+        
         return "\n".join(lines)
     
     def refreshCache(self):
         """Reload all files from disk into cache."""
         self._file_cache.clear()
         self._code_cache.clear()
-        self._preloadCache()
+        self._preload_cache()
+        if self._online_client:
+            self._online_client.clear_cache()
         logger.info("Skill cache refreshed")
+    
+    def get_status(self) -> Dict:
+        """Get current status including online availability."""
+        status = {
+            "local_available": os.path.exists(self.script_repo_path),
+            "online_enabled": self._online_enabled,
+        }
+        
+        if self._online_client:
+            status["online_status"] = self._online_client.get_status()
+        
+        return status
