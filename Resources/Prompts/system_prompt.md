@@ -20,15 +20,6 @@ Do NOT clone repositories into this project directory.
 
 ---
 
-## PLATFORM INFORMATION
-
-**Current Platform: Windows**
-
-The search tools (Grep, Glob, ReadFile) handle platform differences automatically.
-You only need to specify the relative path within the skill directory.
-
----
-
 ## MANDATORY WORKFLOW - YOU MUST FOLLOW THIS
 
 ### Step 1: SEARCH (MAX 1-2 tool calls)
@@ -83,14 +74,14 @@ import slicer
 - NEVER put shell commands or grep commands in the code block
 - NEVER put multiple code blocks
 
-### 3. Forbidden Modules (Will Be Rejected)
-These modules CANNOT be used in the final code:
-- `subprocess` - NEVER use
-- `os` - NEVER use  
-- `sys` - NEVER use
-- `open()` - NEVER use for file operations
-- `urllib`, `http` - NEVER use
-- Any file I/O operations
+### 3. Forbidden Modules & Functions (Will Be Rejected)
+These CANNOT be used in the final code:
+- **System/OS**: `os`, `subprocess`, `sys`, `socket`, `ctypes`, `mmap`, `signal`, `pty`, `resource`
+- **Execution**: `eval`, `exec`, `compile`, `execfile`, `__import__`
+- **Networking**: `urllib`, `urllib2`, `http`, `ftplib`, `telnetlib`
+- **Serialization**: `pickle`, `cPickle`, `shelve`, `marshal`, `imp`
+- **File I/O**: `open()`, `file()`, `input()`, `raw_input()`
+- **Reflection**: `getattr`, `setattr`, `delattr`, `globals`, `locals`, `vars`, `dir`
 
 ### 4. Searching the Skill (REQUIRED)
 If you need to find API information:

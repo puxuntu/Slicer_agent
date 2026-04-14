@@ -405,40 +405,6 @@ class SkillContextManager:
         
         return context
     
-    def formatContextForPrompt(self, context: Dict) -> str:
-        """
-        Format the context dictionary into a string suitable for LLM prompt.
-        
-        Args:
-            context: Context dictionary from buildContext()
-            
-        Returns:
-            Formatted context string
-        """
-        lines = []
-        
-        # Add API guidance
-        hints = context.get("api_hints", [])
-        if hints:
-            lines.append("## API GUIDANCE")
-            for hint in hints:
-                lines.append(f"- {hint}")
-            lines.append("")
-        
-        # Add scene context
-        if context.get("scene"):
-            scene = context["scene"]
-            lines.append("## CURRENT SLICER SCENE")
-            if scene.get("node_counts"):
-                lines.append("Nodes in scene:")
-                for node_type, count in scene["node_counts"].items():
-                    lines.append(f"  - {node_type}: {count}")
-            if scene.get("sample_node_names"):
-                lines.append(f"Sample node names: {', '.join(scene['sample_node_names'][:3])}")
-            lines.append("")
-        
-        return "\n".join(lines)
-    
     def get_status(self) -> Dict:
         """
         Get current status of the skill context manager.

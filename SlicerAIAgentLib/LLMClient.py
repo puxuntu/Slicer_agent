@@ -182,28 +182,68 @@ class LLMClient:
     
     def _getFallbackSystemPrompt(self) -> str:
         """
-        Get a minimal fallback system prompt if the file cannot be loaded.
-        
-        Returns:
-            Fallback system prompt string
+        Get a fallback system prompt if the file cannot be loaded.
+        Matches the structure of Resources/Prompts/system_prompt.md.
         """
-        return """You are an expert 3D Slicer developer assistant.
+        return """## Slicer Programming Reference
 
-Generate accurate, safe Python code for 3D Slicer operations.
+For help writing 3D Slicer code, search the slicer skill using the available tools.
 
-CRITICAL RULES:
-1. After modifying volume arrays with arrayFromVolume(), always call arrayFromVolumeModified()
-2. Node names are not unique - use GetID() for reliable identification
-3. Slicer uses RAS coordinate system internally
-4. Volume arrays are KJI order (slice, row, column), not IJK
-5. Call slicer.app.processEvents() in long-running loops
+## MANDATORY WORKFLOW - YOU MUST FOLLOW THIS
 
-Use slicer.util functions first, then MRML scene methods, then module logics.
+### Step 1: SEARCH (MAX 1-2 tool calls)
+Before writing code, search the skill for API information using Grep or ReadFile.
+STOP CONDITION: Once you find the relevant API information (1-2 searches), proceed to Step 3. DO NOT keep searching.
 
-Output format:
-1. Brief explanation (1-2 sentences)
-2. Python code in ```python block
-3. Safety warnings if applicable
+### Step 2: WRITE CODE IMMEDIATELY
+After getting search results, you MUST output the final code. DO NOT request more tools.
+
+## CRITICAL RULES - NEVER VIOLATE
+
+### 1. Output Format (STRICT)
+Your response MUST follow this exact structure:
+
+```
+[Thinking]
+Step 1: I need to search for [specific API]...
+Step 2: (Describe what you found in skill search)
+Step 3: Based on the search results, I'll use [exact API name]
+
+```python
+# EXACTLY ONE python code block with the final, executable code
+import slicer
+# ... Slicer code only, using APIs confirmed from skill search
+```
+```
+
+### 2. Code Block Rules
+- **ONLY ONE** ```python code block in the entire response
+- The code block must contain **executable Slicer Python code only**
+- NEVER put subprocess, os, sys, open(), file operations in the code block
+- NEVER put shell commands or grep commands in the code block
+- NEVER put multiple code blocks
+
+### 3. Forbidden Modules & Functions (Will Be Rejected)
+These CANNOT be used in the final code:
+- **System/OS**: `os`, `subprocess`, `sys`, `socket`, `ctypes`, `mmap`, `signal`, `pty`, `resource`
+- **Execution**: `eval`, `exec`, `compile`, `execfile`, `__import__`
+- **Networking**: `urllib`, `urllib2`, `http`, `ftplib`, `telnetlib`
+- **Serialization**: `pickle`, `cPickle`, `shelve`, `marshal`, `imp`
+- **File I/O**: `open()`, `file()`, `input()`, `raw_input()`
+- **Reflection**: `getattr`, `setattr`, `delattr`, `globals`, `locals`, `vars`, `dir`
+
+### 4. Searching the Skill (REQUIRED)
+If you need to find API information:
+- **MUST use tools** (Grep, ReadFile, Glob) to search the skill
+- Put your search process description in [Thinking] section
+- **NEVER** write Python code to search (no subprocess, no file open)
+
+## Common Pitfalls
+1. **NEVER generate code to search the skill** - Use tools for search, not Python code
+2. **NEVER include subprocess calls** - These will be rejected by the validator
+3. **NEVER include file operations** - Use slicer.util functions instead
+4. **ONLY ONE code block** - Multiple code blocks will cause confusion
+5. **NEVER guess API names** - Always search the skill first to confirm exact names
 """
 
     def _buildSystemPrompt(self, context: Optional[Dict] = None) -> str:
@@ -219,7 +259,14 @@ Output format:
         """
         # Start with the template from file
         base_prompt = self._system_prompt_template
-        
+
+        # Inject dynamic platform information
+        import platform
+        base_prompt += f"\n\n## PLATFORM INFORMATION\n"
+        base_prompt += f"Current Platform: {platform.system()}\n"
+        base_prompt += "The search tools (Grep, Glob, ReadFile) handle platform differences automatically.\n"
+        base_prompt += "You only need to specify the relative path within the skill directory.\n"
+
         # Add dynamic context from SkillContextManager
         if context:
             # Add skill location for reference
@@ -761,12 +808,12 @@ Output format:
         code_pattern = r'```python\s*\n(.*?)\n```'
         matches = re.findall(code_pattern, message, re.DOTALL)
         if matches:
-            return '\n\n'.join(matches)
+            return matches[0]  # Enforce exactly one code block
 
         code_pattern = r'```\s*\n(.*?)\n```'
         matches = re.findall(code_pattern, message, re.DOTALL)
         if matches:
-            return '\n\n'.join(matches)
+            return matches[0]  # Enforce exactly one code block
 
         return None
 
