@@ -1,8 +1,8 @@
 """
 SkillContextManager - Manages skill-based context for LLM prompts.
 
-Integrates with the external slicer-skill-full knowledge base located at:
-    C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full
+Integrates with the slicer-skill-full knowledge base located alongside the
+extension at: Resources/Skills/slicer-skill-full (relative to the extension root).
 
 The AI agent uses tools (Grep, Glob, ReadFile) to search the skill directly.
 This manager provides:
@@ -31,8 +31,11 @@ class SkillContextManager:
     - Provides current MRML scene context
     """
     
-    # Path to the external skill directory
-    SKILL_PATH = "C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full"
+    # Path to the skill directory (resolved relative to this file's location)
+    SKILL_PATH = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'Resources', 'Skills', 'slicer-skill-full'
+    ))
     
     # API guidance hints based on keywords
     # These tell the AI which Slicer APIs to use - NOT search commands
