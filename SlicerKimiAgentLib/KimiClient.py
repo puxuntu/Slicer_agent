@@ -695,10 +695,27 @@ Output format:
                     "content": "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
                 })
                 
-                # Report progress (simplified format)
+                # Report progress with detailed tool info
                 if on_progress:
-                    tool_names = [tc['tool'] for tc in tool_calls_history[-len(tool_results):]]
-                    progress_msg = f"🔍 Tools: {', '.join(tool_names)}\n"
+                    progress_lines = [f"🔍 Round {round_num + 1}:"]
+                    for tc in tool_calls_history[-len(tool_results):]:
+                        tool_name = tc['tool']
+                        args = tc['args']
+                        # Build detailed description based on tool type
+                        if tool_name == 'Grep':
+                            pattern = args.get('pattern', 'N/A')
+                            path = args.get('path', 'N/A')
+                            progress_lines.append(f"  Grep: \"{pattern}\" → {path}")
+                        elif tool_name == 'ReadFile':
+                            path = args.get('path', 'N/A')
+                            progress_lines.append(f"  ReadFile: {path}")
+                        elif tool_name == 'Glob':
+                            pattern = args.get('pattern', 'N/A')
+                            path = args.get('path', 'N/A')
+                            progress_lines.append(f"  Glob: {pattern} in {path}")
+                        else:
+                            progress_lines.append(f"  {tool_name}: {args}")
+                    progress_msg = '\n'.join(progress_lines) + '\n'
                     on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1})
                 
                 logger.info(f"Round {round_num + 1} complete. Added {len(tool_results)} tool results. Proceeding to next round.")
