@@ -145,11 +145,11 @@ class LLMClient:
 
         messages.append({"role": "user", "content": prompt})
 
-        # DEBUG: Write the final assembled prompt to a local file for inspection
+        # DEBUG: Write the first-turn prompt to a local file for inspection
         try:
             debug_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'last_prompt_debug.txt'
+                'first_prompt_debug.txt'
             )
             with open(debug_path, 'w', encoding='utf-8') as f:
                 for i, msg in enumerate(messages):
@@ -681,6 +681,23 @@ If you need to find API information:
                 
                 if not tool_calls:
                     # No tool calls, we have the final response
+                    # DEBUG: Write the complete messages (including any tool results) to a local file
+                    try:
+                        debug_path = os.path.join(
+                            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'last_prompt_debug.txt'
+                        )
+                        with open(debug_path, 'w', encoding='utf-8') as f:
+                            for i, msg in enumerate(messages):
+                                f.write(f"{'='*60}\n")
+                                f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
+                                f.write(f"{'='*60}\n")
+                                if 'tool_calls' in msg:
+                                    f.write("[tool_calls present]\n")
+                                f.write(f"{msg.get('content', '')}\n\n")
+                    except Exception:
+                        pass
+
                     self._appendConversation(prompt, content, reasoning_content)
                     response = self._buildResponse(
                         content,
