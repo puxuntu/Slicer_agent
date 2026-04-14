@@ -267,34 +267,21 @@ If you need to find API information:
         base_prompt += "The search tools (Grep, Glob, ReadFile) handle platform differences automatically.\n"
         base_prompt += "You only need to specify the relative path within the skill directory.\n"
 
-        # Add dynamic context from SkillContextManager
-        if context:
-            # Add skill location for reference
-            if context.get('skill_path'):
-                base_prompt += f"\n\n## SKILL LOCATION\n"
-                base_prompt += f"Base path: {context['skill_path']}\n"
-                base_prompt += f"Key locations:\n"
-                base_prompt += f"  - Script repository: slicer-source/Docs/developer_guide/script_repository/\n"
-                base_prompt += f"  - Slicer util: slicer-source/Base/Python/slicer/util.py\n"
-                base_prompt += f"  - Volume rendering: slicer-source/Modules/Loadable/VolumeRendering/\n"
-                base_prompt += f"  - Segmentations: slicer-source/Modules/Loadable/Segmentations/\n"
-            
-            # Add API guidance hints
-            if context.get('api_hints'):
-                base_prompt += "\n## API GUIDANCE\n"
-                for hint in context['api_hints']:
-                    base_prompt += f"- {hint}\n"
-
-            # Add scene context
-            if context.get('scene'):
-                scene = context['scene']
-                base_prompt += "\n## CURRENT SLICER SCENE:\n"
-                if scene.get('node_counts'):
-                    base_prompt += "Nodes in scene:\n"
-                    for node_type, count in scene['node_counts'].items():
-                        base_prompt += f"  - {node_type}: {count}\n"
-                if scene.get('sample_node_names'):
-                    base_prompt += f"Sample nodes: {', '.join(scene['sample_node_names'][:3])}\n"
+        # Add dynamic scene context
+        if context and context.get('scene'):
+            scene = context['scene']
+            base_prompt += "\n\n## CURRENT SLICER SCENE\n"
+            if scene.get('node_counts'):
+                base_prompt += "Nodes in scene:\n"
+                for node_type, count in scene['node_counts'].items():
+                    base_prompt += f"  - {node_type}: {count}\n"
+            if scene.get('nodes_by_type'):
+                base_prompt += "Node details by type:\n"
+                for node_type, names in scene['nodes_by_type'].items():
+                    name_list = ', '.join(names[:5])
+                    if len(names) > 5:
+                        name_list += f", ... ({len(names) - 5} more)"
+                    base_prompt += f"  - {node_type}: {name_list}\n"
 
         return base_prompt
 

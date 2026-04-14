@@ -257,34 +257,18 @@ More text.
         
         manager = SkillContextManager()
         
-        # Test context building for volume operations
-        context = manager.buildContext("load a volume and render it")
-        self.assertIsNotNone(context)
-        self.assertIn("search_hints", context)
-        self.assertTrue(len(context.get("search_hints", [])) > 0)
+        # Test skill path resolution
+        self.assertIsNotNone(manager.skill_path)
+        self.assertTrue(os.path.exists(manager.skill_path) or manager.get_skill_mode() == "unknown")
         
-        # Test context building for segmentation
-        context = manager.buildContext("create a segmentation and threshold")
-        self.assertIsNotNone(context)
-        hints = context.get("search_hints", [])
-        self.assertTrue(any("segment" in h.lower() for h in hints))
-        
-        # Test context building for markups
-        context = manager.buildContext("add fiducial points")
-        self.assertIsNotNone(context)
-        hints = context.get("search_hints", [])
-        self.assertTrue(any("markup" in h.lower() or "fiducial" in h.lower() for h in hints))
-        
-        # Test context formatting
-        context = manager.buildContext("load volume")
-        formatted = manager.formatContextForPrompt(context)
-        self.assertIn("SLICER SKILL CONTEXT", formatted)
-        self.assertIn("SEARCH HINTS", formatted)
+        # Test skill mode detection
+        self.assertIn(manager.get_skill_mode(), ["full", "lightweight", "web", "unknown"])
         
         # Test status
         status = manager.get_status()
         self.assertIn("skill_path", status)
         self.assertIn("skill_mode", status)
+        self.assertIn("skill_exists", status)
         
         self.delayDisplay("SkillContextManager tests passed")
 
@@ -378,10 +362,9 @@ More text.
         validator = CodeValidator()
         executor = SafeExecutor()
         
-        # Test workflow: Build context -> Validate -> Execute (mock)
+        # Test workflow: component initialization and basic operations
         prompt = "load a volume"
-        context = skill_manager.buildContext(prompt)
-        self.assertIsNotNone(context)
+        self.assertIsNotNone(skill_manager.skill_path)
         
         # Test code validation
         test_code = "volume = slicer.util.loadVolume('/path/to/volume.nrrd')"

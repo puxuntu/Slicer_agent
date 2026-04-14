@@ -376,7 +376,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._renderStreamingEntry()
 
         # Build context on the main thread (it reads the MRML scene)
-        context = self.logic._buildContext(prompt) if self.logic else None
+        context = {"scene": self.logic._buildSceneContext()} if self.logic else None
 
         # Launch the streaming request in a background thread
         def _backgroundStream():
@@ -498,7 +498,7 @@ Only output the complete corrected Python code in a single code block."""
         # Generate corrected code in background
         def generateCorrection():
             try:
-                context = self.logic._buildContext(correction_prompt) if self.logic else None
+                context = {"scene": self.logic._buildSceneContext()} if self.logic else None
                 response = self.logic.generateResponse(correction_prompt, context=context)
                 
                 if response.get("code"):
@@ -708,7 +708,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         if not self.apiKey:
             raise RuntimeError("API key not configured")
 
-        context = self._buildContext(prompt)
+        context = {"scene": self._buildSceneContext()}
         response = self.llmClient.chat(prompt, context=context)
         self.conversationStore.addExchange(prompt, response)
         return response
@@ -735,7 +735,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             raise RuntimeError("API key not configured")
 
         if context is None:
-            context = self._buildContext(prompt)
+            context = {"scene": self._buildSceneContext()}
 
         if use_tools and self.toolExecutor and self.skillTools:
             # Use tool calling for skill search
@@ -803,10 +803,50 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             logger.error(f"Tool execution failed: {tool_name} - {e}")
             return {"error": str(e)}
 
-    def _buildContext(self, prompt):
-        if not self.skillManager:
+    def _buildSceneContext(self):
+        """
+        Build context about the current Slicer MRML scene.
+
+        Returns:
+            Dictionary with node counts and node names by type, or None.
+        """
+        try:
+            scene = slicer.mrmlScene
+            context = {
+                "node_counts": {},
+                "nodes_by_type": {},
+            }
+
+            node_classes = [
+                ("vtkMRMLScalarVolumeNode", "Volume"),
+                ("vtkMRMLLabelMapVolumeNode", "LabelMap"),
+                ("vtkMRMLModelNode", "Model"),
+                ("vtkMRMLSegmentationNode", "Segmentation"),
+                ("vtkMRMLTransformNode", "Transform"),
+                ("vtkMRMLMarkupsFiducialNode", "Fiducial"),
+                ("vtkMRMLMarkupsCurveNode", "Curve"),
+                ("vtkMRMLMarkupsPlaneNode", "Plane"),
+                ("vtkMRMLMarkupsROINode", "ROI"),
+            ]
+
+            for class_name, display_name in node_classes:
+                nodes = scene.GetNodesByClass(class_name)
+                count = nodes.GetNumberOfItems()
+                if count > 0:
+                    context["node_counts"][display_name] = count
+                    names = []
+                    for i in range(count):
+                        node = nodes.GetItemAsObject(i)
+                        if node and node.GetName():
+                            names.append(node.GetName())
+                    if names:
+                        context["nodes_by_type"][display_name] = names
+
+            return context if context["node_counts"] else None
+
+        except Exception as e:
+            logger.warning(f"Failed to get scene context: {e}")
             return None
-        return self.skillManager.buildContext(prompt)
 
     def executeCode(self, code):
         validation = self.codeValidator.validate(code)
@@ -911,7 +951,7 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         from SlicerAIAgentLib import SkillContextManager
 
         manager = SkillContextManager.SkillContextManager()
-        context = manager.buildContext("load a volume")
 
-        self.assertIsNotNone(context, "Context should be built")
+        self.assertIsNotNone(manager.skill_path, "Skill path should be set")
+        self.assertIn(manager.get_skill_mode(), ["full", "lightweight", "web", "unknown"])
         self.delayDisplay("Skill context manager test passed")

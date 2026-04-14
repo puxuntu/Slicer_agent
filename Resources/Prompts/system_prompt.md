@@ -20,6 +20,18 @@ Do NOT clone repositories into this project directory.
 
 ---
 
+## SKILL LOCATION
+
+Base path: `Resources/Skills/slicer-skill-full`
+
+Key locations within the skill:
+  - Script repository: `slicer-source/Docs/developer_guide/script_repository/`
+  - Slicer util module: `slicer-source/Base/Python/slicer/util.py`
+  - Volume rendering: `slicer-source/Modules/Loadable/VolumeRendering/`
+  - Segmentations: `slicer-source/Modules/Loadable/Segmentations/`
+
+---
+
 ## MANDATORY WORKFLOW - YOU MUST FOLLOW THIS
 
 ### Step 1: SEARCH (MAX 1-2 tool calls)
