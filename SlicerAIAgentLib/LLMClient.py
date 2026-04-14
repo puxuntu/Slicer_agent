@@ -144,6 +144,24 @@ class LLMClient:
         messages.extend(history_to_include)
 
         messages.append({"role": "user", "content": prompt})
+
+        # DEBUG: Write the final assembled prompt to a local file for inspection
+        try:
+            debug_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'last_prompt_debug.txt'
+            )
+            with open(debug_path, 'w', encoding='utf-8') as f:
+                for i, msg in enumerate(messages):
+                    f.write(f"{'='*60}\n")
+                    f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
+                    f.write(f"{'='*60}\n")
+                    if 'tool_calls' in msg:
+                        f.write("[tool_calls present]\n")
+                    f.write(f"{msg.get('content', '')}\n\n")
+        except Exception:
+            pass  # Silently ignore debug write failures
+
         return messages
 
     def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
@@ -271,17 +289,12 @@ If you need to find API information:
         if context and context.get('scene'):
             scene = context['scene']
             base_prompt += "\n\n## CURRENT SLICER SCENE\n"
-            if scene.get('node_counts'):
-                base_prompt += "Nodes in scene:\n"
-                for node_type, count in scene['node_counts'].items():
-                    base_prompt += f"  - {node_type}: {count}\n"
-            if scene.get('nodes_by_type'):
-                base_prompt += "Node details by type:\n"
-                for node_type, names in scene['nodes_by_type'].items():
-                    name_list = ', '.join(names[:5])
-                    if len(names) > 5:
-                        name_list += f", ... ({len(names) - 5} more)"
-                    base_prompt += f"  - {node_type}: {name_list}\n"
+            base_prompt += "Raw unprocessed scene context (let the AI analyze):\n```\n"
+            try:
+                base_prompt += json.dumps(scene, ensure_ascii=False, indent=2)
+            except Exception:
+                base_prompt += str(scene)
+            base_prompt += "\n```\n"
 
         return base_prompt
 

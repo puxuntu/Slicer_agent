@@ -825,45 +825,39 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _buildSceneContext(self):
         """
-        Build context about the current Slicer MRML scene.
+        Build raw context about the current Slicer MRML scene.
 
         Returns:
-            Dictionary with node counts and node names by type, or None.
+            Dictionary with the raw MRML XML string, or None.
         """
         try:
             scene = slicer.mrmlScene
-            context = {
-                "node_counts": {},
-                "nodes_by_type": {},
+            raw_mrml = scene.GetSaveToString()
+            return {
+                "raw_mrml": raw_mrml,
             }
+        except Exception:
+            pass
 
-            node_classes = [
-                ("vtkMRMLScalarVolumeNode", "Volume"),
-                ("vtkMRMLLabelMapVolumeNode", "LabelMap"),
-                ("vtkMRMLModelNode", "Model"),
-                ("vtkMRMLSegmentationNode", "Segmentation"),
-                ("vtkMRMLTransformNode", "Transform"),
-                ("vtkMRMLMarkupsFiducialNode", "Fiducial"),
-                ("vtkMRMLMarkupsCurveNode", "Curve"),
-                ("vtkMRMLMarkupsPlaneNode", "Plane"),
-                ("vtkMRMLMarkupsROINode", "ROI"),
-            ]
-
-            for class_name, display_name in node_classes:
-                nodes = scene.GetNodesByClass(class_name)
-                count = nodes.GetNumberOfItems()
-                if count > 0:
-                    context["node_counts"][display_name] = count
-                    names = []
-                    for i in range(count):
-                        node = nodes.GetItemAsObject(i)
-                        if node and node.GetName():
-                            names.append(node.GetName())
-                    if names:
-                        context["nodes_by_type"][display_name] = names
-
-            return context if context["node_counts"] else None
-
+        # Fallback: iterate all nodes and build a raw node list
+        try:
+            scene = slicer.mrmlScene
+            all_nodes = scene.GetNodes()
+            total = all_nodes.GetNumberOfItems()
+            node_list = []
+            for i in range(total):
+                node = all_nodes.GetItemAsObject(i)
+                if node is None:
+                    continue
+                node_list.append({
+                    "class": node.GetClassName(),
+                    "name": node.GetName() or "(unnamed)",
+                    "id": node.GetID(),
+                })
+            return {
+                "raw_mrml": "",
+                "fallback_nodes": node_list,
+            }
         except Exception as e:
             logger.warning(f"Failed to get scene context: {e}")
             return None
