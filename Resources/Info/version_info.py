@@ -1,6 +1,6 @@
-# SlicerKimiAgent Extension
+# SlicerAIAgent Extension
 """
-AI-powered assistant extension for 3D Slicer using KIMI API.
+AI-powered assistant extension for 3D Slicer using LLM APIs.
 Provides intelligent code generation and scene manipulation through natural language.
 """
 

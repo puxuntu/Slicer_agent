@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>SlicerKimiAgentWidget</class>
- <widget class="QWidget" name="SlicerKimiAgentWidget">
+ <class>SlicerAIAgentWidget</class>
+ <widget class="QWidget" name="SlicerAIAgentWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Slicer KIMI Agent</string>
+   <string>Slicer AI Agent</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    
@@ -38,7 +38,7 @@
          <enum>QLineEdit::Password</enum>
         </property>
         <property name="placeholderText">
-         <string>Enter your KIMI API key</string>
+         <string>Enter your API key</string>
         </property>
        </widget>
       </item>

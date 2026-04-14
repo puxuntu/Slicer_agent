@@ -3,12 +3,12 @@ cmake_minimum_required(VERSION 3.16)
 #------------------------------------------------------------------
 # Extension Meta-information
 #------------------------------------------------------------------
-set(EXTENSION_NAME SlicerKimiAgent)
+set(EXTENSION_NAME SlicerAIAgent)
 set(EXTENSION_CATEGORY "AI")
 set(EXTENSION_CONTRIBUTORS "Puxun (Agent Developer)")
 set(EXTENSION_DESCRIPTION "An AI-powered assistant extension for 3D Slicer using KIMI API. Provides intelligent code generation, scene manipulation through natural language, and guided workflows.")
-set(EXTENSION_ICONURL "https://raw.githubusercontent.com/yourusername/SlicerKimiAgent/main/SlicerKimiAgent.png")
-set(EXTENSION_SCREENSHOTURLS "https://raw.githubusercontent.com/yourusername/SlicerKimiAgent/main/screenshots/screenshot1.png")
+set(EXTENSION_ICONURL "https://raw.githubusercontent.com/yourusername/SlicerAIAgent/main/SlicerAIAgent.png")
+set(EXTENSION_SCREENSHOTURLS "https://raw.githubusercontent.com/yourusername/SlicerAIAgent/main/screenshots/screenshot1.png")
 set(EXTENSION_DEPENDS "NA")
 set(EXTENSION_LICENSE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
 set(EXTENSION_README_FILE ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
@@ -42,7 +42,7 @@ endif()
 #------------------------------------------------------------------
 # Scripted modules
 set(modules
-  SlicerKimiAgent
+  SlicerAIAgent
   )
 
 foreach(module ${modules})
@@ -58,8 +58,8 @@ endforeach()
 #------------------------------------------------------------------
 if(BUILD_TESTING)
   slicerMacroBuildScriptedModule(
-    NAME SlicerKimiAgentTest
-    SCRIPTS Testing/SlicerKimiAgentTest.py
+    NAME SlicerAIAgentTest
+    SCRIPTS Testing/SlicerAIAgentTest.py
     )
 endif()
 

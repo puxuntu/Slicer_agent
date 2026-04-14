@@ -1,10 +1,10 @@
 """
-Unit tests for SlicerKimiAgent extension.
+Unit tests for SlicerAIAgent extension.
 
 Run these tests from Slicer's Python console:
     import unittest
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromName('SlicerKimiAgentTest')
+    suite = loader.loadTestsFromName('SlicerAIAgentTest')
     unittest.TextTestRunner(verbosity=2).run(suite)
 """
 
@@ -24,9 +24,9 @@ from slicer.ScriptedLoadableModule import *
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
+class SlicerAIAgentTest(ScriptedLoadableModuleTest):
     """
-    Comprehensive test suite for SlicerKimiAgent.
+    Comprehensive test suite for SlicerAIAgent.
     """
 
     def setUp(self):
@@ -44,7 +44,7 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
         self.tearDown()
         
         self.setUp()
-        self.test_KimiClient()
+        self.test_LLMClient()
         self.tearDown()
         
         self.setUp()
@@ -74,8 +74,8 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
     def test_ModuleImport(self):
         """Test that all module components can be imported."""
         try:
-            from SlicerKimiAgentLib import (
-                KimiClient,
+            from SlicerAIAgentLib import (
+                LLMClient,
                 SkillContextManager,
                 SkillTools,
                 CodeValidator,
@@ -88,11 +88,11 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
             self.delayDisplay(f"Module import failed: {e}")
             raise
 
-    def test_KimiClient(self):
-        """Test KimiClient functionality."""
-        from SlicerKimiAgentLib import KimiClient
+    def test_LLMClient(self):
+        """Test LLMClient functionality."""
+        from SlicerAIAgentLib import LLMClient
 
-        client = KimiClient()
+        client = LLMClient()
 
         # Test defaults
         self.assertEqual(client.model, "kimi-k2.5")
@@ -169,11 +169,11 @@ More text.
         self.assertIn("SKILL LOCATION", prompt)
         self.assertIn("loadVolume", prompt)
 
-        self.delayDisplay("KimiClient tests passed")
+        self.delayDisplay("LLMClient tests passed")
 
     def test_CodeValidator(self):
         """Test CodeValidator functionality."""
-        from SlicerKimiAgentLib import CodeValidator
+        from SlicerAIAgentLib import CodeValidator
         
         validator = CodeValidator()
         
@@ -215,7 +215,7 @@ More text.
 
     def test_SafeExecutor(self):
         """Test SafeExecutor functionality."""
-        from SlicerKimiAgentLib import SafeExecutor
+        from SlicerAIAgentLib import SafeExecutor
         
         executor = SafeExecutor()
         
@@ -253,7 +253,7 @@ More text.
 
     def test_SkillContextManager(self):
         """Test SkillContextManager functionality with real Slicer skill."""
-        from SlicerKimiAgentLib import SkillContextManager
+        from SlicerAIAgentLib import SkillContextManager
         
         manager = SkillContextManager()
         
@@ -290,7 +290,7 @@ More text.
 
     def test_ConversationStore(self):
         """Test ConversationStore functionality."""
-        from SlicerKimiAgentLib import ConversationStore
+        from SlicerAIAgentLib import ConversationStore
         
         store = ConversationStore()
         store.clearAll()
@@ -338,7 +338,7 @@ More text.
 
     def test_SlicerCodeTemplates(self):
         """Test SlicerCodeTemplates functionality."""
-        from SlicerKimiAgentLib import SlicerCodeTemplates
+        from SlicerAIAgentLib import SlicerCodeTemplates
         
         # Test getting specific template
         template = SlicerCodeTemplates.getTemplate("load_volume")
@@ -365,15 +365,15 @@ More text.
 
     def test_Integration(self):
         """Integration test of multiple components."""
-        from SlicerKimiAgentLib import (
-            KimiClient,
+        from SlicerAIAgentLib import (
+            LLMClient,
             SkillContextManager,
             CodeValidator,
             SafeExecutor,
         )
         
         # Create components
-        client = KimiClient()
+        client = LLMClient()
         skill_manager = SkillContextManager()
         validator = CodeValidator()
         executor = SafeExecutor()
@@ -395,13 +395,13 @@ More text.
         self.delayDisplay("Integration tests passed")
 
 
-class SlicerKimiAgentLogicTest(unittest.TestCase):
-    """Tests for the SlicerKimiAgentLogic class."""
+class SlicerAIAgentLogicTest(unittest.TestCase):
+    """Tests for the SlicerAIAgentLogic class."""
 
     def setUp(self):
         """Setup for each test."""
-        from SlicerKimiAgent import SlicerKimiAgentLogic
-        self.logic = SlicerKimiAgentLogic()
+        from SlicerAIAgent import SlicerAIAgentLogic
+        self.logic = SlicerAIAgentLogic()
 
     def tearDown(self):
         """Cleanup after each test."""
@@ -419,10 +419,10 @@ class SlicerKimiAgentLogicTest(unittest.TestCase):
     def test_model_setting(self):
         """Test model setting."""
         self.logic.setModel("moonshot-v1-32k")
-        self.assertEqual(self.logic.kimiClient.model, "moonshot-v1-32k")
+        self.assertEqual(self.logic.llmClient.model, "moonshot-v1-32k")
 
         self.logic.setModel("kimi-latest")
-        self.assertEqual(self.logic.kimiClient.model, "kimi-k2.5")
+        self.assertEqual(self.logic.llmClient.model, "kimi-k2.5")
 
     def test_conversation_clear(self):
         """Test conversation clearing."""

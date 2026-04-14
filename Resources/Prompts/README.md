@@ -1,14 +1,14 @@
 # System Prompts
 
-This directory contains the system prompts used by SlicerKimiAgent.
+This directory contains the system prompts used by SlicerAIAgent.
 
 ## Files
 
 ### system_prompt.md
 
-The main system prompt template loaded by `KimiClient` when building prompts for the KIMI API.
+The main system prompt template loaded by `LLMClient` when building prompts for the LLM API.
 
-**Location:** `SlicerKimiAgent/Resources/Prompts/system_prompt.md`
+**Location:** `SlicerAIAgent/Resources/Prompts/system_prompt.md`
 
 **Contents:**
 - Core mission and role definition
@@ -35,9 +35,9 @@ You can edit this file to customize the AI assistant's behavior without modifyin
 
 ## Fallback Mechanism
 
-If the system prompt file cannot be loaded (e.g., file missing or corrupted), `KimiClient` will automatically use a minimal built-in fallback prompt to ensure the system remains functional.
+If the system prompt file cannot be loaded (e.g., file missing or corrupted), `LLMClient` will automatically use a minimal built-in fallback prompt to ensure the system remains functional.
 
 ## Related Files
 
-- `SlicerKimiAgentLib/KimiClient.py` - Loads and uses this prompt
+- `SlicerAIAgentLib/LLMClient.py` - Loads and uses this prompt
 - `Resources/Skills/script_repository/` - Source of dynamic code examples

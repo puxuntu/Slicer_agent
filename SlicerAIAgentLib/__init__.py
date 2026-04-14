@@ -1,8 +1,8 @@
 """
-SlicerKimiAgentLib - Core library for the SlicerKimiAgent extension.
+SlicerAIAgentLib - Core library for the SlicerAIAgent extension.
 
 This package contains the core components for AI-powered assistance in 3D Slicer:
-- KimiClient: HTTP client for KIMI API communication
+- LLMClient: HTTP client for LLM API communication (OpenAI-compatible)
 - SkillContextManager: Manages skill-based context for LLM prompts
 - SkillTools: Tool calling support for searching the skill
 - CodeValidator: Validates Python code for safety before execution
@@ -11,7 +11,7 @@ This package contains the core components for AI-powered assistance in 3D Slicer
 """
 
 __all__ = [
-    'KimiClient',
+    'LLMClient',
     'SkillContextManager', 
     'SkillTools',
     'CodeValidator',
@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 # Import main classes for convenient access
-from .KimiClient import KimiClient
+from .LLMClient import LLMClient
 from .SkillContextManager import SkillContextManager
 from .SkillTools import SkillToolExecutor, get_skill_tools
 from .CodeValidator import CodeValidator

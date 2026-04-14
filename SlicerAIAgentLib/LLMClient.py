@@ -1,8 +1,10 @@
 """
-KimiClient - HTTP client for KIMI API communication.
+LLMClient - HTTP client for LLM API communication.
 
 Supports streaming responses, conversation history, token tracking, and tool calling.
 System prompt is loaded from external markdown file.
+
+Compatible with OpenAI-compatible APIs including Kimi, OpenAI, and others.
 """
 
 import json
@@ -17,19 +19,20 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-class KimiClient:
+class LLMClient:
     """
-    Client for interacting with the KIMI API.
+    Client for interacting with LLM APIs (OpenAI-compatible).
 
     Features:
     - Streaming response handling
     - Multi-turn conversation support
     - Token usage tracking
     - Retry logic with exponential backoff
+    - Compatible with Kimi, OpenAI, and other OpenAI-compatible APIs
     """
 
     # API Configuration
-    # Note: Kimi API is compatible with OpenAI API format
+    # Compatible with OpenAI API format
     DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
     DEFAULT_MODEL = "kimi-k2.5"
     DEFAULT_TIMEOUT = None  # No client-side timeout for API requests
@@ -60,10 +63,10 @@ class KimiClient:
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """
-        Initialize the KIMI client.
+        Initialize the LLM client.
 
         Args:
-            api_key: KIMI API key (optional, can be set later)
+            api_key: API key (optional, can be set later)
             model: Model name to use (default: kimi-k2.5)
         """
         self.api_key = api_key
@@ -110,7 +113,7 @@ class KimiClient:
     def _buildHeaders(self) -> Dict[str, str]:
         """Build HTTP headers for API requests."""
         if not self.api_key:
-            raise RuntimeError("API key not configured. Please set your KIMI API key in Settings.")
+            raise RuntimeError("API key not configured. Please set your API key in Settings.")
 
         return {
             "Content-Type": "application/json",
@@ -255,7 +258,7 @@ Output format:
         return urllib.request.urlopen(request, timeout=self.timeout)
 
     def _buildRequest(self, url: str, payload: Optional[Dict[str, Any]] = None, method: str = 'POST') -> urllib.request.Request:
-        """Create an HTTP request for the Kimi API."""
+        """Create an HTTP request for the LLM API."""
         data = None
         if payload is not None:
             data = json.dumps(payload).encode('utf-8')
@@ -366,7 +369,7 @@ Output format:
 
     def chat(self, prompt: str, context: Optional[Dict] = None, stream: bool = False) -> Dict[str, Any]:
         """
-        Send a chat request to the KIMI API.
+        Send a chat request to the LLM API.
 
         Args:
             prompt: User's input prompt
@@ -415,7 +418,7 @@ Output format:
                 logger.warning(f"HTTP error on attempt {attempt + 1}: {e.code} - {error_body}")
 
                 if e.code == 401:
-                    raise RuntimeError("Invalid API key. Please check your KIMI API key.")
+                    raise RuntimeError("Invalid API key. Please check your API key.")
                 if e.code == 404:
                     error_data = json.loads(error_body) if error_body else {}
                     error_msg = error_data.get('error', {}).get('message', 'Model not found')
@@ -462,7 +465,7 @@ Output format:
         on_delta: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """
-        Send a streaming chat request to the KIMI API and assemble the full result.
+        Send a streaming chat request to the LLM API and assemble the full result.
 
         Args:
             prompt: User's input prompt
@@ -534,7 +537,7 @@ Output format:
                 logger.warning(f"HTTP error on attempt {attempt + 1}: {e.code} - {error_body}")
 
                 if e.code == 401:
-                    raise RuntimeError("Invalid API key. Please check your KIMI API key.")
+                    raise RuntimeError("Invalid API key. Please check your API key.")
                 if e.code == 404:
                     error_data = json.loads(error_body) if error_body else {}
                     error_msg = error_data.get('error', {}).get('message', 'Model not found')
@@ -855,4 +858,4 @@ Output format:
     def cleanup(self):
         """Cleanup resources."""
         self.conversation_history = []
-        logger.info("KimiClient cleaned up")
+        logger.info("LLMClient cleaned up")

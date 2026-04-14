@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 #------------------------------------------------------------------
 # Module Class
 #------------------------------------------------------------------
-class SlicerKimiAgent(ScriptedLoadableModule):
-    """AI-powered assistant for 3D Slicer using KIMI API."""
+class SlicerAIAgent(ScriptedLoadableModule):
+    """AI-powered assistant for 3D Slicer using LLM APIs."""
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "Slicer KIMI Agent"
+        self.parent.title = "Slicer AI Agent"
         self.parent.categories = ["AI"]
         self.parent.dependencies = []
         self.parent.contributors = ["Puxun (Agent Developer)"]
@@ -36,24 +36,24 @@ class SlicerKimiAgent(ScriptedLoadableModule):
         - Integration with Slicer's skill knowledge base
 
         Usage:
-        1. Enter your KIMI API key in Settings
+        1. Enter your API key in Settings
         2. Type your request in the chat box
         3. Review and execute the generated code
         """
         self.parent.acknowledgementText = """
-        This extension uses the KIMI API for code generation.
+        This extension uses LLM APIs for code generation.
         Thanks to the 3D Slicer community for the comprehensive skill knowledge base.
         """
         moduleDir = os.path.dirname(__file__)
-        iconPath = os.path.join(moduleDir, 'Resources', 'Icons', 'SlicerKimiAgent.png')
+        iconPath = os.path.join(moduleDir, 'Resources', 'Icons', 'SlicerAIAgent.png')
         if os.path.exists(iconPath):
             self.parent.icon = qt.QIcon(iconPath)
 
 #------------------------------------------------------------------
 # Widget Class
 #------------------------------------------------------------------
-class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
-    """Main UI widget for SlicerKimiAgent."""
+class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+    """Main UI widget for SlicerAIAgent."""
 
     def __init__(self, parent=None):
         ScriptedLoadableModuleWidget.__init__(self, parent)
@@ -73,7 +73,7 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
 
-        uiFilePath = os.path.join(os.path.dirname(__file__), 'Resources', 'UI', 'SlicerKimiAgent.ui')
+        uiFilePath = os.path.join(os.path.dirname(__file__), 'Resources', 'UI', 'SlicerAIAgent.ui')
         if os.path.exists(uiFilePath):
             self.ui = slicer.util.loadUI(uiFilePath)
             self.layout.addWidget(self.ui)
@@ -82,7 +82,7 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             self.setupUIProgrammatically()
 
-        self.logic = SlicerKimiAgentLogic()
+        self.logic = SlicerAIAgentLogic()
         self.loadSettings()
 
         self._streamPollTimer = qt.QTimer()
@@ -93,7 +93,7 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
-        logger.info("SlicerKimiAgent widget setup complete")
+        logger.info("SlicerAIAgent widget setup complete")
 
     def _connectUIWidgets(self):
         self.apiKeyInput = self.ui.findChild(qt.QLineEdit, "apiKeyInput")
@@ -111,7 +111,7 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def setupUIProgrammatically(self):
         self.ui = ctk.ctkCollapsibleButton()
-        self.ui.text = "Slicer KIMI Agent"
+        self.ui.text = "Slicer AI Agent"
         self.layout.addWidget(self.ui)
 
         mainLayout = qt.QVBoxLayout(self.ui)
@@ -125,7 +125,7 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.apiKeyInput = qt.QLineEdit()
         self.apiKeyInput.setEchoMode(qt.QLineEdit.Password)
-        self.apiKeyInput.setPlaceholderText("Enter your KIMI API key")
+        self.apiKeyInput.setPlaceholderText("Enter your API key")
         settingsLayout.addRow("API Key:", self.apiKeyInput)
 
         modelLayout = qt.QHBoxLayout()
@@ -224,12 +224,12 @@ class SlicerKimiAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self._streamPollTimer.stop()
         if self.logic:
             self.logic.cleanup()
-        logger.info("SlicerKimiAgent widget cleaned up")
+        logger.info("SlicerAIAgent widget cleaned up")
 
     def enter(self):
         if (hasattr(self, 'chatHistory') and self.chatHistory is not None and
             self.logic and not self.logic.hasApiKey()):
-            self.appendToChat("System", "Please configure your KIMI API key in Settings before using the agent.")
+            self.appendToChat("System", "Please configure your API key in Settings before using the agent.")
 
     def exit(self):
         pass
@@ -568,7 +568,7 @@ Only output the complete corrected Python code in a single code block."""
             return
 
         settings = qt.QSettings()
-        settings.beginGroup("SlicerKimiAgent")
+        settings.beginGroup("SlicerAIAgent")
         settings.setValue("apiKey", self.apiKeyInput.text)
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             settings.setValue("model", self.modelSelector.currentText)
@@ -604,7 +604,7 @@ Only output the complete corrected Python code in a single code block."""
         slicer.app.processEvents()
 
         try:
-            if self.logic.kimiClient.validateModel(model):
+            if self.logic.llmClient.validateModel(model):
                 slicer.util.infoDisplay(f"Connection successful!\n\nModel '{model}' is valid and accessible.")
             else:
                 slicer.util.warningDisplay(f"Model '{model}' not found.\n\nTry one of these:\n- kimi-k2.5\n- kimi-k2-thinking\n- kimi-k2-turbo-preview")
@@ -623,7 +623,7 @@ Only output the complete corrected Python code in a single code block."""
 
     def loadSettings(self):
         settings = qt.QSettings()
-        settings.beginGroup("SlicerKimiAgent")
+        settings.beginGroup("SlicerAIAgent")
 
         apiKey = settings.value("apiKey", "")
         model = settings.value("model", "kimi-k2.5")
@@ -642,9 +642,9 @@ Only output the complete corrected Python code in a single code block."""
 #------------------------------------------------------------------
 # Logic Class
 #------------------------------------------------------------------
-class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
+class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
     """
-    Business logic for SlicerKimiAgent.
+    Business logic for SlicerAIAgent.
     Handles AI interactions, code generation, and execution.
     """
 
@@ -652,7 +652,7 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         ScriptedLoadableModuleLogic.__init__(self)
         self.apiKey = None
         self.model = "kimi-k2.5"
-        self.kimiClient = None
+        self.llmClient = None
         self.skillManager = None
         self.codeValidator = None
         self.executor = None
@@ -662,10 +662,10 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
 
     def _initializeComponents(self):
         try:
-            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore, SkillTools
+            from SlicerAIAgentLib import LLMClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore, SkillTools
 
             self.conversationStore = ConversationStore()
-            self.kimiClient = KimiClient()
+            self.llmClient = LLMClient()
             # Initialize skill manager
             self.skillManager = SkillContextManager()
             # Initialize tool executor for skill searching
@@ -674,7 +674,7 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
 
-            logger.info("SlicerKimiAgent logic components initialized")
+            logger.info("SlicerAIAgent logic components initialized")
         except Exception as e:
             logger.error(f"Failed to initialize components: {e}")
             import traceback
@@ -682,13 +682,13 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
 
     def setApiKey(self, apiKey):
         self.apiKey = apiKey
-        if self.kimiClient:
-            self.kimiClient.setApiKey(apiKey)
+        if self.llmClient:
+            self.llmClient.setApiKey(apiKey)
 
     def setModel(self, model):
         self.model = model
-        if self.kimiClient:
-            self.kimiClient.setModel(model)
+        if self.llmClient:
+            self.llmClient.setModel(model)
 
     def hasApiKey(self):
         return bool(self.apiKey)
@@ -703,13 +703,13 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         Returns:
             dict with keys: message, reasoning_content, code, tokens, cost
         """
-        if not self.kimiClient:
-            raise RuntimeError("KIMI client not initialized")
+        if not self.llmClient:
+            raise RuntimeError("LLM client not initialized")
         if not self.apiKey:
             raise RuntimeError("API key not configured")
 
         context = self._buildContext(prompt)
-        response = self.kimiClient.chat(prompt, context=context)
+        response = self.llmClient.chat(prompt, context=context)
         self.conversationStore.addExchange(prompt, response)
         return response
 
@@ -729,8 +729,8 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         Returns:
             dict with keys: message, reasoning_content, code, tokens, cost
         """
-        if not self.kimiClient:
-            raise RuntimeError("KIMI client not initialized")
+        if not self.llmClient:
+            raise RuntimeError("LLM client not initialized")
         if not self.apiKey:
             raise RuntimeError("API key not configured")
 
@@ -745,7 +745,7 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
                     if on_delta:
                         on_delta(progress)
                 
-                response = self.kimiClient.chatWithTools(
+                response = self.llmClient.chatWithTools(
                     prompt,
                     tools=self.skillTools,
                     tool_executor=self._executeTool,
@@ -772,10 +772,10 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
                             time.sleep(0.01)
             except Exception as e:
                 logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
-                response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+                response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
         else:
             # Fallback to regular streaming
-            response = self.kimiClient.chatStream(prompt, context=context, on_delta=on_delta)
+            response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
         
         self.conversationStore.addExchange(prompt, response)
         return response
@@ -842,8 +842,8 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
     def clearConversation(self):
         if self.conversationStore:
             self.conversationStore.clear()
-        if self.kimiClient:
-            self.kimiClient.clearHistory()
+        if self.llmClient:
+            self.llmClient.clearHistory()
 
     def pauseProcessing(self):
         self._processing = False
@@ -852,16 +852,16 @@ class SlicerKimiAgentLogic(ScriptedLoadableModuleLogic):
         self._processing = True
 
     def cleanup(self):
-        if self.kimiClient:
-            self.kimiClient.cleanup()
+        if self.llmClient:
+            self.llmClient.cleanup()
         if self.executor:
             self.executor.cleanup()
 
 #------------------------------------------------------------------
 # Test Class
 #------------------------------------------------------------------
-class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
-    """Unit tests for SlicerKimiAgent."""
+class SlicerAIAgentTest(ScriptedLoadableModuleTest):
+    """Unit tests for SlicerAIAgent."""
 
     def setUp(self):
         slicer.mrmlScene.Clear(0)
@@ -875,14 +875,14 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
 
     def test_ModuleImport(self):
         try:
-            from SlicerKimiAgentLib import KimiClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
+            from SlicerAIAgentLib import LLMClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
             self.delayDisplay("Module import test passed")
         except Exception as e:
             self.delayDisplay(f"Module import test failed: {e}")
             raise
 
     def test_CodeValidator(self):
-        from SlicerKimiAgentLib import CodeValidator
+        from SlicerAIAgentLib import CodeValidator
 
         validator = CodeValidator.CodeValidator()
 
@@ -897,7 +897,7 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
         self.delayDisplay("Code validator test passed")
 
     def test_SafeExecutor(self):
-        from SlicerKimiAgentLib import SafeExecutor
+        from SlicerAIAgentLib import SafeExecutor
 
         executor = SafeExecutor.SafeExecutor()
 
@@ -908,7 +908,7 @@ class SlicerKimiAgentTest(ScriptedLoadableModuleTest):
         self.delayDisplay("Safe executor test passed")
 
     def test_SkillContextManager(self):
-        from SlicerKimiAgentLib import SkillContextManager
+        from SlicerAIAgentLib import SkillContextManager
 
         manager = SkillContextManager.SkillContextManager()
         context = manager.buildContext("load a volume")

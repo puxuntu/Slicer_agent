@@ -2,7 +2,7 @@
 
 For help writing 3D Slicer code, use the slicer skill located at:
 
-    C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full
+    C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full
 
 That directory contains `SKILL.md` with instructions for searching Slicer source
 code, extensions, discourse archives, dependency repositories, and NA-MIC Project Week materials.
@@ -12,11 +12,11 @@ Do NOT clone repositories into this project directory.
 
   ```
 - All searches should target paths under `C:/Users/20152/Desktop/slicer-skill/slicer-skill-full`:
-  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full/slicer-source/`
-  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full/slicer-extensions/`
-  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full/slicer-discourse/`
-  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full/slicer-dependencies/`
-  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerKimiAgent/Resources/Skills/slicer-skill-full/slicer-projectweek/`
+  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full/slicer-source/`
+  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full/slicer-extensions/`
+  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full/slicer-discourse/`
+  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full/slicer-dependencies/`
+  - `C:/Users/20152/Desktop/slicer-skill/Slicer_Agent_Puxun/SlicerAIAgent/Resources/Skills/slicer-skill-full/slicer-projectweek/`
 
 ---
 
