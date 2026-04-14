@@ -34,7 +34,7 @@ Key locations within the skill:
 
 ## MANDATORY WORKFLOW - YOU MUST FOLLOW THIS
 
-### Step 1: SEARCH (MAX 1-2 tool calls)
+### Step 1: SEARCH
 **Before writing code, search the skill for API information.**
 
 Available tools:
@@ -43,7 +43,7 @@ Available tools:
 - **ReadFile**: Read full documentation
   - Example: `ReadFile path="slicer-source/Docs/developer_guide/script_repository/volumes.md"`
 
-**STOP CONDITION**: Once you find the relevant API information (1-2 searches), proceed to Step 3. DO NOT keep searching.
+**STOP CONDITION**: Once you find the relevant API information for the task, proceed to Step 3. Avoid unnecessary repeated searches for the same topic.
 
 ### Step 2: WRITE CODE IMMEDIATELY
 After getting search results, you MUST output the final code. DO NOT request more tools.

@@ -248,15 +248,16 @@ def get_skill_tools() -> List[Dict]:
     Get tool definitions for the AI.
     These are passed to the API to register available tools.
     
-    IMPORTANT: After using 1-2 tools and getting the information you need,
-    STOP calling tools and provide the final response with Python code.
+    IMPORTANT: Search the skill as needed for the task, but avoid repeated
+    searches for the same topic. Once you find the relevant API, provide the
+    final response with Python code.
     """
     return [
         {
             "type": "function",
             "function": {
                 "name": "Grep",
-                "description": "Quick search for API names or keywords. Use 1-2 searches max, then write code. DO NOT keep searching once you find the API.",
+                "description": "Quick search for API names or keywords. Search as needed for the task, but avoid repeated searches for the same topic. Once you find the relevant API, write the code.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -277,7 +278,7 @@ def get_skill_tools() -> List[Dict]:
             "type": "function",
             "function": {
                 "name": "ReadFile",
-                "description": "Read documentation for detailed API info. After reading, STOP and write code. DO NOT read more files.",
+                "description": "Read documentation for detailed API info. Read what you need, then write code. Avoid reading multiple files that cover the same topic.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -294,7 +295,7 @@ def get_skill_tools() -> List[Dict]:
             "type": "function",
             "function": {
                 "name": "Glob",
-                "description": "Find files by pattern. Use once if needed, then write code.",
+                "description": "Find files by pattern. Use when needed to locate relevant files, then write code.",
                 "parameters": {
                     "type": "object",
                     "properties": {
