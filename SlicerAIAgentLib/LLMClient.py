@@ -757,10 +757,12 @@ If you need to find API information:
                 # Add tool results
                 messages.extend(tool_results)
                 # Add reminder for AI to provide final answer (not another tool call)
-                messages.append({
-                    "role": "system",
-                    "content": "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
-                })
+                reminder = "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
+                if not (messages and messages[-1].get("role") == "system" and messages[-1].get("content") == reminder):
+                    messages.append({
+                        "role": "system",
+                        "content": reminder,
+                    })
                 
                 # Report progress with detailed tool info
                 if on_progress:

@@ -25,6 +25,15 @@ class SkillToolExecutor:
         self.skill_path = skill_path
         self.platform = platform.system().lower()  # 'windows', 'linux', 'darwin'
     
+    def _relativize(self, path: str) -> str:
+        """Convert an absolute path back to a relative forward-slash path."""
+        try:
+            rel = os.path.relpath(path, self.skill_path)
+        except ValueError:
+            # On Windows, relpath can fail if paths are on different drives
+            rel = path
+        return rel.replace(os.sep, '/')
+
     def execute(self, tool_name: str, arguments: Dict) -> Dict:
         """
         Execute a tool call.
@@ -37,13 +46,25 @@ class SkillToolExecutor:
             Tool execution result
         """
         if tool_name == "Grep":
-            return self._grep(arguments.get("pattern", ""), arguments.get("path", ""))
+            result = self._grep(arguments.get("pattern", ""), arguments.get("path", ""))
         elif tool_name == "ReadFile":
-            return self._readfile(arguments.get("path", ""))
+            result = self._readfile(arguments.get("path", ""))
         elif tool_name == "Glob":
-            return self._glob(arguments.get("pattern", ""), arguments.get("path", ""))
+            result = self._glob(arguments.get("pattern", ""), arguments.get("path", ""))
         else:
             return {"error": f"Unknown tool: {tool_name}"}
+        
+        # Normalize absolute paths in the result back to relative forward-slash paths
+        if isinstance(result, dict):
+            if "path" in result:
+                result["path"] = self._relativize(result["path"])
+            if "results" in result and isinstance(result["results"], list):
+                for item in result["results"]:
+                    if isinstance(item, dict) and "file" in item:
+                        item["file"] = self._relativize(item["file"])
+            if "file" in result:
+                result["file"] = self._relativize(result["file"])
+        return result
     
     def _grep(self, pattern: str, path: str) -> Dict:
         """
