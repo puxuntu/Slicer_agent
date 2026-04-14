@@ -56,7 +56,7 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         self.tearDown()
         
         self.setUp()
-        self.test_SkillContextManager()
+        self.test_SkillPath()
         self.tearDown()
         
         self.setUp()
@@ -76,7 +76,6 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         try:
             from SlicerAIAgentLib import (
                 LLMClient,
-                SkillContextManager,
                 SkillTools,
                 CodeValidator,
                 SafeExecutor,
@@ -251,26 +250,18 @@ More text.
         
         self.delayDisplay("SafeExecutor tests passed")
 
-    def test_SkillContextManager(self):
-        """Test SkillContextManager functionality with real Slicer skill."""
-        from SlicerAIAgentLib import SkillContextManager
+    def test_SkillPath(self):
+        """Test skill path resolution and mode detection in logic."""
+        from SlicerAIAgent import SlicerAIAgentLogic
         
-        manager = SkillContextManager()
+        logic = SlicerAIAgentLogic()
         
-        # Test skill path resolution
-        self.assertIsNotNone(manager.skill_path)
-        self.assertTrue(os.path.exists(manager.skill_path) or manager.get_skill_mode() == "unknown")
+        self.assertIsNotNone(logic.skill_path)
+        self.assertTrue(os.path.exists(logic.skill_path) or logic.skill_mode == "unknown")
+        self.assertIn(logic.skill_mode, ["full", "lightweight", "web", "unknown"])
         
-        # Test skill mode detection
-        self.assertIn(manager.get_skill_mode(), ["full", "lightweight", "web", "unknown"])
-        
-        # Test status
-        status = manager.get_status()
-        self.assertIn("skill_path", status)
-        self.assertIn("skill_mode", status)
-        self.assertIn("skill_exists", status)
-        
-        self.delayDisplay("SkillContextManager tests passed")
+        logic.cleanup()
+        self.delayDisplay("Skill path tests passed")
 
     def test_ConversationStore(self):
         """Test ConversationStore functionality."""
@@ -349,22 +340,22 @@ More text.
 
     def test_Integration(self):
         """Integration test of multiple components."""
+        from SlicerAIAgent import SlicerAIAgentLogic
         from SlicerAIAgentLib import (
             LLMClient,
-            SkillContextManager,
             CodeValidator,
             SafeExecutor,
         )
         
         # Create components
         client = LLMClient()
-        skill_manager = SkillContextManager()
+        logic = SlicerAIAgentLogic()
         validator = CodeValidator()
         executor = SafeExecutor()
         
         # Test workflow: component initialization and basic operations
         prompt = "load a volume"
-        self.assertIsNotNone(skill_manager.skill_path)
+        self.assertIsNotNone(logic.skill_path)
         
         # Test code validation
         test_code = "volume = slicer.util.loadVolume('/path/to/volume.nrrd')"

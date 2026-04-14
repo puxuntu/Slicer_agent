@@ -1,3 +1,4 @@
+import json
 import os
 import queue
 import threading
@@ -653,7 +654,8 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         self.apiKey = None
         self.model = "kimi-k2.5"
         self.llmClient = None
-        self.skillManager = None
+        self.skill_path = None
+        self.skill_mode = "unknown"
         self.codeValidator = None
         self.executor = None
         self.conversationStore = None
@@ -662,14 +664,20 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _initializeComponents(self):
         try:
-            from SlicerAIAgentLib import LLMClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore, SkillTools
+            from SlicerAIAgentLib import LLMClient, CodeValidator, SafeExecutor, ConversationStore, SkillTools
 
             self.conversationStore = ConversationStore()
             self.llmClient = LLMClient()
-            # Initialize skill manager
-            self.skillManager = SkillContextManager()
+
+            # Resolve skill path relative to this module
+            self.skill_path = os.path.normpath(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                'Resources', 'Skills', 'slicer-skill-full'
+            ))
+            self.skill_mode = self._detectSkillMode()
+
             # Initialize tool executor for skill searching
-            self.toolExecutor = SkillTools.SkillToolExecutor(self.skillManager.SKILL_PATH)
+            self.toolExecutor = SkillTools.SkillToolExecutor(self.skill_path)
             self.skillTools = SkillTools.get_skill_tools()
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
@@ -679,6 +687,18 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             logger.error(f"Failed to initialize components: {e}")
             import traceback
             traceback.print_exc()
+
+    def _detectSkillMode(self):
+        """Detect skill mode from .setup-stamp.json."""
+        stamp_path = os.path.join(self.skill_path, ".setup-stamp.json")
+        if os.path.exists(stamp_path):
+            try:
+                with open(stamp_path, 'r', encoding='utf-8') as f:
+                    stamp = json.load(f)
+                return stamp.get("mode", "unknown")
+            except Exception as e:
+                logger.warning(f"Failed to read setup stamp: {e}")
+        return "unknown"
 
     def setApiKey(self, apiKey):
         self.apiKey = apiKey
@@ -911,11 +931,11 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         self.test_ModuleImport()
         self.test_CodeValidator()
         self.test_SafeExecutor()
-        self.test_SkillContextManager()
+        self.test_SkillPath()
 
     def test_ModuleImport(self):
         try:
-            from SlicerAIAgentLib import LLMClient, SkillContextManager, CodeValidator, SafeExecutor, ConversationStore
+            from SlicerAIAgentLib import LLMClient, CodeValidator, SafeExecutor, ConversationStore
             self.delayDisplay("Module import test passed")
         except Exception as e:
             self.delayDisplay(f"Module import test failed: {e}")
@@ -947,11 +967,10 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
 
         self.delayDisplay("Safe executor test passed")
 
-    def test_SkillContextManager(self):
-        from SlicerAIAgentLib import SkillContextManager
+    def test_SkillPath(self):
+        logic = SlicerAIAgentLogic()
 
-        manager = SkillContextManager.SkillContextManager()
-
-        self.assertIsNotNone(manager.skill_path, "Skill path should be set")
-        self.assertIn(manager.get_skill_mode(), ["full", "lightweight", "web", "unknown"])
-        self.delayDisplay("Skill context manager test passed")
+        self.assertIsNotNone(logic.skill_path, "Skill path should be set")
+        self.assertIn(logic.skill_mode, ["full", "lightweight", "web", "unknown"])
+        logic.cleanup()
+        self.delayDisplay("Skill path test passed")

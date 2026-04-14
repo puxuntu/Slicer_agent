@@ -3,7 +3,6 @@ SlicerAIAgentLib - Core library for the SlicerAIAgent extension.
 
 This package contains the core components for AI-powered assistance in 3D Slicer:
 - LLMClient: HTTP client for LLM API communication (OpenAI-compatible)
-- SkillContextManager: Manages skill-based context for LLM prompts
 - SkillTools: Tool calling support for searching the skill
 - CodeValidator: Validates Python code for safety before execution
 - SafeExecutor: Sandboxed execution environment for generated code
@@ -12,7 +11,6 @@ This package contains the core components for AI-powered assistance in 3D Slicer
 
 __all__ = [
     'LLMClient',
-    'SkillContextManager', 
     'SkillTools',
     'CodeValidator',
     'SafeExecutor',
@@ -22,7 +20,6 @@ __all__ = [
 
 # Import main classes for convenient access
 from .LLMClient import LLMClient
-from .SkillContextManager import SkillContextManager
 from .SkillTools import SkillToolExecutor, get_skill_tools
 from .CodeValidator import CodeValidator
 from .SafeExecutor import SafeExecutor
