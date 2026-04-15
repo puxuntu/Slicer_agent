@@ -137,7 +137,35 @@ class LLMClient:
         """
         messages: List[Dict[str, Any]] = []
 
-        system_content = self._buildSystemPrompt(context)
+        if not self.conversation_history:
+            system_content = self._buildSystemPrompt(context)
+        else:
+            # Lightweight system prompt for follow-up turns
+            system_content = (
+                "You are an expert 3D Slicer Python coding assistant. "
+                "Critical rules still apply: exactly one ```python code block, no forbidden modules (os, subprocess, sys, open, eval, exec, getattr, etc.). "
+                "Continue the conversation based on previous context and the current scene below.\n"
+            )
+            if context and context.get('scene'):
+                scene = context['scene']
+                system_content += "\n## CURRENT SLICER SCENE\n"
+                if isinstance(scene, dict) and scene.get('structured'):
+                    system_content += "Structured scene summary:\n```json\n"
+                    try:
+                        system_content += json.dumps(scene['structured'], ensure_ascii=False, indent=2)
+                    except Exception:
+                        system_content += str(scene['structured'])
+                    system_content += "\n```\n"
+                    if scene.get('raw_mrml_truncated'):
+                        system_content += f"\nRaw MRML (truncated, {scene.get('raw_mrml_length', 0)} chars total):\n```xml\n{scene['raw_mrml_truncated']}\n```\n"
+                else:
+                    system_content += "Raw scene context:\n```\n"
+                    try:
+                        system_content += json.dumps(scene, ensure_ascii=False, indent=2)
+                    except Exception:
+                        system_content += str(scene)
+                    system_content += "\n```\n"
+
         messages.append({"role": "system", "content": system_content})
 
         history_to_include = self.conversation_history[-50:]  # Keep last 50 messages for context
@@ -301,12 +329,22 @@ This is wrong because it uses subprocess instead of the provided tools.
         if context and context.get('scene'):
             scene = context['scene']
             base_prompt += "\n\n## CURRENT SLICER SCENE\n"
-            base_prompt += "Raw unprocessed scene context (let the AI analyze):\n```\n"
-            try:
-                base_prompt += json.dumps(scene, ensure_ascii=False, indent=2)
-            except Exception:
-                base_prompt += str(scene)
-            base_prompt += "\n```\n"
+            if isinstance(scene, dict) and scene.get('structured'):
+                base_prompt += "Structured scene summary:\n```json\n"
+                try:
+                    base_prompt += json.dumps(scene['structured'], ensure_ascii=False, indent=2)
+                except Exception:
+                    base_prompt += str(scene['structured'])
+                base_prompt += "\n```\n"
+                if scene.get('raw_mrml_truncated'):
+                    base_prompt += f"\nRaw MRML (truncated, {scene.get('raw_mrml_length', 0)} chars total):\n```xml\n{scene['raw_mrml_truncated']}\n```\n"
+            else:
+                base_prompt += "Raw unprocessed scene context:\n```\n"
+                try:
+                    base_prompt += json.dumps(scene, ensure_ascii=False, indent=2)
+                except Exception:
+                    base_prompt += str(scene)
+                base_prompt += "\n```\n"
 
         return base_prompt
 
@@ -671,6 +709,7 @@ This is wrong because it uses subprocess instead of the provided tools.
         messages = self._buildMessages(prompt, context)
         url = f"{self.base_url}/chat/completions"
         tool_calls_history = []
+        intermediate_messages = []  # Persist tool calling trajectory to conversation history
         
         for round_num in range(max_tool_rounds):
             logger.info(f"Tool calling round {round_num + 1}")
@@ -710,7 +749,15 @@ This is wrong because it uses subprocess instead of the provided tools.
                     except Exception:
                         pass
 
-                    self._appendConversation(prompt, content, reasoning_content)
+                    # Persist full turn including tool calling trajectory
+                    self.conversation_history.append({'role': 'user', 'content': prompt})
+                    if intermediate_messages:
+                        self.conversation_history.extend(intermediate_messages)
+                    assistant_entry = {'role': 'assistant', 'content': content}
+                    if reasoning_content:
+                        assistant_entry['reasoning_content'] = reasoning_content
+                    self.conversation_history.append(assistant_entry)
+
                     response = self._buildResponse(
                         content,
                         reasoning_content,
@@ -766,16 +813,20 @@ This is wrong because it uses subprocess instead of the provided tools.
                 if reasoning_content:
                     assistant_msg["reasoning_content"] = reasoning_content
                 messages.append(assistant_msg)
+                intermediate_messages.append(assistant_msg)
                 # Add tool results
                 messages.extend(tool_results)
+                intermediate_messages.extend(tool_results)
                 # Add reminder for AI to provide final answer (not another tool call)
                 reminder = "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
                 # Remove any previous identical reminders to keep the prompt clean
                 messages = [m for m in messages if not (m.get("role") == "system" and m.get("content") == reminder)]
-                messages.append({
+                reminder_msg = {
                     "role": "system",
                     "content": reminder,
-                })
+                }
+                messages.append(reminder_msg)
+                intermediate_messages.append(reminder_msg)
                 
                 # Report progress with detailed tool info
                 if on_progress:
