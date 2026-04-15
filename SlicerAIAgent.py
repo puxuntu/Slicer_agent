@@ -488,6 +488,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         def onExecutionComplete(result):
             feedback_lines = []
+            output_has_errors = False
             if result.get("timed_out", False):
                 self.statusLabel.text = "Ready"
                 output = result.get('output', 'No output')
@@ -506,6 +507,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     msg += f"\nOutput: {output}"
                 self.appendToChat("System", msg)
                 feedback_lines.append(f"Status: success\nExecution time: {execution_time:.2f}s\nOutput: {output}")
+                # Detect errors printed but caught by the script itself
+                lower_output = output.lower()
+                if any(k in lower_output for k in ('error:', 'traceback', 'exception', 'failed')):
+                    output_has_errors = True
+                    feedback_lines.append("Warning: execution output contains error indicators even though no uncaught exception was raised.")
             else:
                 # Execution failed
                 error_msg = result.get('error', 'Unknown error')
@@ -519,40 +525,34 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 feedback_text = "Code execution result:\n" + "\n".join(feedback_lines) + "\nThe MRML scene has been updated. Refer to the CURRENT SLICER SCENE in the next system prompt for the complete raw MRML."
                 self.logic.addExecutionFeedback(feedback_text)
             
-            # Self-correction for failures (but not timeouts)
-            if not result.get("timed_out", False) and not result["success"]:
-                error_msg = result.get('error', 'Unknown error')
+            # Self-correction for failures or suspicious outputs (but not timeouts)
+            if not result.get("timed_out", False) and (not result["success"] or output_has_errors):
                 if attempt < max_attempts:
                     self.appendToChat("System", "Auto-correcting...")
-                    self._selfCorrectCode(error_msg, attempt, max_attempts)
+                    self._selfCorrectCode("", attempt, max_attempts)
                 else:
                     self.statusLabel.text = "Ready"
+                    final_error = result.get('error', 'Unknown error') if not result["success"] else "Output contains errors"
                     self.appendToChat("Error", 
                         f"Execution failed after {max_attempts} attempts.\n"
-                        f"Final error: {error_msg}")
+                        f"Final error: {final_error}")
         
         # Execute asynchronously
         self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
     
     def _selfCorrectCode(self, error_msg, attempt, max_attempts):
-        """Generate corrected code based on error feedback."""
+        """Generate corrected code based on execution feedback in conversation history."""
         if not self.currentCode:
             return
         
-        # Build correction prompt
-        correction_prompt = f"""The previous code failed with this error:
-```
-{error_msg}
-```
-
-Previous code:
-```python
-{self.currentCode}
-```
-
-Please fix the error and provide the corrected code. 
-Analyze the error carefully and make minimal changes to fix it.
-Only output the complete corrected Python code in a single code block."""
+        # Lightweight correction prompt; detailed error and previous code
+        # are already available in the conversation history via addExecutionFeedback.
+        correction_prompt = (
+            "The previous code execution encountered issues. "
+            "Please refer to the execution feedback in the conversation history and provide the corrected code. "
+            "Analyze the error carefully and make minimal changes to fix it. "
+            "Only output the complete corrected Python code in a single code block."
+        )
 
         self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
         

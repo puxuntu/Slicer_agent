@@ -139,25 +139,7 @@ class LLMClient:
         """
         messages: List[Dict[str, Any]] = []
 
-        if not self.conversation_history:
-            system_content = self._buildSystemPrompt(context)
-        else:
-            # Lightweight system prompt for follow-up turns
-            system_content = (
-                "You are an expert 3D Slicer Python coding assistant. "
-                "Critical rules still apply: exactly one ```python code block, no forbidden modules (os, subprocess, sys, open, eval, exec, getattr, etc.). "
-                "Continue the conversation based on previous context and the current scene below.\n"
-            )
-            if context and context.get('scene'):
-                scene = context['scene']
-                system_content += "\n## CURRENT SLICER SCENE\n"
-                system_content += "Raw unprocessed MRML scene context (let the AI analyze):\n```\n"
-                try:
-                    system_content += json.dumps(scene, ensure_ascii=False, indent=2)
-                except Exception:
-                    system_content += str(scene)
-                system_content += "\n```\n"
-
+        system_content = self._buildSystemPrompt(context)
         messages.append({"role": "system", "content": system_content})
 
         history_to_include = self.conversation_history[-50:]  # Keep last 50 messages for context
@@ -172,7 +154,15 @@ class LLMClient:
                 f'{self.turn_number}_first_prompt_debug.txt'
             )
             with open(debug_path, 'w', encoding='utf-8') as f:
+                total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
+                users_seen = 0
                 for i, msg in enumerate(messages):
+                    if msg.get('role') == 'user':
+                        users_seen += 1
+                        turn_label = self.turn_number - total_user_msgs + users_seen
+                        f.write(f"\n{'-'*40}\n")
+                        f.write(f"--- Turn {turn_label} ---\n")
+                        f.write(f"{'-'*40}\n")
                     f.write(f"{'='*60}\n")
                     f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
                     f.write(f"{'='*60}\n")
@@ -723,7 +713,15 @@ This is wrong because it uses subprocess instead of the provided tools.
                             f'{self.turn_number}_last_prompt_debug.txt'
                         )
                         with open(debug_path, 'w', encoding='utf-8') as f:
+                            total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
+                            users_seen = 0
                             for i, msg in enumerate(messages):
+                                if msg.get('role') == 'user':
+                                    users_seen += 1
+                                    turn_label = self.turn_number - total_user_msgs + users_seen
+                                    f.write(f"\n{'-'*40}\n")
+                                    f.write(f"--- Turn {turn_label} ---\n")
+                                    f.write(f"{'-'*40}\n")
                                 f.write(f"{'='*60}\n")
                                 f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
                                 f.write(f"{'='*60}\n")
@@ -811,7 +809,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                     "content": reminder,
                 }
                 messages.append(reminder_msg)
-                intermediate_messages.append(reminder_msg)
+                # Do NOT append reminder_msg to intermediate_messages; it should not persist into conversation history
                 
                 # Report progress with detailed tool info
                 if on_progress:
