@@ -828,14 +828,35 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         Build raw context about the current Slicer MRML scene.
 
         Returns:
-            Dictionary with the raw MRML XML string, or None.
+            Dictionary with the raw MRML XML string and/or raw node list.
         """
         try:
             scene = slicer.mrmlScene
             scene.SetSaveToXMLString(1)
             raw_mrml = scene.GetSceneXMLString()
+            if raw_mrml:
+                return {"raw_mrml": raw_mrml}
+        except Exception:
+            pass
+
+        # Fallback: iterate all nodes and build a raw node list
+        try:
+            scene = slicer.mrmlScene
+            all_nodes = scene.GetNodes()
+            total = all_nodes.GetNumberOfItems()
+            node_list = []
+            for i in range(total):
+                node = all_nodes.GetItemAsObject(i)
+                if node is None:
+                    continue
+                node_list.append({
+                    "class": node.GetClassName(),
+                    "name": node.GetName() or "(unnamed)",
+                    "id": node.GetID(),
+                })
             return {
-                "raw_mrml": raw_mrml,
+                "raw_mrml": "",
+                "fallback_nodes": node_list,
             }
         except Exception as e:
             logger.warning(f"Failed to get scene context: {e}")
