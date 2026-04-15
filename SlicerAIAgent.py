@@ -259,9 +259,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if self._streamReasoning:
             escaped_reasoning = self.escapeHtml(self._streamReasoning).replace(chr(10), '<br>')
             parts.append(
-                f'<div style="margin-left: 10px; margin-top: 5px; color: #888; '
-                f'border-left: 3px solid #ccc; padding-left: 8px;">'
-                f'<b>[Thinking]</b><br>{escaped_reasoning}</div>'
+                f'<div style="margin-left: 10px; margin-top: 5px; color: #666; '
+                f'border-left: 3px solid #ccc; padding-left: 8px; font-style: italic;">'
+                f'{escaped_reasoning}</div>'
             )
         if self._streamContent:
             escaped_content = self.escapeHtml(self._streamContent).replace(chr(10), '<br>')
@@ -311,10 +311,30 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def _onStreamDelta(self, delta):
         """Apply one streamed delta on the main thread."""
-        self._streamReasoning += delta.get('reasoning_content', '')
-        self._streamContent += delta.get('content', '')
-        self._renderStreamingEntry()
+        if delta.get('round'):
+            self._updateToolProgress(delta)
+        else:
+            self._streamReasoning += delta.get('reasoning_content', '')
+            self._streamContent += delta.get('content', '')
+            self._renderStreamingEntry()
         slicer.app.processEvents()
+
+    def _updateToolProgress(self, delta):
+        """Display tool execution progress as a separate committed entry."""
+        progress_text = delta.get('reasoning_content', '').strip()
+        if not progress_text:
+            return
+
+        timestamp = qt.QDateTime.currentDateTime().toString("hh:mm:ss")
+        html = (
+            f'<div style="margin: 5px 0; padding: 5px 10px; background-color: #f5f5f5; border-left: 3px solid #999;">'
+            f'<span style="color: #999; font-size: 10px;">[{timestamp}]</span> '
+            f'<span style="color: #666; font-weight: bold;">Search:</span>'
+            f'<div style="margin-left: 10px; margin-top: 3px; white-space: pre-wrap; color: #555;">{self.escapeHtml(progress_text).replace(chr(10), "<br>")}</div>'
+            f'</div>'
+        )
+        self._chatEntriesHtml.append(html)
+        self._setChatHtml(''.join(self._chatEntriesHtml) + self._buildStreamingEntryHtml())
 
     def _onStreamComplete(self, response):
         """Called on the main thread when streaming finishes successfully."""
@@ -773,23 +793,22 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     on_progress=_on_progress,
                 )
                 
-                # Show final thinking content and message
+                # Stream the final response in small chunks for a smooth UI effect
                 if on_delta and response:
-                    # Stream final thinking content (reasoning from AI)
-                    if response.get('reasoning_content'):
-                        on_delta({'reasoning_content': '\n[Thinking]\n', 'content': ''})
-                        for line in response['reasoning_content'].split('\n'):
-                            on_delta({'reasoning_content': line + '\n', 'content': ''})
-                    
-                    # Then stream the main content
-                    if response.get('message'):
-                        message = response['message']
-                        chunk_size = 10
+                    reasoning = response.get('reasoning_content', '')
+                    message = response.get('message', '')
+                    chunk_size = 8
+                    import time
+                    if reasoning:
+                        for i in range(0, len(reasoning), chunk_size):
+                            chunk = reasoning[i:i+chunk_size]
+                            on_delta({'reasoning_content': chunk, 'content': ''})
+                            time.sleep(0.015)
+                    if message:
                         for i in range(0, len(message), chunk_size):
                             chunk = message[i:i+chunk_size]
                             on_delta({'content': chunk, 'reasoning_content': ''})
-                            import time
-                            time.sleep(0.01)
+                            time.sleep(0.015)
             except Exception as e:
                 logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
                 response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
