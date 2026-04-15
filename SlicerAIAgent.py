@@ -345,6 +345,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if response.get("code"):
             self.currentCode = response["code"]
             self.codeDisplay.setPlainText(response["code"])
+            self._saveGeneratedCodeToFile(response["code"])
             # Auto-execute the generated code
             self._autoExecuteCode()
 
@@ -426,6 +427,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if response.get("code"):
                 self.currentCode = response["code"]
                 self.codeDisplay.setPlainText(response["code"])
+                self._saveGeneratedCodeToFile(response["code"])
                 # Auto-execute the generated code
                 self._autoExecuteCode()
 
@@ -440,6 +442,16 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         finally:
             self.statusLabel.text = "Ready"
             self.sendButton.setEnabled(True)
+
+    def _saveGeneratedCodeToFile(self, code):
+        """Save the generated code to a local text file for user reference."""
+        try:
+            moduleDir = os.path.dirname(__file__)
+            latestPath = os.path.join(moduleDir, 'latest_generated_code.txt')
+            with open(latestPath, 'w', encoding='utf-8') as f:
+                f.write(code)
+        except Exception as e:
+            logger.warning(f"Failed to save generated code to file: {e}")
 
     def _autoExecuteCode(self, attempt=1, max_attempts=5):
         """Auto-execute generated code with pre-validation and self-correction on failure."""
@@ -525,6 +537,7 @@ Only output the complete corrected Python code in a single code block."""
                 if response.get("code"):
                     self.currentCode = response["code"]
                     self.codeDisplay.setPlainText(response["code"])
+                    self._saveGeneratedCodeToFile(response["code"])
                     # Recursively execute with incremented attempt counter
                     self._autoExecuteCode(attempt + 1, max_attempts)
                 else:
