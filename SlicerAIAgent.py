@@ -508,29 +508,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.appendToChat("System", msg)
                 feedback_lines.append(f"Status: failed\nExecution time: {execution_time:.2f}s\nError: {error_msg[:500]}")
             
-            # Add execution feedback to conversation history with a scene snapshot
+            # Add execution feedback to conversation history
             if self.logic:
-                scene_summary = ""
-                try:
-                    scene_context = self.logic._buildSceneContext()
-                    if scene_context and scene_context.get('structured'):
-                        structured = scene_context['structured']
-                        if structured.get('volumes'):
-                            scene_summary += "\nCurrent scene volumes:\n" + "\n".join(
-                                [f"  - {v['name']} ({v['id']}, class={v['class']})" for v in structured['volumes']]
-                            )
-                        if structured.get('volume_rendering'):
-                            scene_summary += "\nCurrent volume rendering nodes:\n" + "\n".join(
-                                [f"  - {vr['name']} (volume_id={vr['volume_id']}, visibility={vr['visibility']})" for vr in structured['volume_rendering']]
-                            )
-                        if structured.get('segmentations'):
-                            scene_summary += "\nCurrent segmentations:\n" + "\n".join(
-                                [f"  - {s['name']} ({s['id']})" for s in structured['segmentations']]
-                            )
-                except Exception:
-                    pass
-                
-                feedback_text = "Code execution result:\n" + "\n".join(feedback_lines) + scene_summary
+                feedback_text = "Code execution result:\n" + "\n".join(feedback_lines) + "\nThe MRML scene has been updated. Refer to the CURRENT SLICER SCENE in the next system prompt for the complete raw MRML."
                 self.logic.addExecutionFeedback(feedback_text)
             
             # Self-correction for failures (but not timeouts)
@@ -910,119 +890,24 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _buildSceneContext(self):
         """
-        Build structured context about the current Slicer MRML scene.
+        Build raw context about the current Slicer MRML scene.
 
         Returns:
-            Dictionary with structured node summary and truncated raw MRML XML.
+            Dictionary with the full raw MRML XML string, or None.
         """
         try:
             scene = slicer.mrmlScene
-            summary = {
-                "volumes": [],
-                "volume_rendering": [],
-                "segmentations": [],
-                "models": [],
-                "transforms": [],
-                "markups": [],
-                "active_volume": None,
-            }
-
-            # Scalar volumes
-            volumeNodes = scene.GetNodesByClass("vtkMRMLScalarVolumeNode")
-            for i in range(volumeNodes.GetNumberOfItems()):
-                node = volumeNodes.GetItemAsObject(i)
-                summary["volumes"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                    "class": node.GetClassName(),
-                })
-
-            # LabelMap volumes
-            labelMapNodes = scene.GetNodesByClass("vtkMRMLLabelMapVolumeNode")
-            for i in range(labelMapNodes.GetNumberOfItems()):
-                node = labelMapNodes.GetItemAsObject(i)
-                summary["volumes"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                    "class": node.GetClassName(),
-                })
-
-            # Volume rendering display nodes
-            vrNodes = scene.GetNodesByClass("vtkMRMLVolumeRenderingDisplayNode")
-            for i in range(vrNodes.GetNumberOfItems()):
-                node = vrNodes.GetItemAsObject(i)
-                volumeID = node.GetVolumeNodeID() if hasattr(node, 'GetVolumeNodeID') else None
-                visibility = bool(node.GetVisibility()) if hasattr(node, 'GetVisibility') else None
-                summary["volume_rendering"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                    "volume_id": volumeID,
-                    "visibility": visibility,
-                })
-
-            # Segmentation nodes
-            segNodes = scene.GetNodesByClass("vtkMRMLSegmentationNode")
-            for i in range(segNodes.GetNumberOfItems()):
-                node = segNodes.GetItemAsObject(i)
-                summary["segmentations"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                })
-
-            # Model nodes
-            modelNodes = scene.GetNodesByClass("vtkMRMLModelNode")
-            for i in range(modelNodes.GetNumberOfItems()):
-                node = modelNodes.GetItemAsObject(i)
-                summary["models"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                })
-
-            # Transform nodes
-            transformNodes = scene.GetNodesByClass("vtkMRMLTransformNode")
-            for i in range(transformNodes.GetNumberOfItems()):
-                node = transformNodes.GetItemAsObject(i)
-                summary["transforms"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                })
-
-            # Markup nodes
-            markupNodes = scene.GetNodesByClass("vtkMRMLMarkupsNode")
-            for i in range(markupNodes.GetNumberOfItems()):
-                node = markupNodes.GetItemAsObject(i)
-                summary["markups"].append({
-                    "id": node.GetID(),
-                    "name": node.GetName(),
-                    "class": node.GetClassName(),
-                })
-
-            # Active volume from selection node
-            selectionNode = scene.GetFirstNodeByClass("vtkMRMLSelectionNode")
-            if selectionNode:
-                activeVolumeID = selectionNode.GetActiveVolumeID()
-                if activeVolumeID:
-                    activeNode = scene.GetNodeByID(activeVolumeID)
-                    if activeNode:
-                        summary["active_volume"] = {
-                            "id": activeVolumeID,
-                            "name": activeNode.GetName(),
-                            "class": activeNode.GetClassName(),
-                        }
-
-            # Raw MRML as fallback/truncated reference
             scene.SetSaveToXMLString(1)
             scene.Commit()
             raw_mrml = scene.GetSceneXMLString()
-
-            return {
-                "structured": summary,
-                "raw_mrml_length": len(raw_mrml),
-                "raw_mrml_truncated": raw_mrml[:2000] + ("..." if len(raw_mrml) > 2000 else ""),
-            }
+            if raw_mrml:
+                return {"raw_mrml": raw_mrml}
+            else:
+                logger.warning("GetSceneXMLString() returned empty string")
         except Exception as e:
-            logger.warning(f"Failed to get scene context: {e}")
-            return None
+            logger.warning(f"Failed to get scene XML: {e}")
+
+        return None
 
     def executeCode(self, code):
         validation = self.codeValidator.validate(code)

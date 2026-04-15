@@ -149,22 +149,12 @@ class LLMClient:
             if context and context.get('scene'):
                 scene = context['scene']
                 system_content += "\n## CURRENT SLICER SCENE\n"
-                if isinstance(scene, dict) and scene.get('structured'):
-                    system_content += "Structured scene summary:\n```json\n"
-                    try:
-                        system_content += json.dumps(scene['structured'], ensure_ascii=False, indent=2)
-                    except Exception:
-                        system_content += str(scene['structured'])
-                    system_content += "\n```\n"
-                    if scene.get('raw_mrml_truncated'):
-                        system_content += f"\nRaw MRML (truncated, {scene.get('raw_mrml_length', 0)} chars total):\n```xml\n{scene['raw_mrml_truncated']}\n```\n"
-                else:
-                    system_content += "Raw scene context:\n```\n"
-                    try:
-                        system_content += json.dumps(scene, ensure_ascii=False, indent=2)
-                    except Exception:
-                        system_content += str(scene)
-                    system_content += "\n```\n"
+                system_content += "Raw unprocessed MRML scene context (let the AI analyze):\n```\n"
+                try:
+                    system_content += json.dumps(scene, ensure_ascii=False, indent=2)
+                except Exception:
+                    system_content += str(scene)
+                system_content += "\n```\n"
 
         messages.append({"role": "system", "content": system_content})
 
@@ -329,22 +319,12 @@ This is wrong because it uses subprocess instead of the provided tools.
         if context and context.get('scene'):
             scene = context['scene']
             base_prompt += "\n\n## CURRENT SLICER SCENE\n"
-            if isinstance(scene, dict) and scene.get('structured'):
-                base_prompt += "Structured scene summary:\n```json\n"
-                try:
-                    base_prompt += json.dumps(scene['structured'], ensure_ascii=False, indent=2)
-                except Exception:
-                    base_prompt += str(scene['structured'])
-                base_prompt += "\n```\n"
-                if scene.get('raw_mrml_truncated'):
-                    base_prompt += f"\nRaw MRML (truncated, {scene.get('raw_mrml_length', 0)} chars total):\n```xml\n{scene['raw_mrml_truncated']}\n```\n"
-            else:
-                base_prompt += "Raw unprocessed scene context:\n```\n"
-                try:
-                    base_prompt += json.dumps(scene, ensure_ascii=False, indent=2)
-                except Exception:
-                    base_prompt += str(scene)
-                base_prompt += "\n```\n"
+            base_prompt += "Raw unprocessed MRML scene context (let the AI analyze):\n```\n"
+            try:
+                base_prompt += json.dumps(scene, ensure_ascii=False, indent=2)
+            except Exception:
+                base_prompt += str(scene)
+            base_prompt += "\n```\n"
 
         return base_prompt
 
