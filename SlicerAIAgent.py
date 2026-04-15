@@ -450,6 +450,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             turn_number = 1
             if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
                 turn_number = getattr(self.logic.llmClient, 'turn_number', 1)
+            # turn_number is incremented right after the assistant response finishes,
+            # so the code generated in turn N is saved when turn_number equals N+1.
+            turn_number = max(1, turn_number - 1)
             latestPath = os.path.join(moduleDir, f'{turn_number}_latest_generated_code.txt')
             with open(latestPath, 'w', encoding='utf-8') as f:
                 f.write(code)
