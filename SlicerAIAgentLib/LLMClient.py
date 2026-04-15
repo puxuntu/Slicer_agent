@@ -76,6 +76,7 @@ class LLMClient:
         self.conversation_history: List[Dict[str, Any]] = []
         self.total_tokens_used = 0
         self.total_cost = 0.0
+        self.turn_number = 1
         self._system_prompt_template = self._loadSystemPromptTemplate()
 
     def _normalizeModelName(self, model: Optional[str]) -> str:
@@ -100,6 +101,7 @@ class LLMClient:
     def clearHistory(self):
         """Clear conversation history."""
         self.conversation_history = []
+        self.turn_number = 1
         logger.info("Conversation history cleared")
 
     def getHistory(self) -> List[Dict[str, Any]]:
@@ -167,7 +169,7 @@ class LLMClient:
         try:
             debug_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'first_prompt_debug.txt'
+                f'{self.turn_number}_first_prompt_debug.txt'
             )
             with open(debug_path, 'w', encoding='utf-8') as f:
                 for i, msg in enumerate(messages):
@@ -482,6 +484,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                 assistant_message = self._coerceText(assistant_payload.get('content'))
                 reasoning_content = self._coerceText(assistant_payload.get('reasoning_content'))
                 self._appendConversation(prompt, assistant_message, reasoning_content)
+                self.turn_number += 1
                 return self._buildResponse(
                     assistant_message,
                     reasoning_content,
@@ -594,6 +597,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                 assistant_message = ''.join(content_parts)
                 reasoning_content = ''.join(reasoning_parts)
                 self._appendConversation(prompt, assistant_message, reasoning_content)
+                self.turn_number += 1
 
                 raw_response = {
                     'choices': [
@@ -716,7 +720,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                     try:
                         debug_path = os.path.join(
                             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            'last_prompt_debug.txt'
+                            f'{self.turn_number}_last_prompt_debug.txt'
                         )
                         with open(debug_path, 'w', encoding='utf-8') as f:
                             for i, msg in enumerate(messages):
@@ -737,6 +741,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                     if reasoning_content:
                         assistant_entry['reasoning_content'] = reasoning_content
                     self.conversation_history.append(assistant_entry)
+                    self.turn_number += 1
 
                     response = self._buildResponse(
                         content,

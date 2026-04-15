@@ -447,7 +447,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Save the generated code to a local text file for user reference."""
         try:
             moduleDir = os.path.dirname(__file__)
-            latestPath = os.path.join(moduleDir, 'latest_generated_code.txt')
+            turn_number = 1
+            if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
+                turn_number = getattr(self.logic.llmClient, 'turn_number', 1)
+            latestPath = os.path.join(moduleDir, f'{turn_number}_latest_generated_code.txt')
             with open(latestPath, 'w', encoding='utf-8') as f:
                 f.write(code)
         except Exception as e:
