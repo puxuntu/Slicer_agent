@@ -307,6 +307,19 @@ This is wrong because it uses subprocess instead of the provided tools.
         base_prompt += "The search tools (Grep, Glob, ReadFile) handle platform differences automatically.\n"
         base_prompt += "You only need to specify the relative path within the skill directory.\n"
 
+        # Load full SKILL.md into the system prompt
+        skill_md_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'Resources', 'Skills', 'slicer-skill-full', 'SKILL.md'
+        )
+        try:
+            with open(skill_md_path, 'r', encoding='utf-8') as f:
+                skill_md_content = f.read()
+            if skill_md_content.strip():
+                base_prompt += f"\n\n## SKILL REPOSITORY GUIDE (FULL CONTENT OF SKILL.md)\n\n{skill_md_content}\n"
+        except Exception:
+            pass  # If SKILL.md is missing, continue without it
+
         # Add dynamic scene context
         if context and context.get('scene'):
             scene = context['scene']
@@ -416,6 +429,95 @@ This is wrong because it uses subprocess instead of the provided tools.
         if reasoning_content:
             assistant_entry['reasoning_content'] = reasoning_content
         self.conversation_history.append(assistant_entry)
+
+    def _summarizeToolResultsWithLLM(self, tool_results_text: str, user_prompt: str) -> str:
+        """
+        Ask the LLM to dynamically extract only the high-signal snippets from tool results.
+        Returns the LLM-selected summary, or empty string on failure (caller should fallback).
+        """
+        if not self.api_key:
+            return ""
+        summary_prompt = (
+            "You are compressing tool search results for conversation history. "
+            "Below are the full contents of files read from a Slicer skill knowledge base. "
+            "The user's original request was:\n"
+            f"---\n{user_prompt}\n---\n\n"
+            "Extract ONLY the snippets that are useful for answering the user's request in future turns. "
+            "Prefer complete ```python code blocks and exact API signatures. "
+            "Discard long prose, explanations, and unrelated examples. "
+            "Do NOT add your own commentary --- output only the raw extracted snippets.\n\n"
+            "TOOL RESULTS:\n"
+            f"{tool_results_text}"
+        )
+        messages = [{"role": "user", "content": summary_prompt}]
+        payload = self._buildPayload(messages, stream=False)
+        url = f"{self.base_url}/chat/completions"
+        try:
+            request = self._buildRequest(url, payload)
+            with self._openRequest(request) as response:
+                data = json.loads(response.read().decode('utf-8'))
+            content = self._coerceText(data['choices'][0]['message'].get('content', ''))
+            # Track token usage for summary request
+            usage = data.get('usage', {})
+            self.total_tokens_used += usage.get('total_tokens', 0)
+            self.total_cost += self._calculateCost(usage)
+            return content.strip()
+        except Exception as e:
+            logger.warning(f"LLM summarization failed, will fallback: {e}")
+            return ""
+
+    def _fallbackCompressReadFile(self, full_content: str) -> str:
+        """Fallback deterministic compression when LLM summarization fails."""
+        code_blocks = re.findall(r'```python\s*\n(.*?)\n```', full_content, re.DOTALL)
+        if code_blocks:
+            return '\n\n'.join(['```python\n' + cb + '\n```' for cb in code_blocks])
+        summarized = full_content[:500]
+        if len(full_content) > 500:
+            summarized += f"\n... [truncated from {len(full_content)} chars]"
+        return summarized
+
+    def _compressToolResultsForHistory(self, messages: List[Dict[str, Any]], user_prompt: str = '') -> List[Dict[str, Any]]:
+        """
+        Compress tool results before persisting them to conversation history.
+        Full tool results are used within the current turn, but only a summary
+        is kept for future turns to prevent context bloat.
+        """
+        compressed: List[Dict[str, Any]] = []
+        for msg in messages:
+            if msg.get('role') == 'assistant':
+                # Keep assistant tool_calls messages
+                compressed.append(msg)
+            elif msg.get('role') == 'tool':
+                try:
+                    data = json.loads(msg.get('content', '{}'))
+                    tool_name = data.get('tool', '')
+                    if tool_name == 'ReadFile':
+                        full_content = data.get('content', '')
+                        # Try LLM-driven summarization first
+                        llm_summary = self._summarizeToolResultsWithLLM(full_content, user_prompt)
+                        if llm_summary:
+                            data['content'] = llm_summary
+                        else:
+                            data['content'] = self._fallbackCompressReadFile(full_content)
+                        data.pop('size', None)
+                        data.pop('total_lines', None)
+                        compressed.append({
+                            'role': 'tool',
+                            'tool_call_id': msg.get('tool_call_id', ''),
+                            'content': json.dumps(data, ensure_ascii=False),
+                        })
+                    elif tool_name in ('Grep', 'Glob'):
+                        # Grep and Glob results are usually short; keep as-is
+                        compressed.append(msg)
+                    else:
+                        compressed.append(msg)
+                except Exception:
+                    compressed.append(msg)
+            else:
+                # system reminders should already be excluded, but skip just in case
+                if msg.get('role') != 'system':
+                    compressed.append(msg)
+        return compressed
 
     def _buildResponse(self, message: str, reasoning_content: str, usage: Dict[str, Any], raw_response: Dict[str, Any]) -> Dict[str, Any]:
         """Build the normalized response dictionary returned to callers."""
@@ -706,6 +808,28 @@ This is wrong because it uses subprocess instead of the provided tools.
                 
                 if not tool_calls:
                     # No tool calls, we have the final response
+                    # Enforce: if the last tool-calling round used Grep but not ReadFile, force another round
+                    if intermediate_messages:
+                        last_assistant_tool_calls = None
+                        for msg in reversed(intermediate_messages):
+                            if msg.get('role') == 'assistant' and 'tool_calls' in msg:
+                                last_assistant_tool_calls = msg['tool_calls']
+                                break
+                        if last_assistant_tool_calls:
+                            tools_used = [tc.get('function', {}).get('name', '') for tc in last_assistant_tool_calls]
+                            if 'Grep' in tools_used and 'ReadFile' not in tools_used:
+                                logger.info("Enforcing ReadFile after Grep")
+                                messages.append({
+                                    'role': 'system',
+                                    'content': (
+                                        'You used Grep in the last round but did not ReadFile the most relevant source file. '
+                                        'Grep results are too sparse to write correct code. '
+                                        'You MUST call ReadFile on the most relevant file before writing code. '
+                                        'Please call ReadFile now.'
+                                    ),
+                                })
+                                continue
+
                     # DEBUG: Write the complete messages (including any tool results) to a local file
                     try:
                         debug_path = os.path.join(
@@ -731,10 +855,11 @@ This is wrong because it uses subprocess instead of the provided tools.
                     except Exception:
                         pass
 
-                    # Persist full turn including tool calling trajectory
+                    # Persist full turn including tool calling trajectory (compressed for history)
                     self.conversation_history.append({'role': 'user', 'content': prompt})
                     if intermediate_messages:
-                        self.conversation_history.extend(intermediate_messages)
+                        compressed_messages = self._compressToolResultsForHistory(intermediate_messages, user_prompt=prompt)
+                        self.conversation_history.extend(compressed_messages)
                     assistant_entry = {'role': 'assistant', 'content': content}
                     if reasoning_content:
                         assistant_entry['reasoning_content'] = reasoning_content

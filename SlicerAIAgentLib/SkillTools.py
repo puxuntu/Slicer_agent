@@ -48,7 +48,11 @@ class SkillToolExecutor:
         if tool_name == "Grep":
             result = self._grep(arguments.get("pattern", ""), arguments.get("path", ""))
         elif tool_name == "ReadFile":
-            result = self._readfile(arguments.get("path", ""))
+            result = self._readfile(
+                arguments.get("path", ""),
+                arguments.get("start_line"),
+                arguments.get("end_line")
+            )
         elif tool_name == "Glob":
             result = self._glob(arguments.get("pattern", ""), arguments.get("path", ""))
         else:
@@ -206,8 +210,8 @@ class SkillToolExecutor:
         
         return results
     
-    def _readfile(self, path: str) -> Dict:
-        """Read file content."""
+    def _readfile(self, path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> Dict:
+        """Read the full file content. Line range parameters are ignored to ensure the LLM always receives complete context in the current turn."""
         # Normalize path
         if not os.path.isabs(path):
             path = os.path.join(self.skill_path, path)
@@ -225,7 +229,7 @@ class SkillToolExecutor:
             return {
                 "tool": "ReadFile",
                 "path": path,
-                "content": content[:5000],  # Limit content
+                "content": content,
                 "size": len(content)
             }
         except Exception as e:
@@ -299,7 +303,7 @@ def get_skill_tools() -> List[Dict]:
             "type": "function",
             "function": {
                 "name": "ReadFile",
-                "description": "Read documentation for detailed API info. Read what you need, then write code. Avoid reading multiple files that cover the same topic.",
+                "description": "Read the complete content of a file from the skill knowledge base. Always returns the full file so you have complete context. Use after Grep to confirm exact API signatures and usage.",
                 "parameters": {
                     "type": "object",
                     "properties": {
