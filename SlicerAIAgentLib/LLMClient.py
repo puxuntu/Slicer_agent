@@ -44,8 +44,9 @@ class LLMClient:
     }
 
     # Pricing per 1K tokens (approximate, update as needed)
-    # See: https://platform.moonshot.cn/docs/pricing
+    # See: https://platform.moonshot.cn/docs/pricing and https://www.anthropic.com/pricing
     MODEL_PRICING = {
+        # Kimi / Moonshot models
         "kimi-k2.5": {"input": 0.002, "output": 0.006},
         "kimi-k2-thinking": {"input": 0.002, "output": 0.006},
         "kimi-k2-turbo-preview": {"input": 0.001, "output": 0.003},
@@ -53,6 +54,30 @@ class LLMClient:
         "moonshot-v1-8k": {"input": 0.001, "output": 0.002},
         "moonshot-v1-32k": {"input": 0.002, "output": 0.004},
         "moonshot-v1-128k": {"input": 0.006, "output": 0.012},
+        # Claude / Anthropic models (4.6 family)
+        "claude-opus-4-6": {"input": 0.015, "output": 0.075},
+        "claude-opus-4-6-high": {"input": 0.015, "output": 0.075},
+        "claude-opus-4-6-low": {"input": 0.015, "output": 0.075},
+        "claude-opus-4-6-max": {"input": 0.015, "output": 0.075},
+        "claude-opus-4-6-medium": {"input": 0.015, "output": 0.075},
+        "claude-opus-4-6-thinking": {"input": 0.015, "output": 0.075},
+        "claude-sonnet-4-6": {"input": 0.003, "output": 0.015},
+        "claude-sonnet-4-6-high": {"input": 0.003, "output": 0.015},
+        "claude-sonnet-4-6-low": {"input": 0.003, "output": 0.015},
+        "claude-sonnet-4-6-max": {"input": 0.003, "output": 0.015},
+        "claude-sonnet-4-6-medium": {"input": 0.003, "output": 0.015},
+        "claude-sonnet-4-6-thinking": {"input": 0.003, "output": 0.015},
+        "claude-haiku-4-5-20251001": {"input": 0.0008, "output": 0.004},
+        "claude-haiku-4-5-20251001-thinking": {"input": 0.0008, "output": 0.004},
+        # Claude / Anthropic models (legacy fallbacks)
+        "claude-opus-4-5": {"input": 0.015, "output": 0.075},
+        "claude-sonnet-4-5": {"input": 0.003, "output": 0.015},
+        "claude-haiku-4-5": {"input": 0.0008, "output": 0.004},
+        "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
+        "claude-3-5-haiku-20241022": {"input": 0.0008, "output": 0.004},
+        "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
+        "claude-3-sonnet-20240229": {"input": 0.003, "output": 0.015},
+        "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
     }
 
     # Path to system prompt file (relative to this file)
@@ -72,6 +97,7 @@ class LLMClient:
         self.api_key = api_key
         self.model = self._normalizeModelName(model or self.DEFAULT_MODEL)
         self.base_url = self.DEFAULT_BASE_URL
+        self.provider = "kimi"
         self.timeout = self.DEFAULT_TIMEOUT
         self.conversation_history: List[Dict[str, Any]] = []
         self.total_tokens_used = 0
@@ -98,6 +124,126 @@ class LLMClient:
         """Set a custom base URL (for enterprise deployments)."""
         self.base_url = base_url.rstrip('/')
 
+    def setProvider(self, provider: str):
+        """Set the API provider ('kimi' or 'claude')."""
+        self.provider = (provider or "kimi").lower()
+
+    def _isAnthropicNative(self) -> bool:
+        """
+        Return True when the wire format should be Anthropic-native (Messages API).
+        This is true ONLY when the base_url points to api.anthropic.com.
+        Third-party Claude proxies (e.g. api.gpt.ge) use OpenAI-compatible format
+        even though the models are Claude — so they return False here.
+        """
+        return 'anthropic.com' in getattr(self, 'base_url', '').lower()
+
+    def _isClaudeProvider(self) -> bool:
+        """Return True when the user selected 'Claude' as the provider (model list / pricing)."""
+        return getattr(self, 'provider', 'kimi').lower() == 'claude'
+
+    def _isClaude(self) -> bool:
+        """Backward-compat alias: True only for native Anthropic API."""
+        return self._isAnthropicNative()
+
+    def _getChatUrl(self) -> str:
+        if self._isAnthropicNative():
+            return f"{self.base_url}/messages"
+        return f"{self.base_url}/chat/completions"
+
+    def _convertMessagesForClaude(self, messages: List[Dict[str, Any]]) -> Tuple[Optional[str], List[Dict[str, Any]]]:
+        """Extract system prompt and convert OpenAI-style messages to Anthropic format."""
+        system_parts: List[str] = []
+        claude_messages: List[Dict[str, Any]] = []
+        for m in messages:
+            role = m.get('role')
+            content = m.get('content', '')
+            if role == 'system':
+                if content:
+                    system_parts.append(content)
+            elif role == 'tool':
+                claude_messages.append({
+                    'role': 'user',
+                    'content': [{
+                        'type': 'tool_result',
+                        'tool_use_id': m.get('tool_call_id', ''),
+                        'content': content,
+                    }]
+                })
+            elif role == 'assistant':
+                tool_calls = m.get('tool_calls')
+                if tool_calls:
+                    blocks: List[Dict[str, Any]] = []
+                    if content:
+                        blocks.append({'type': 'text', 'text': content})
+                    for tc in tool_calls:
+                        func = tc.get('function', {})
+                        args_str = func.get('arguments', '{}')
+                        try:
+                            args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                        except Exception:
+                            args = {}
+                        blocks.append({
+                            'type': 'tool_use',
+                            'id': tc.get('id', ''),
+                            'name': func.get('name', ''),
+                            'input': args,
+                        })
+                    claude_messages.append({'role': 'assistant', 'content': blocks})
+                else:
+                    claude_messages.append({'role': 'assistant', 'content': content})
+            else:
+                claude_messages.append({'role': role, 'content': content})
+        system = '\n\n'.join(system_parts) if system_parts else None
+        return system, claude_messages
+
+    def _convertToolsForClaude(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        claude_tools: List[Dict[str, Any]] = []
+        for t in tools:
+            if t.get('type') == 'function':
+                func = t.get('function', {})
+                claude_tools.append({
+                    'name': func.get('name', ''),
+                    'description': func.get('description', ''),
+                    'input_schema': func.get('parameters', {}),
+                })
+        return claude_tools
+
+    def _normalizeClaudeResponse(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert Anthropic Messages API response to OpenAI-compatible shape."""
+        content_blocks = data.get('content', [])
+        text_parts: List[str] = []
+        tool_calls: List[Dict[str, Any]] = []
+        for block in content_blocks:
+            btype = block.get('type')
+            if btype == 'text':
+                text_parts.append(block.get('text', ''))
+            elif btype == 'tool_use':
+                tool_calls.append({
+                    'id': block.get('id', ''),
+                    'type': 'function',
+                    'function': {
+                        'name': block.get('name', ''),
+                        'arguments': json.dumps(block.get('input', {}), ensure_ascii=False)
+                    }
+                })
+        message: Dict[str, Any] = {
+            'content': ''.join(text_parts),
+            'role': 'assistant',
+        }
+        if tool_calls:
+            message['tool_calls'] = tool_calls
+        usage_data = data.get('usage', {})
+        input_tokens = usage_data.get('input_tokens', 0)
+        output_tokens = usage_data.get('output_tokens', 0)
+        return {
+            'choices': [{'message': message}],
+            'usage': {
+                'prompt_tokens': input_tokens,
+                'completion_tokens': output_tokens,
+                'total_tokens': input_tokens + output_tokens,
+            }
+        }
+
     def clearHistory(self):
         """Clear conversation history."""
         self.conversation_history = []
@@ -117,6 +263,12 @@ class LLMClient:
         if not self.api_key:
             raise RuntimeError("API key not configured. Please set your API key in Settings.")
 
+        if self._isClaude():
+            return {
+                "content-type": "application/json",
+                "x-api-key": self.api_key,
+                "anthropic-version": "2024-10-22",
+            }
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
@@ -176,7 +328,22 @@ class LLMClient:
 
     def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Build the API payload for chat completion requests."""
-        payload: Dict[str, Any] = {
+        if self._isClaude():
+            system, claude_messages = self._convertMessagesForClaude(messages)
+            payload: Dict[str, Any] = {
+                "model": self.model,
+                "messages": claude_messages,
+                "max_tokens": 4096,
+            }
+            if system:
+                payload["system"] = system
+            if stream:
+                payload["stream"] = True
+            if tools:
+                payload["tools"] = self._convertToolsForClaude(tools)
+            return payload
+
+        payload = {
             "model": self.model,
             "messages": messages,
         }
@@ -451,11 +618,13 @@ This is wrong because it uses subprocess instead of the provided tools.
         )
         messages = [{"role": "user", "content": summary_prompt}]
         payload = self._buildPayload(messages, stream=False)
-        url = f"{self.base_url}/chat/completions"
+        url = self._getChatUrl()
         try:
             request = self._buildRequest(url, payload)
             with self._openRequest(request) as response:
                 data = json.loads(response.read().decode('utf-8'))
+            if self._isClaude():
+                data = self._normalizeClaudeResponse(data)
             content = self._coerceText(data['choices'][0]['message'].get('content', ''))
             # Track token usage for summary request
             usage = data.get('usage', {})
@@ -563,7 +732,7 @@ This is wrong because it uses subprocess instead of the provided tools.
 
         messages = self._buildMessages(prompt, context)
         payload = self._buildPayload(messages, stream=False)
-        url = f"{self.base_url}/chat/completions"
+        url = self._getChatUrl()
 
         last_error = None
         for attempt in range(self.MAX_RETRIES):
@@ -571,6 +740,9 @@ This is wrong because it uses subprocess instead of the provided tools.
                 request = self._buildRequest(url, payload)
                 with self._openRequest(request) as response:
                     data = json.loads(response.read().decode('utf-8'))
+
+                if self._isClaude():
+                    data = self._normalizeClaudeResponse(data)
 
                 assistant_payload = data['choices'][0]['message']
                 assistant_message = self._coerceText(assistant_payload.get('content'))
@@ -594,11 +766,17 @@ This is wrong because it uses subprocess instead of the provided tools.
                 if e.code == 404:
                     error_data = json.loads(error_body) if error_body else {}
                     error_msg = error_data.get('error', {}).get('message', 'Model not found')
+                    if self._isClaudeProvider():
+                        docs_hint = "https://docs.anthropic.com/en/docs/about-claude/models"
+                        suggestion = "Try using 'claude-3-5-sonnet-20241022' or check available models at:"
+                    else:
+                        docs_hint = "https://platform.moonshot.cn/docs/models"
+                        suggestion = "Try using 'kimi-k2.5' or check available models at:"
                     raise RuntimeError(
                         f"Model error: {error_msg}\n\n"
                         f"Current model: '{self.model}'\n"
-                        f"Try using 'kimi-k2.5' or check available models at:\n"
-                        f"https://platform.moonshot.cn/docs/models"
+                        f"{suggestion}\n"
+                        f"{docs_hint}"
                     )
                 if e.code == 429:
                     import time
@@ -652,9 +830,21 @@ This is wrong because it uses subprocess instead of the provided tools.
         if not self.api_key:
             raise RuntimeError("API key not configured")
 
+        if self._isClaude():
+            # Anthropic native streaming uses a different SSE format; fallback to non-streaming
+            result = self.chat(prompt, context=context)
+            if on_delta:
+                on_delta({
+                    'content': result.get('message', ''),
+                    'reasoning_content': result.get('reasoning_content', ''),
+                    'finish_reason': 'stop',
+                    'raw_chunk': result.get('raw_response', {}),
+                })
+            return result
+
         messages = self._buildMessages(prompt, context)
         payload = self._buildPayload(messages, stream=True)
-        url = f"{self.base_url}/chat/completions"
+        url = self._getChatUrl()
 
         last_error = None
         for attempt in range(self.MAX_RETRIES):
@@ -714,11 +904,17 @@ This is wrong because it uses subprocess instead of the provided tools.
                 if e.code == 404:
                     error_data = json.loads(error_body) if error_body else {}
                     error_msg = error_data.get('error', {}).get('message', 'Model not found')
+                    if self._isClaudeProvider():
+                        docs_hint = "https://docs.anthropic.com/en/docs/about-claude/models"
+                        suggestion = "Try using 'claude-3-5-sonnet-20241022' or check available models at:"
+                    else:
+                        docs_hint = "https://platform.moonshot.cn/docs/models"
+                        suggestion = "Try using 'kimi-k2.5' or check available models at:"
                     raise RuntimeError(
                         f"Model error: {error_msg}\n\n"
                         f"Current model: '{self.model}'\n"
-                        f"Try using 'kimi-k2.5' or check available models at:\n"
-                        f"https://platform.moonshot.cn/docs/models"
+                        f"{suggestion}\n"
+                        f"{docs_hint}"
                     )
                 if e.code == 429:
                     import time
@@ -783,7 +979,7 @@ This is wrong because it uses subprocess instead of the provided tools.
             raise RuntimeError("API key not configured")
         
         messages = self._buildMessages(prompt, context)
-        url = f"{self.base_url}/chat/completions"
+        url = self._getChatUrl()
         tool_calls_history = []
         intermediate_messages = []  # Persist tool calling trajectory to conversation history
         
@@ -798,6 +994,9 @@ This is wrong because it uses subprocess instead of the provided tools.
                 request = self._buildRequest(url, payload)
                 with self._openRequest(request) as response:
                     data = json.loads(response.read().decode('utf-8'))
+
+                if self._isClaude():
+                    data = self._normalizeClaudeResponse(data)
                 
                 assistant_message = data['choices'][0]['message']
                 content = self._coerceText(assistant_message.get('content', ''))
@@ -1018,7 +1217,13 @@ This is wrong because it uses subprocess instead of the provided tools.
         Returns:
             Estimated cost in USD
         """
-        pricing = self.MODEL_PRICING.get(self.model) or self.MODEL_PRICING[self.DEFAULT_MODEL]
+        pricing = self.MODEL_PRICING.get(self.model)
+        if pricing is None:
+            # Fallback: use Claude sonnet pricing for Claude provider, else Kimi default
+            if self._isClaudeProvider():
+                pricing = self.MODEL_PRICING.get("claude-3-5-sonnet-20241022", {"input": 0.003, "output": 0.015})
+            else:
+                pricing = self.MODEL_PRICING[self.DEFAULT_MODEL]
         input_tokens = usage.get('prompt_tokens', 0)
         output_tokens = usage.get('completion_tokens', 0)
         return (input_tokens / 1000) * pricing['input'] + (output_tokens / 1000) * pricing['output']
@@ -1033,7 +1238,12 @@ This is wrong because it uses subprocess instead of the provided tools.
 
     def testConnection(self) -> Dict[str, Any]:
         """
-        Test API connection with a simple request.
+        Test API connection.
+
+        Strategy:
+        1. Try GET /models — cheap, returns available model list (OpenAI-compatible proxies).
+        2. If /models is unsupported or returns non-JSON, fall back to a minimal
+           chat request via validateModel() to confirm the key + model work.
 
         Returns:
             Dictionary with success status and available models (if returned)
@@ -1041,23 +1251,52 @@ This is wrong because it uses subprocess instead of the provided tools.
         if not self.api_key:
             return {'success': False, 'error': 'API key not configured'}
 
+        # Native Anthropic API has no /models endpoint — go straight to validateModel
+        if self._isAnthropicNative():
+            valid = self.validateModel()
+            return {
+                'success': valid,
+                'models': [self.model] if valid else [],
+                'message': 'Connection successful' if valid else 'Connection failed',
+            }
+
+        # Try GET /models first (OpenAI-compatible endpoint)
         try:
             url = f"{self.base_url}/models"
             request = self._buildRequest(url, payload=None, method='GET')
             with self._openRequest(request) as response:
-                data = json.loads(response.read().decode('utf-8'))
+                raw = response.read().decode('utf-8').strip()
+            if not raw:
+                raise ValueError("Empty response from /models")
+            data = json.loads(raw)
+            models = [m.get('id') for m in data.get('data', []) if m.get('id')]
+            return {
+                'success': True,
+                'models': models,
+                'message': 'Connection successful',
+            }
+        except (urllib.error.HTTPError, urllib.error.URLError, ValueError, json.JSONDecodeError) as models_err:
+            logger.warning(f"GET /models failed ({models_err}), falling back to chat probe")
+
+        # Fallback: send a minimal chat request to confirm key + model are valid
+        try:
+            logger.info(f"Testing model '{self.model}' via {self._getChatUrl()}")
+            valid = self.validateModel()
+            if valid:
                 return {
                     'success': True,
-                    'models': [m.get('id') for m in data.get('data', [])],
+                    'models': [],   # proxy didn't expose model list
                     'message': 'Connection successful',
                 }
-        except urllib.error.HTTPError as e:
-            error_body = e.read().decode('utf-8')
-            return {
-                'success': False,
-                'error': f"HTTP {e.code}: {error_body}",
-                'message': 'Connection failed',
-            }
+            else:
+                return {
+                    'success': False,
+                    'error': f"Model '{self.model}' not found on this endpoint.",
+                    'message': 'Connection failed',
+                }
+        except RuntimeError:
+            # validateModel already raised with detailed message — re-raise to surface it
+            raise
         except Exception as e:
             return {
                 'success': False,
@@ -1067,31 +1306,61 @@ This is wrong because it uses subprocess instead of the provided tools.
 
     def validateModel(self, model_name: str = None) -> bool:
         """
-        Test if a specific model name is valid.
+        Test if a specific model name is valid by sending a minimal request.
 
         Args:
             model_name: Model name to test (default: current model)
 
         Returns:
-            True if model is accessible
+            True if model is accessible, False if 404
         """
         model = self._normalizeModelName(model_name or self.model)
         if not self.api_key:
             return False
 
+        # Temporarily swap self.model so _buildPayload uses the right model name
+        original_model = self.model
+        self.model = model
+        http_error = None
+        other_error = None
         try:
-            payload = {
-                'model': model,
-                'messages': [{'role': 'user', 'content': 'Hi'}],
-                'max_tokens': 10,
-            }
-            request = self._buildRequest(f"{self.base_url}/chat/completions", payload)
+            messages = [{'role': 'user', 'content': 'Hi'}]
+            payload = self._buildPayload(messages)
+            url = self._getChatUrl()
+            request = self._buildRequest(url, payload)
             with self._openRequest(request):
                 return True
         except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return False
-            raise
+            http_error = e
+        except Exception as e:
+            other_error = e
+        finally:
+            self.model = original_model
+
+        # Handle errors after finally restores self.model
+        if http_error is not None:
+            error_body = http_error.read().decode('utf-8', errors='ignore')
+            url_hint = ""
+            if '/v1' not in self.base_url:
+                url_hint = f"\n  • Try adding '/v1' to your base URL: {self.base_url}/v1"
+            elif self.base_url.endswith('/v1'):
+                url_hint = f"\n  • Try removing '/v1' from your base URL: {self.base_url[:-3]}"
+            if http_error.code == 404:
+                # Include the actual error body so user can see what the server said
+                logger.warning(f"Model probe 404: {error_body[:500]}")
+                raise RuntimeError(
+                    f"Model '{model}' not found (HTTP 404).\n\n"
+                    f"Server response: {error_body[:200] if error_body else '(empty body)'}\n\n"
+                    f"This proxy may use different model names. Try:\n"
+                    f"  • gpt-4 (if proxy maps OpenAI names to Claude)\n"
+                    f"  • claude-3-sonnet-20240229 (alternate date format)\n"
+                    f"  • anthropic/claude-3-5-sonnet-20241022 (provider-prefixed){url_hint}\n"
+                    f"  • Check your proxy's documentation for exact model names"
+                )
+            raise RuntimeError(f"HTTP {http_error.code}: {error_body}")
+        if other_error is not None:
+            raise other_error
+        return False
 
     def cleanup(self):
         """Cleanup resources."""

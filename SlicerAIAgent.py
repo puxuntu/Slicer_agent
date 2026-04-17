@@ -4,6 +4,7 @@ import queue
 import threading
 import unittest
 import logging
+from typing import List
 import vtk
 import qt
 import ctk
@@ -97,8 +98,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         logger.info("SlicerAIAgent widget setup complete")
 
     def _connectUIWidgets(self):
-        self.apiKeyInput = self.ui.findChild(qt.QLineEdit, "apiKeyInput")
+        self.providerSelector = self.ui.findChild(qt.QComboBox, "providerSelector")
         self.modelSelector = self.ui.findChild(qt.QComboBox, "modelSelector")
+        self.baseUrlInput = self.ui.findChild(qt.QLineEdit, "baseUrlInput")
+        self.apiKeyInput = self.ui.findChild(qt.QLineEdit, "apiKeyInput")
         self.saveSettingsButton = self.ui.findChild(qt.QPushButton, "saveSettingsButton")
         self.testConnectionButton = self.ui.findChild(qt.QPushButton, "testConnectionButton")
         self.chatHistory = self.ui.findChild(qt.QTextEdit, "chatHistory")
@@ -124,23 +127,37 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         settingsLayout = qt.QFormLayout(settingsGroup)
 
+        # Row 1: Provider + Model
+        providerModelLayout = qt.QHBoxLayout()
+        self.providerSelector = qt.QComboBox()
+        self.providerSelector.addItems(["Kimi", "Claude"])
+        self.providerSelector.setToolTip("Select AI provider")
+        providerModelLayout.addWidget(self.providerSelector)
+
+        self.modelSelector = qt.QComboBox()
+        self.modelSelector.setEditable(True)
+        self.modelSelector.setToolTip("Select or type a model name")
+        providerModelLayout.addWidget(self.modelSelector)
+        settingsLayout.addRow("Provider / Model:", providerModelLayout)
+
+        # Row 2: Base URL
+        self.baseUrlInput = qt.QLineEdit()
+        self.baseUrlInput.setPlaceholderText("API base URL")
+        settingsLayout.addRow("Base URL:", self.baseUrlInput)
+
+        # Row 3: API Key + Test button
+        apiKeyLayout = qt.QHBoxLayout()
         self.apiKeyInput = qt.QLineEdit()
         self.apiKeyInput.setEchoMode(qt.QLineEdit.Password)
         self.apiKeyInput.setPlaceholderText("Enter your API key")
-        settingsLayout.addRow("API Key:", self.apiKeyInput)
-
-        modelLayout = qt.QHBoxLayout()
-        self.modelSelector = qt.QComboBox()
-        self.modelSelector.setEditable(True)
-        self.modelSelector.setToolTip("K2.5 models: kimi-k2.5 (default), kimi-k2-thinking, kimi-k2-turbo-preview")
-        self.modelSelector.addItems(["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"])
-        modelLayout.addWidget(self.modelSelector)
+        apiKeyLayout.addWidget(self.apiKeyInput)
 
         self.testConnectionButton = qt.QPushButton("Test")
         self.testConnectionButton.setToolTip("Test API connection")
-        modelLayout.addWidget(self.testConnectionButton)
-        settingsLayout.addRow("Model:", modelLayout)
+        apiKeyLayout.addWidget(self.testConnectionButton)
+        settingsLayout.addRow("API Key:", apiKeyLayout)
 
+        # Row 4: Save Settings
         self.saveSettingsButton = qt.QPushButton("Save Settings")
         settingsLayout.addRow(self.saveSettingsButton)
 
@@ -204,6 +221,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.saveSettingsButton.clicked.connect(self.onSaveSettings)
         if hasattr(self, 'testConnectionButton') and self.testConnectionButton is not None:
             self.testConnectionButton.clicked.connect(self.onTestConnection)
+        if hasattr(self, 'providerSelector') and self.providerSelector is not None:
+            self.providerSelector.currentTextChanged.connect(self.onProviderChanged)
 
     def disconnect(self):
         self.removeObservers()
@@ -625,6 +644,42 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 .replace('"', "&quot;")
                 .replace("'", "&#x27;"))
 
+    def _defaultModelsForProvider(self, provider: str) -> List[str]:
+        if provider == "Claude":
+            return [
+                # Claude 4.6 Sonnet variants
+                "claude-sonnet-4-6",
+                "claude-sonnet-4-6-high",
+                "claude-sonnet-4-6-low",
+                "claude-sonnet-4-6-max",
+                "claude-sonnet-4-6-medium",
+                "claude-sonnet-4-6-thinking",
+                # Claude 4.6 Opus variants
+                "claude-opus-4-6",
+                "claude-opus-4-6-high",
+                "claude-opus-4-6-low",
+                "claude-opus-4-6-max",
+                "claude-opus-4-6-medium",
+                "claude-opus-4-6-thinking",
+                # Claude 4.5 Haiku variants
+                "claude-haiku-4-5-20251001",
+                "claude-haiku-4-5-20251001-thinking",
+            ]
+        return ["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+
+    def _defaultBaseUrlForProvider(self, provider: str) -> str:
+        if provider == "Claude":
+            return "https://api.anthropic.com/v1"
+        return "https://api.moonshot.cn/v1"
+
+    def onProviderChanged(self, provider: str):
+        if not hasattr(self, 'modelSelector') or self.modelSelector is None:
+            return
+        self.modelSelector.clear()
+        self.modelSelector.addItems(self._defaultModelsForProvider(provider))
+        if hasattr(self, 'baseUrlInput') and self.baseUrlInput is not None:
+            self.baseUrlInput.text = self._defaultBaseUrlForProvider(provider)
+
     def onSaveSettings(self):
         if not hasattr(self, 'apiKeyInput') or self.apiKeyInput is None:
             return
@@ -632,15 +687,22 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         settings = qt.QSettings()
         settings.beginGroup("SlicerAIAgent")
         settings.setValue("apiKey", self.apiKeyInput.text)
+        if hasattr(self, 'providerSelector') and self.providerSelector is not None:
+            settings.setValue("provider", self.providerSelector.currentText)
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             settings.setValue("model", self.modelSelector.currentText)
-        
+        if hasattr(self, 'baseUrlInput') and self.baseUrlInput is not None:
+            settings.setValue("baseUrl", self.baseUrlInput.text)
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(self.apiKeyInput.text)
+            if hasattr(self, 'providerSelector') and self.providerSelector is not None:
+                self.logic.setProvider(self.providerSelector.currentText)
             if hasattr(self, 'modelSelector') and self.modelSelector is not None:
                 self.logic.setModel(self.modelSelector.currentText)
+            if hasattr(self, 'baseUrlInput') and self.baseUrlInput is not None:
+                self.logic.setBaseUrl(self.baseUrlInput.text)
 
         slicer.util.infoDisplay("Settings saved successfully!")
 
@@ -649,8 +711,25 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             slicer.util.warningDisplay("Logic not initialized")
             return
 
+        if not self.logic.llmClient:
+            init_error = getattr(self.logic, '_initError', None)
+            if init_error:
+                slicer.util.warningDisplay(
+                    f"LLM client failed to initialize:\n\n{init_error}\n\n"
+                    "Check the Slicer Python console for the full traceback."
+                )
+            else:
+                slicer.util.warningDisplay(
+                    "LLM client not initialized.\n\n"
+                    "This usually means a required Python package failed to import.\n"
+                    "Check the Slicer Python console for import errors."
+                )
+            return
+
         apiKey = self.apiKeyInput.text if hasattr(self, 'apiKeyInput') else ""
         model = self.modelSelector.currentText if hasattr(self, 'modelSelector') else "kimi-k2.5"
+        baseUrl = self.baseUrlInput.text if hasattr(self, 'baseUrlInput') else ""
+        provider = self.providerSelector.currentText if hasattr(self, 'providerSelector') else "Kimi"
 
         if not apiKey:
             slicer.util.warningDisplay("Please enter an API key first")
@@ -658,48 +737,87 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         originalKey = self.logic.apiKey
         originalModel = self.logic.model
+        originalBaseUrl = self.logic.baseUrl if hasattr(self.logic, 'baseUrl') else ""
+        originalProvider = self.logic.llmClient.provider
 
         self.logic.setApiKey(apiKey)
         self.logic.setModel(model)
+        self.logic.setProvider(provider)
+        if baseUrl:
+            self.logic.setBaseUrl(baseUrl)
 
         self.statusLabel.text = "Testing connection..."
         slicer.app.processEvents()
 
         try:
-            if self.logic.llmClient.validateModel(model):
-                slicer.util.infoDisplay(f"Connection successful!\n\nModel '{model}' is valid and accessible.")
+            result = self.logic.llmClient.testConnection()
+            if result.get('success'):
+                available = result.get('models', [])
+                if available:
+                    # Proxy returned a model list — check if our model is in it
+                    if model in available:
+                        msg = f"Connection successful!\n\nModel '{model}' is available."
+                    else:
+                        top = '\n'.join(f"  • {m}" for m in available[:15])
+                        more = f"\n  ... and {len(available)-15} more" if len(available) > 15 else ""
+                        msg = (
+                            f"Connection successful, but model '{model}' was NOT found.\n\n"
+                            f"Models available on this endpoint:\n{top}{more}\n\n"
+                            f"Select one of the above models from the dropdown."
+                        )
+                else:
+                    # /models not supported — confirmed via chat probe
+                    msg = (
+                        f"Connection successful!\n\n"
+                        f"Model '{model}' is accessible.\n"
+                        f"(This endpoint does not expose a model list.)"
+                    )
+                slicer.util.infoDisplay(msg)
             else:
-                slicer.util.warningDisplay(f"Model '{model}' not found.\n\nTry one of these:\n- kimi-k2.5\n- kimi-k2-thinking\n- kimi-k2-turbo-preview")
+                error = result.get('error', 'Unknown error')
+                slicer.util.warningDisplay(f"Connection failed:\n{error}")
         except Exception as e:
-            error_msg = str(e)
-            if "404" in error_msg:
-                slicer.util.warningDisplay(f"Model '{model}' not found (404).\n\nTry these K2.5 model names:\n- kimi-k2.5 (standard)\n- kimi-k2-thinking (with thinking)\n- kimi-k2-turbo-preview (faster)\n\nOr check your API key.")
-            elif "401" in error_msg:
-                slicer.util.warningDisplay("Invalid API key (401).\n\nPlease check your API key.")
-            else:
-                slicer.util.warningDisplay(f"Connection failed:\n{error_msg}")
+            slicer.util.warningDisplay(f"Connection failed:\n{e}")
         finally:
             self.statusLabel.text = "Ready"
             self.logic.setApiKey(originalKey)
             self.logic.setModel(originalModel)
+            self.logic.setProvider(originalProvider)
+            # Always restore base URL (even if it was empty — use provider default)
+            self.logic.setBaseUrl(originalBaseUrl if originalBaseUrl else self._defaultBaseUrlForProvider(originalProvider))
 
     def loadSettings(self):
         settings = qt.QSettings()
         settings.beginGroup("SlicerAIAgent")
 
         apiKey = settings.value("apiKey", "")
+        provider = settings.value("provider", "Kimi")
         model = settings.value("model", "kimi-k2.5")
+        baseUrl = settings.value("baseUrl", "")
 
         if hasattr(self, 'apiKeyInput') and self.apiKeyInput is not None:
             self.apiKeyInput.text = apiKey
+        if hasattr(self, 'providerSelector') and self.providerSelector is not None:
+            self.providerSelector.setCurrentText(provider)
+            self.onProviderChanged(provider)
         if hasattr(self, 'modelSelector') and self.modelSelector is not None:
             self.modelSelector.setCurrentText(model)
+        if hasattr(self, 'baseUrlInput') and self.baseUrlInput is not None:
+            if baseUrl:
+                self.baseUrlInput.text = baseUrl
+            else:
+                self.baseUrlInput.text = self._defaultBaseUrlForProvider(provider)
 
         settings.endGroup()
 
         if self.logic:
             self.logic.setApiKey(apiKey)
             self.logic.setModel(model)
+            self.logic.setProvider(provider)
+            if baseUrl:
+                self.logic.setBaseUrl(baseUrl)
+            else:
+                self.logic.setBaseUrl(self._defaultBaseUrlForProvider(provider))
 
 #------------------------------------------------------------------
 # Logic Class
@@ -714,6 +832,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         ScriptedLoadableModuleLogic.__init__(self)
         self.apiKey = None
         self.model = "kimi-k2.5"
+        self.baseUrl = ""
         self.llmClient = None
         self.skill_path = None
         self.skill_mode = "unknown"
@@ -745,9 +864,11 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
             logger.info("SlicerAIAgent logic components initialized")
         except Exception as e:
-            logger.error(f"Failed to initialize components: {e}")
             import traceback
-            traceback.print_exc()
+            tb = traceback.format_exc()
+            logger.error(f"Failed to initialize components: {e}\n{tb}")
+            # Store the error so the UI can surface it to the user
+            self._initError = str(e)
 
     def _detectSkillMode(self):
         """Detect skill mode from .setup-stamp.json."""
@@ -770,6 +891,15 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         self.model = model
         if self.llmClient:
             self.llmClient.setModel(model)
+
+    def setBaseUrl(self, baseUrl):
+        self.baseUrl = baseUrl
+        if self.llmClient:
+            self.llmClient.setBaseUrl(baseUrl)
+
+    def setProvider(self, provider):
+        if self.llmClient:
+            self.llmClient.setProvider(provider)
 
     def hasApiKey(self):
         return bool(self.apiKey)
