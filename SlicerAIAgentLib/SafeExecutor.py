@@ -66,48 +66,13 @@ class SafeExecutor:
         
     def _buildGlobals(self) -> Dict[str, Any]:
         """
-        Build the globals dictionary for code execution.
+        Return the __main__ module's globals dictionary.
         
-        Returns:
-            Dictionary of available global names
+        This makes the execution environment identical to the Slicer Python
+        Console, so that shortcuts like getNode (injected by slicerqt.py)
+        are automatically available.
         """
-        # Start with safe builtins
-        safe_builtins = {
-            'abs', 'all', 'any', 'ascii', 'bin', 'bool', 'bytearray', 'bytes',
-            'callable', 'chr', 'classmethod', 'complex', 'delattr', 'dict',
-            'dir', 'divmod', 'enumerate', 'filter', 'float', 'format',
-            'frozenset', 'hasattr', 'hash', 'help', 'hex', 'id', 'int',
-            'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals',
-            'map', 'max', 'memoryview', 'min', 'next', 'object', 'oct',
-            'ord', 'pow', 'print', 'property', 'range', 'repr', 'reversed',
-            'round', 'set', 'setattr', 'slice', 'sorted', 'staticmethod',
-            'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip',
-            '__import__',  # We'll monitor this
-        }
-        
-        builtins_dict = {name: getattr(builtins, name) for name in safe_builtins if hasattr(builtins, name)}
-        
-        # Build globals with Slicer environment
-        globals_dict = {
-            '__builtins__': builtins_dict,
-            'slicer': slicer,
-            'vtk': vtk,
-            'qt': qt,
-        }
-        
-        # Add ctk if available
-        if ctk is not None:
-            globals_dict['ctk'] = ctk
-        
-        # Add commonly used modules
-        try:
-            import numpy
-            globals_dict['numpy'] = numpy
-            globals_dict['np'] = numpy
-        except ImportError:
-            pass
-            
-        return globals_dict
+        return sys.modules['__main__'].__dict__
     
     def _injectHelpers(self, globals_dict: Dict) -> Dict:
         """
@@ -199,7 +164,9 @@ class SafeExecutor:
         stderr_capture = io.StringIO()
         
         # Prepare execution environment
-        exec_globals = self._globals_dict.copy()
+        # Use __main__ globals directly so that code runs in the same namespace
+        # as the Slicer Python Console (getNode and other shortcuts are available).
+        exec_globals = self._globals_dict
         exec_globals = self._injectHelpers(exec_globals)
         
         result_value = None
@@ -212,28 +179,14 @@ class SafeExecutor:
             with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
                 # Compile code to enable better error reporting
                 compiled_code = compile(code, '<SlicerKimiAgent>', 'exec')
-                
-                # Execute with periodic timeout checks
-                # Note: We can't truly interrupt Python execution, but we can check
-                # timeout between statements if code is multiple statements
                 tree = ast.parse(code)
                 
-                if len(tree.body) == 1:
-                    # Single statement - execute directly
-                    exec(compiled_code, exec_globals)
-                else:
-                    # Multiple statements - execute one by one to allow timeout checks
-                    for stmt in tree.body:
-                        # Check timeout before each statement
-                        elapsed = (datetime.now() - self._execution_start_time).total_seconds()
-                        if elapsed > effective_timeout:
-                            raise TimeoutError(f"Execution exceeded {effective_timeout} seconds")
-                        
-                        stmt_code = compile(ast.Module([stmt], []), '<SlicerKimiAgent>', 'exec')
-                        exec(stmt_code, exec_globals)
-                        
-                        # Process events to keep UI responsive
-                        slicer.app.processEvents()
+                # Whole-block atomic execution (same as Slicer Python Console).
+                # We no longer split into individual statements or call processEvents()
+                # between them, to avoid exposing intermediate VTK/MRML state to the
+                # GUI event loop (which can cause crashes when code manipulates
+                # low-level array views).
+                exec(compiled_code, exec_globals)
                 
                 # Try to get result of last expression
                 try:
@@ -245,10 +198,8 @@ class SafeExecutor:
                 except:
                     pass
                 
-                # Update shared globals with new definitions
-                for key, value in exec_globals.items():
-                    if key not in ['__builtins__', '_checkTimeout', '_keepAlive', 'keepAlive']:
-                        self._globals_dict[key] = value
+                # Variables are already persisted in __main__.__dict__ because
+                # exec_globals and self._globals_dict point to the same dict.
                         
         except TimeoutError as e:
             timed_out = True
@@ -351,4 +302,4 @@ class SafeExecutor:
     def cleanup(self):
         """Cleanup resources."""
         self.execution_history = []
-        self._globals_dict = self._buildGlobals()
+        # Do not reset _globals_dict since it points to __main__.__dict__

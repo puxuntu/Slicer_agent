@@ -103,6 +103,7 @@ class LLMClient:
         self.total_tokens_used = 0
         self.total_cost = 0.0
         self.turn_number = 1
+        self.debug_suffix = ""  # e.g., "_correction" for self-correction turns
         self._system_prompt_template = self._loadSystemPromptTemplate()
 
     def _normalizeModelName(self, model: Optional[str]) -> str:
@@ -303,7 +304,7 @@ class LLMClient:
         try:
             debug_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                f'{self.turn_number}_first_prompt_debug.txt'
+                f'{self.turn_number}_first_prompt_debug{self.debug_suffix}.txt'
             )
             with open(debug_path, 'w', encoding='utf-8') as f:
                 total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
@@ -1033,7 +1034,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                     try:
                         debug_path = os.path.join(
                             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            f'{self.turn_number}_last_prompt_debug.txt'
+                            f'{self.turn_number}_last_prompt_debug{self.debug_suffix}.txt'
                         )
                         with open(debug_path, 'w', encoding='utf-8') as f:
                             total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')

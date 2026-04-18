@@ -467,12 +467,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         try:
             moduleDir = os.path.dirname(__file__)
             turn_number = 1
+            suffix = ""
             if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
                 turn_number = getattr(self.logic.llmClient, 'turn_number', 1)
+                suffix = getattr(self.logic.llmClient, 'debug_suffix', "")
             # turn_number is incremented right after the assistant response finishes,
             # so the code generated in turn N is saved when turn_number equals N+1.
             turn_number = max(1, turn_number - 1)
-            latestPath = os.path.join(moduleDir, f'{turn_number}_latest_generated_code.txt')
+            latestPath = os.path.join(moduleDir, f'{turn_number}_latest_generated_code{suffix}.txt')
             with open(latestPath, 'w', encoding='utf-8') as f:
                 f.write(code)
         except Exception as e:
@@ -548,7 +550,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if not result.get("timed_out", False) and (not result["success"] or output_has_errors):
                 if attempt < max_attempts:
                     self.appendToChat("System", "Auto-correcting...")
-                    self._selfCorrectCode("", attempt, max_attempts)
+                    error_for_correction = result.get('error', '')
+                    self._selfCorrectCode(error_for_correction, attempt, max_attempts)
                 else:
                     self.statusLabel.text = "Ready"
                     final_error = result.get('error', 'Unknown error') if not result["success"] else "Output contains errors"
@@ -564,22 +567,31 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if not self.currentCode:
             return
         
-        # Lightweight correction prompt; detailed error and previous code
-        # are already available in the conversation history via addExecutionFeedback.
+        # Hard-correction prompt: force the model to output only a code block.
+        # The actual error is injected directly so the model knows what to fix.
+        error_detail = error_msg if error_msg else "Unknown error"
         correction_prompt = (
-            "The previous code execution encountered issues. "
-            "Please refer to the execution feedback in the conversation history and provide the corrected code. "
-            "Analyze the error carefully and make minimal changes to fix it. "
-            "Only output the complete corrected Python code in a single code block."
+            f"CRITICAL: The previous Python code execution failed with this error:\n"
+            f"{error_detail}\n\n"
+            "Your task is to fix this error and output the COMPLETE corrected Python code. "
+            "Do NOT explain the error. Do NOT apologize. Do NOT write any analysis or markdown text outside the code block. "
+            "Your ENTIRE response must be ONE single ```python code block containing the full corrected script and NOTHING else."
         )
 
         self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
         
-        # Generate corrected code in background
+        # Generate corrected code on the main thread
         def generateCorrection():
             try:
-                context = {"scene": self.logic._buildSceneContext()} if self.logic else None
-                response = self.logic.generateResponse(correction_prompt, context=context)
+                # Tag this turn so debug files are named with "_correction" suffix
+                if self.logic and self.logic.llmClient:
+                    self.logic.llmClient.debug_suffix = "_correction"
+                
+                response = self.logic.generateResponse(correction_prompt)
+                
+                # Reset suffix immediately after the LLM call finishes
+                if self.logic and self.logic.llmClient:
+                    self.logic.llmClient.debug_suffix = ""
                 
                 if response.get("code"):
                     self.currentCode = response["code"]
@@ -588,15 +600,20 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     # Recursively execute with incremented attempt counter
                     self._autoExecuteCode(attempt + 1, max_attempts)
                 else:
-                    self.appendToChat("Error", "No corrected code generated.")
+                    # If no code in response, show the raw response for debugging
+                    raw_msg = response.get('message', '')[:300]
+                    self.appendToChat("System", f"Correction response contained no code block. Raw response preview:\n{raw_msg}")
                     self.statusLabel.text = "Ready"
             except Exception as e:
+                # Make sure suffix is reset even on failure
+                if self.logic and self.logic.llmClient:
+                    self.logic.llmClient.debug_suffix = ""
                 self.appendToChat("Error", f"Self-correction failed: {str(e)}")
                 self.statusLabel.text = "Ready"
         
-        # Run correction in background thread
-        import threading
-        threading.Thread(target=generateCorrection, daemon=True).start()
+        # Run correction on the main thread via QTimer to avoid unsafe
+        # MRML scene access from a background thread.
+        qt.QTimer.singleShot(0, generateCorrection)
 
     # Note: onCopyButtonClicked removed - copy functionality not needed with auto-execution
 
