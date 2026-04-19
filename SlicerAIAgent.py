@@ -71,6 +71,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Thread-safe queue for streaming events (filled by worker, drained on main thread)
         self._streamQueue = queue.Queue()
         self._streamPollTimer = None
+        # Timing data for performance analysis
+        self._timing = None
 
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
@@ -360,6 +362,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streaming = False
         self._finalizeStreamingEntry()
 
+        # Record LLM internal timing
+        if self._timing:
+            self._timing['llm_timing'] = response.get('timing_report', {})
+            import time
+            self._timing['generation_complete'] = time.time()
+
         # Display generated code if any and auto-execute
         if response.get("code"):
             self.currentCode = response["code"]
@@ -416,8 +424,19 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streamTimestamp = qt.QDateTime.currentDateTime().toString("hh:mm:ss")
         self._renderStreamingEntry()
 
+        # Initialize timing
+        import time
+        self._timing = {
+            'request_start': time.time(),
+            'prompt': prompt,
+        }
+
         # Build context on the main thread (it reads the MRML scene)
+        import time as _time
+        ctx_start = _time.time()
         context = {"scene": self.logic._buildSceneContext()} if self.logic else None
+        if self._timing:
+            self._timing['context_build_time'] = _time.time() - ctx_start
 
         # Launch the streaming request in a background thread
         def _backgroundStream():
@@ -425,7 +444,13 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 def _onDelta(delta):
                     self._streamQueue.put(('delta', dict(delta)))
 
+                import time as _time
+                gen_start = _time.time()
+                if self._timing:
+                    self._timing['generation_start'] = gen_start
                 response = self.logic.generateResponseStream(prompt, context, _onDelta)
+                if self._timing:
+                    self._timing['generation_end'] = _time.time()
                 self._streamQueue.put(('complete', dict(response)))
             except Exception as e:
                 self._streamQueue.put(('error', str(e)))
@@ -506,7 +531,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.statusLabel.text = f"Executing (attempt {attempt}/{max_attempts})..."
         slicer.app.processEvents()
-        
+
+        import time
+        if self._timing and 'execution_start' not in self._timing:
+            self._timing['execution_start'] = time.time()
+
         def onExecutionComplete(result):
             feedback_lines = []
             output_has_errors = False
@@ -545,7 +574,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if self.logic:
                 feedback_text = "Code execution result:\n" + "\n".join(feedback_lines) + "\nThe MRML scene has been updated. Refer to the CURRENT SLICER SCENE in the next system prompt for the complete raw MRML."
                 self.logic.addExecutionFeedback(feedback_text)
-            
+
+            # Record execution timing
+            import time
+            if self._timing:
+                self._timing['execution_end'] = time.time()
+                self._timing['execution_result'] = 'success' if result.get('success') else 'failed'
+                self._writeTimingReport()
+
             # Self-correction for failures or suspicious outputs (but not timeouts)
             if not result.get("timed_out", False) and (not result["success"] or output_has_errors):
                 if attempt < max_attempts:
@@ -566,7 +602,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Generate corrected code based on execution feedback in conversation history."""
         if not self.currentCode:
             return
-        
+
+        import time
+        if self._timing:
+            corrections = self._timing.setdefault('corrections', [])
+            corrections.append({'attempt': attempt + 1, 'start': time.time()})
+
         # Hard-correction prompt: force the model to output only a code block.
         # The actual error is injected directly so the model knows what to fix.
         error_detail = error_msg if error_msg else "Unknown error"
@@ -614,6 +655,89 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Run correction on the main thread via QTimer to avoid unsafe
         # MRML scene access from a background thread.
         qt.QTimer.singleShot(0, generateCorrection)
+
+    def _writeTimingReport(self):
+        """Write detailed performance timing to a text file."""
+        import os, time
+        if not self._timing:
+            return
+        try:
+            moduleDir = os.path.dirname(__file__)
+            turn_number = 1
+            if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
+                turn_number = getattr(self.logic.llmClient, 'turn_number', 1)
+                suffix = getattr(self.logic.llmClient, 'debug_suffix', "")
+            else:
+                suffix = ""
+            # turn_number is already incremented after response, so current turn is turn_number-1
+            turn_number = max(1, turn_number - 1)
+            logPath = os.path.join(moduleDir, f'{turn_number}_performance_log{suffix}.txt')
+
+            t = self._timing
+            lines = ["="*50, "Performance Timing Report", "="*50, ""]
+
+            # Overview
+            if 'turn_start' in t and 'generation_complete' in t:
+                total = t['generation_complete'] - t['turn_start']
+                lines.append(f"Turn wall-clock time (up to generation): {total:.3f}s")
+            if 'turn_start' in t and 'execution_end' in t:
+                total = t['execution_end'] - t['turn_start']
+                lines.append(f"Turn wall-clock time (including execution): {total:.3f}s")
+            lines.append("")
+
+            # Context building
+            if 'context_build_time' in t:
+                lines.append(f"Scene context build: {t['context_build_time']:.3f}s")
+                lines.append("")
+
+            # LLM generation
+            if 'turn_start' in t and 'generation_complete' in t:
+                gen = t['generation_complete'] - t['turn_start']
+                lines.append(f"LLM response generation: {gen:.3f}s")
+            if 'llm_timing' in t:
+                lt = t['llm_timing']
+                lines.append(f"  API calls: {lt.get('api_calls', 0)}")
+                lines.append(f"  Total API time: {lt.get('total_api_time', 0):.3f}s")
+                lines.append(f"  Total tool time: {lt.get('total_tool_time', 0):.3f}s")
+                lines.append(f"  Total other time: {lt.get('total_other_time', 0):.3f}s")
+                lines.append(f"  Tool rounds: {lt.get('tool_rounds', 0)}")
+                # Per-round breakdown
+                rounds = lt.get('rounds', [])
+                if rounds:
+                    lines.append("")
+                    lines.append("  Per-round breakdown:")
+                    for r in rounds:
+                        tools = ', '.join(r.get('tools', [])) or 'transition'
+                        lines.append(
+                            f"    Round {r['round']} [{r['phase']}] | "
+                            f"api={r['api_time']:.3f}s tool={r.get('tool_time', 0):.3f}s "
+                            f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]"
+                        )
+            lines.append("")
+
+            # Execution
+            if 'execution_start' in t:
+                if 'execution_end' in t:
+                    exec_t = t['execution_end'] - t['execution_start']
+                    lines.append(f"Code execution: {exec_t:.3f}s (result: {t.get('execution_result', 'unknown')})")
+                else:
+                    lines.append(f"Code execution: started but not finished yet")
+            lines.append("")
+
+            # Self-corrections
+            if 'corrections' in t:
+                lines.append(f"Self-correction attempts: {len(t['corrections'])}")
+                for corr in t['corrections']:
+                    lines.append(f"  Attempt {corr['attempt']}: start={corr['start']:.3f}s")
+            else:
+                lines.append("Self-correction attempts: 0")
+            lines.append("")
+            lines.append("="*50)
+
+            with open(logPath, 'w', encoding='utf-8') as f:
+                f.write("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to write timing report: {e}")
 
     # Note: onCopyButtonClicked removed - copy functionality not needed with auto-execution
 

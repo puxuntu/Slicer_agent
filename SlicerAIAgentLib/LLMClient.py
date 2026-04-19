@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -738,9 +739,12 @@ This is wrong because it uses subprocess instead of the provided tools.
         last_error = None
         for attempt in range(self.MAX_RETRIES):
             try:
+                round_start = time.time()
+                api_start = time.time()
                 request = self._buildRequest(url, payload)
                 with self._openRequest(request) as response:
                     data = json.loads(response.read().decode('utf-8'))
+                api_time = time.time() - api_start
 
                 if self._isClaude():
                     data = self._normalizeClaudeResponse(data)
@@ -947,6 +951,15 @@ This is wrong because it uses subprocess instead of the provided tools.
 
         raise RuntimeError(f"Failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
 
+    def _filterToolsByPhase(self, tools: List[Dict], phase: str) -> List[Dict]:
+        """Filter available tools based on the current search phase."""
+        if phase == "grep":
+            return [t for t in tools if t.get('function', {}).get('name') in ('Grep', 'Glob')]
+        elif phase == "readfile":
+            return [t for t in tools if t.get('function', {}).get('name') == 'ReadFile']
+        else:  # generate
+            return []
+
     def chatWithTools(
         self,
         prompt: str,
@@ -958,13 +971,12 @@ This is wrong because it uses subprocess instead of the provided tools.
     ) -> Dict[str, Any]:
         """
         Send a chat request with tool calling support.
-        
-        This method handles the multi-turn conversation for tool use:
-        1. Send prompt with tools registered
-        2. If AI requests tool calls, execute them
-        3. Return tool results to AI
-        4. Get final response with generated code
-        
+
+        Three-phase search strategy:
+        1. Grep phase: LLM can call unlimited Grep/Glob to locate relevant files.
+        2. ReadFile phase: LLM can call unlimited ReadFile to read full file contents.
+        3. Generate phase: No tools. LLM writes final code directly.
+
         Args:
             prompt: User's input prompt
             tools: List of tool definitions for the AI
@@ -972,29 +984,46 @@ This is wrong because it uses subprocess instead of the provided tools.
             context: Optional skill-based context
             max_tool_rounds: Maximum number of tool call rounds
             on_progress: Callback for progress updates (reasoning_content, content, round_info)
-            
+
         Returns:
             Dictionary with final response, code, tokens, cost, and tool call history
         """
         if not self.api_key:
             raise RuntimeError("API key not configured")
-        
+
         messages = self._buildMessages(prompt, context)
         url = self._getChatUrl()
         tool_calls_history = []
         intermediate_messages = []  # Persist tool calling trajectory to conversation history
-        
+
+        timing_report = {
+            'api_calls': 0,
+            'tool_rounds': 0,
+            'total_api_time': 0.0,
+            'total_tool_time': 0.0,
+            'total_other_time': 0.0,
+            'rounds': [],
+        }
+
+        phase = "grep"  # phases: "grep" -> "readfile" -> "generate"
+
         for round_num in range(max_tool_rounds):
-            logger.info(f"Tool calling round {round_num + 1}")
-            payload = self._buildPayload(messages, stream=False, tools=tools)
+            logger.info(f"Tool calling round {round_num + 1}, phase: {phase}")
+            round_start = time.time()
+
+            # Filter tools by current phase
+            available_tools = self._filterToolsByPhase(tools, phase)
+            payload = self._buildPayload(messages, stream=False, tools=available_tools if available_tools else None)
             
             # Log payload for debugging (truncate for readability)
             logger.debug(f"Payload messages count: {len(messages)}")
             
             try:
+                api_start = time.time()
                 request = self._buildRequest(url, payload)
                 with self._openRequest(request) as response:
                     data = json.loads(response.read().decode('utf-8'))
+                api_time = time.time() - api_start
 
                 if self._isClaude():
                     data = self._normalizeClaudeResponse(data)
@@ -1007,53 +1036,91 @@ This is wrong because it uses subprocess instead of the provided tools.
                 tool_calls = assistant_message.get('tool_calls')
                 
                 if not tool_calls:
-                    # No tool calls, we have the final response
-                    # Enforce: if the last tool-calling round used Grep but not ReadFile, force another round
-                    if intermediate_messages:
-                        last_assistant_tool_calls = None
-                        for msg in reversed(intermediate_messages):
-                            if msg.get('role') == 'assistant' and 'tool_calls' in msg:
-                                last_assistant_tool_calls = msg['tool_calls']
-                                break
-                        if last_assistant_tool_calls:
-                            tools_used = [tc.get('function', {}).get('name', '') for tc in last_assistant_tool_calls]
-                            if 'Grep' in tools_used and 'ReadFile' not in tools_used:
-                                logger.info("Enforcing ReadFile after Grep")
-                                messages.append({
-                                    'role': 'system',
-                                    'content': (
-                                        'You used Grep in the last round but did not ReadFile the most relevant source file. '
-                                        'Grep results are too sparse to write correct code. '
-                                        'You MUST call ReadFile on the most relevant file before writing code. '
-                                        'Please call ReadFile now.'
-                                    ),
-                                })
-                                continue
+                    # No tool calls from LLM - handle phase transition (still an API round)
+                    timing_report['api_calls'] += 1
+                    timing_report['total_api_time'] += api_time
+                    other_time = max(0, time.time() - round_start - api_time)
+                    timing_report['total_other_time'] += other_time
+                    timing_report['rounds'].append({
+                        'round': round_num + 1,
+                        'phase': phase,
+                        'api_time': round(api_time, 3),
+                        'tool_time': 0.0,
+                        'round_time': round(time.time() - round_start, 3),
+                        'tools': [],
+                    })
 
-                    # DEBUG: Write the complete messages (including any tool results) to a local file
-                    try:
-                        debug_path = os.path.join(
-                            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            f'{self.turn_number}_last_prompt_debug{self.debug_suffix}.txt'
-                        )
-                        with open(debug_path, 'w', encoding='utf-8') as f:
-                            total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
-                            users_seen = 0
-                            for i, msg in enumerate(messages):
-                                if msg.get('role') == 'user':
-                                    users_seen += 1
-                                    turn_label = self.turn_number - total_user_msgs + users_seen
-                                    f.write(f"\n{'-'*40}\n")
-                                    f.write(f"--- Turn {turn_label} ---\n")
-                                    f.write(f"{'-'*40}\n")
-                                f.write(f"{'='*60}\n")
-                                f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
-                                f.write(f"{'='*60}\n")
-                                if 'tool_calls' in msg:
-                                    f.write("[tool_calls present]\n")
-                                f.write(f"{msg.get('content', '')}\n\n")
-                    except Exception:
-                        pass
+                    if phase == "grep":
+                        # Transition from search phase to readfile phase
+                        phase = "readfile"
+                        transition_msg = {
+                            'role': 'system',
+                            'content': (
+                                'Search phase complete. All Grep results are provided above. '
+                                'Now use ReadFile to read the FULL content of the most relevant files. '
+                                'You may call multiple ReadFile in parallel. '
+                                'Read only files that contain the exact API signatures and usage examples needed to write the code.'
+                            ),
+                        }
+                        messages.append(transition_msg)
+                        intermediate_messages.append(transition_msg)
+                        if on_progress:
+                            on_progress({
+                                'reasoning_content': f'[Transition] Round {round_num + 1}: Search phase complete. Moving to ReadFile phase...\n',
+                                'content': '',
+                                'round': round_num + 1,
+                                'phase': phase,
+                            })
+                        continue
+
+                    elif phase == "readfile":
+                        # Transition from readfile phase to generate phase
+                        phase = "generate"
+                        transition_msg = {
+                            'role': 'system',
+                            'content': (
+                                'File reading phase complete. All file contents are provided above. '
+                                'Now write the final Python code directly. '
+                                'DO NOT use any more tools. '
+                                'Your response must contain exactly one ```python code block with the complete executable script.'
+                            ),
+                        }
+                        messages.append(transition_msg)
+                        intermediate_messages.append(transition_msg)
+                        if on_progress:
+                            on_progress({
+                                'reasoning_content': f'[Transition] Round {round_num + 1}: File reading phase complete. Generating code...\n',
+                                'content': '',
+                                'round': round_num + 1,
+                                'phase': phase,
+                            })
+                        continue
+
+                    else:  # phase == "generate"
+                        # Final response - DEBUG: Write the complete messages (including any tool results) to a local file
+                        try:
+                            debug_path = os.path.join(
+                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                f'{self.turn_number}_last_prompt_debug{self.debug_suffix}.txt'
+                            )
+                            with open(debug_path, 'w', encoding='utf-8') as f:
+                                total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
+                                users_seen = 0
+                                for i, msg in enumerate(messages):
+                                    if msg.get('role') == 'user':
+                                        users_seen += 1
+                                        turn_label = self.turn_number - total_user_msgs + users_seen
+                                        f.write(f"\n{'-'*40}\n")
+                                        f.write(f"--- Turn {turn_label} ---\n")
+                                        f.write(f"{'-'*40}\n")
+                                    f.write(f"{'='*60}\n")
+                                    f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
+                                    f.write(f"{'='*60}\n")
+                                    if 'tool_calls' in msg:
+                                        f.write("[tool_calls present]\n")
+                                    f.write(f"{msg.get('content', '')}\n\n")
+                        except Exception:
+                            pass
 
                     # Persist full turn including tool calling trajectory (compressed for history)
                     self.conversation_history.append({'role': 'user', 'content': prompt})
@@ -1073,10 +1140,13 @@ This is wrong because it uses subprocess instead of the provided tools.
                         data,
                     )
                     response['tool_calls_history'] = tool_calls_history
+                    response['timing_report'] = timing_report
                     return response
                 
                 # Execute tool calls
                 tool_results = []
+                tool_names = []
+                tool_start = time.time()
                 for tool_call in tool_calls:
                     tool_id = tool_call.get('id')
                     function = tool_call.get('function', {})
@@ -1103,12 +1173,30 @@ This is wrong because it uses subprocess instead of the provided tools.
                             "args": tool_args,
                             "result": result,
                         })
+                        tool_names.append(tool_name)
                     except Exception as e:
                         tool_results.append({
                             "role": "tool",
                             "tool_call_id": tool_id,
                             "content": json.dumps({"error": str(e)}, ensure_ascii=False),
                         })
+                        tool_names.append(f"{tool_name}(error)")
+                tool_time = time.time() - tool_start
+                timing_report['api_calls'] += 1
+                timing_report['tool_rounds'] += 1
+                timing_report['total_api_time'] += api_time
+                timing_report['total_tool_time'] += tool_time
+                other_time = max(0, time.time() - round_start - api_time - tool_time)
+                timing_report['total_other_time'] += other_time
+                timing_report['rounds'].append({
+                    'round': round_num + 1,
+                    'phase': phase,
+                    'api_time': round(api_time, 3),
+                    'tool_time': round(tool_time, 3),
+                    'other_time': round(other_time, 3),
+                    'round_time': round(time.time() - round_start, 3),
+                    'tools': tool_names,
+                })
                 
                 # Add assistant message with tool_calls to conversation
                 # Must include content (can be empty string), tool_calls, and reasoning_content for k2 models
@@ -1125,8 +1213,21 @@ This is wrong because it uses subprocess instead of the provided tools.
                 # Add tool results
                 messages.extend(tool_results)
                 intermediate_messages.extend(tool_results)
-                # Add reminder for AI to provide final answer (not another tool call)
-                reminder = "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
+                # Add phase-appropriate reminder
+                if phase == "grep":
+                    reminder = (
+                        "Search results provided above. "
+                        "If you need more searches, call more Grep or Glob tools. "
+                        "If you have enough search results to identify the relevant files, stop calling tools."
+                    )
+                elif phase == "readfile":
+                    reminder = (
+                        "File contents provided above. "
+                        "If you need to read more files, call more ReadFile tools. "
+                        "If you have enough information to write the code, stop calling tools."
+                    )
+                else:
+                    reminder = "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
                 # Remove any previous identical reminders to keep the prompt clean
                 messages = [m for m in messages if not (m.get("role") == "system" and m.get("content") == reminder)]
                 reminder_msg = {
@@ -1138,7 +1239,8 @@ This is wrong because it uses subprocess instead of the provided tools.
                 
                 # Report progress with detailed tool info
                 if on_progress:
-                    progress_lines = [f"[Search] Round {round_num + 1}:"]
+                    phase_label = {"grep": "Search", "readfile": "Read", "generate": "Generate"}.get(phase, "Search")
+                    progress_lines = [f"[{phase_label}] Round {round_num + 1}:"]
                     for tc in tool_calls_history[-len(tool_results):]:
                         tool_name = tc['tool']
                         args = tc['args']
@@ -1157,7 +1259,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                         else:
                             progress_lines.append(f"  {tool_name}: {args}")
                     progress_msg = '\n'.join(progress_lines) + '\n'
-                    on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1})
+                    on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1, 'phase': phase})
                 
                 logger.info(f"Round {round_num + 1} complete. Added {len(tool_results)} tool results. Proceeding to next round.")
                 
@@ -1184,6 +1286,7 @@ This is wrong because it uses subprocess instead of the provided tools.
             data,
         )
         response['tool_calls_history'] = tool_calls_history
+        response['timing_report'] = timing_report
         return response
 
     def _extractCode(self, message: str) -> Optional[str]:
