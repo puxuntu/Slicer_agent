@@ -76,49 +76,28 @@ class SkillToolExecutor:
                 result["file"] = self._relativize(result["file"])
         return result
     
-    def _grep(self, pattern: str, path: str) -> Dict:
-        """
-        Search for pattern in files.
-        Cross-platform implementation.
-        """
-        # Normalize path
-        if not os.path.isabs(path):
-            path = os.path.join(self.skill_path, path)
-        
-        if not os.path.exists(path):
-            return {"error": f"Path not found: {path}"}
-        
-        results = []
-        
+    def _find_rg(self) -> Optional[str]:
+        """Return path to ripgrep binary if available, else None."""
+        # 1. Windows bundled binary
+        if os.path.isfile(_RG_PATH):
+            return _RG_PATH
+        # 2. System-installed rg (any platform: Linux, macOS, Windows with rg in PATH)
         try:
-            if self.platform == "windows":
-                # Windows: Try PowerShell first, fallback to Python
-                results = self._grep_windows(pattern, path)
-            else:
-                # Linux/macOS: Use grep
-                results = self._grep_unix(pattern, path)
-        except Exception as e:
-            # Fallback to Python implementation
-            results = self._grep_python(pattern, path)
-        
-        return {
-            "tool": "Grep",
-            "pattern": pattern,
-            "path": path,
-            "results": results[:20],  # Limit results
-            "count": len(results)
-        }
-    
-    def _grep_windows(self, pattern: str, path: str) -> List[Dict]:
-        """Windows grep using ripgrep (rg) if available, else Python fallback."""
-        results = []
+            result = subprocess.run(["rg", "--version"], capture_output=True, timeout=2)
+            if result.returncode == 0:
+                return "rg"
+        except Exception:
+            pass
+        return None
 
-        # Prefer bundled or system ripgrep
-        rg_exe = _RG_PATH if os.path.isfile(_RG_PATH) else "rg"
+    def _grep_rg(self, pattern: str, path: str) -> List[Dict]:
+        """Universal ripgrep implementation (works on all platforms)."""
+        results = []
+        rg_exe = self._find_rg()
+        if not rg_exe:
+            return results
 
         try:
-            # ripgrep: -n (line numbers), -i (ignore case), --max-count 20 per file,
-            # -m 20 (stop after 20 matches total), --max-columns 200 (limit line length)
             cmd = [
                 rg_exe,
                 "-n",
@@ -130,23 +109,14 @@ class SkillToolExecutor:
                 pattern,
                 path,
             ]
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                timeout=15,
-            )
-
+            result = subprocess.run(cmd, capture_output=True, timeout=15)
             stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
 
-            if result.returncode in (0, 1):  # 0 = found, 1 = not found
+            if result.returncode in (0, 1):
                 for line in stdout.strip().split('\n')[:20]:
                     line = line.strip()
                     if not line:
                         continue
-                    # rg output format: path:line:content
-                    # Need to handle paths that contain colons (e.g., C:\...)
-                    # Find the first two colons that separate path, line, content
-                    # Strategy: find the first colon after the drive letter, then next colon
                     match = re.match(r'^(.+?):(\d+):(.*)$', line)
                     if match:
                         results.append({
@@ -154,33 +124,91 @@ class SkillToolExecutor:
                             "line": int(match.group(2)),
                             "content": match.group(3)[:200],
                         })
-        except FileNotFoundError:
-            logger.warning("ripgrep (rg) not found, falling back to Python grep")
         except Exception as e:
             logger.warning(f"ripgrep failed: {e}")
+        return results
 
-        # Fallback to Python if rg is unavailable or fails
+    def _grep(self, pattern: str, path: str) -> Dict:
+        """
+        Search for pattern in files.
+        Cross-platform implementation: ripgrep > platform-native > Python fallback.
+        """
+        # Normalize path
+        if not os.path.isabs(path):
+            path = os.path.join(self.skill_path, path)
+
+        if not os.path.exists(path):
+            return {"error": f"Path not found: {path}"}
+
+        results = []
+
+        # Priority 1: ripgrep (fastest, all platforms)
+        try:
+            results = self._grep_rg(pattern, path)
+        except Exception as e:
+            logger.warning(f"rg search failed: {e}")
+
+        # Priority 2: platform-native tools
+        if not results:
+            try:
+                if self.platform == "windows":
+                    results = self._grep_windows_native(pattern, path)
+                else:
+                    results = self._grep_unix(pattern, path)
+            except Exception as e:
+                logger.warning(f"Platform-native grep failed: {e}")
+
+        # Priority 3: pure Python fallback
         if not results:
             results = self._grep_python(pattern, path)
 
-        return results
-    
-    def _grep_unix(self, pattern: str, path: str) -> List[Dict]:
-        """Unix grep using system grep."""
+        return {
+            "tool": "Grep",
+            "pattern": pattern,
+            "path": path,
+            "results": results[:20],
+            "count": len(results)
+        }
+
+    def _grep_windows_native(self, pattern: str, path: str) -> List[Dict]:
+        """Windows fallback: PowerShell Select-String."""
         results = []
-        
+        escaped_pattern = pattern.replace("'", "''")
+        ps_cmd = rf'Select-String -Path "{path}\*" -Pattern \'{escaped_pattern}\' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20 | ForEach-Object {{ "{{0}}:{{1}}:{{2}}" -f $_.Path,$_.LineNumber,$_.Line }}'
+
         try:
-            # Use grep with line numbers
+            result = subprocess.run(
+                ["powershell", "-Command", ps_cmd],
+                capture_output=True,
+                timeout=30
+            )
+            stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
+            if result.returncode == 0 or stdout:
+                for line in stdout.strip().split('\n'):
+                    line = line.strip()
+                    if ':' in line:
+                        parts = line.split(':', 2)
+                        if len(parts) >= 3:
+                            results.append({
+                                "file": parts[0],
+                                "line": int(parts[1]) if parts[1].isdigit() else 0,
+                                "content": parts[2][:200]
+                            })
+        except Exception as e:
+            logger.warning(f"PowerShell grep failed: {e}")
+        return results
+
+    def _grep_unix(self, pattern: str, path: str) -> List[Dict]:
+        """Unix fallback: system grep."""
+        results = []
+        try:
             result = subprocess.run(
                 ["grep", "-r", "-n", "-i", pattern, path],
                 capture_output=True,
-                timeout=30  # Increased timeout for large skill directories
+                timeout=30
             )
-            
-            # Decode with error handling
             stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
-            
-            if result.returncode in [0, 1]:  # 0 = found, 1 = not found
+            if result.returncode in [0, 1]:
                 lines = stdout.strip().split('\n')[:20]
                 for line in lines:
                     if ':' in line:
@@ -189,13 +217,10 @@ class SkillToolExecutor:
                             results.append({
                                 "file": parts[0],
                                 "line": int(parts[1]) if parts[1].isdigit() else 0,
-                                "content": parts[2][:200]  # Limit length
+                                "content": parts[2][:200]
                             })
         except Exception as e:
             logger.warning(f"Unix grep failed: {e}")
-            # Fallback to Python
-            results = self._grep_python(pattern, path)
-        
         return results
     
     def _grep_python(self, pattern: str, path: str) -> List[Dict]:
