@@ -290,14 +290,31 @@ QPushButton:disabled {
    
    <!-- Status Bar -->
    <item>
-    <widget class="QLabel" name="statusLabel">
-     <property name="text">
-      <string>Ready</string>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">color: #666666;</string>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="statusTimerLayout">
+     <item>
+      <widget class="QLabel" name="statusLabel">
+       <property name="text">
+        <string>Ready</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">color: #666666;</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="thinkingTimerLabel">
+       <property name="text">
+        <string></string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">color: #666666; font-size: 11px;</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignRight|Qt::AlignVCenter</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    
    <!-- Token Usage -->

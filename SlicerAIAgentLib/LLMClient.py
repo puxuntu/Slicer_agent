@@ -648,6 +648,34 @@ This is wrong because it uses subprocess instead of the provided tools.
             summarized += f"\n... [truncated from {len(full_content)} chars]"
         return summarized
 
+    def _compressMessagesForGenerate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Compress ReadFile tool results in messages before the generate phase.
+        Reduces token consumption by keeping only code blocks and truncating prose.
+        """
+        compressed: List[Dict[str, Any]] = []
+        for msg in messages:
+            if msg.get('role') == 'tool':
+                try:
+                    data = json.loads(msg.get('content', '{}'))
+                    tool_name = data.get('tool', '')
+                    if tool_name == 'ReadFile':
+                        full_content = data.get('content', '')
+                        data['content'] = self._fallbackCompressReadFile(full_content)
+                        data.pop('size', None)
+                        compressed.append({
+                            'role': 'tool',
+                            'tool_call_id': msg.get('tool_call_id', ''),
+                            'content': json.dumps(data, ensure_ascii=False),
+                        })
+                    else:
+                        compressed.append(msg)
+                except Exception:
+                    compressed.append(msg)
+            else:
+                compressed.append(msg)
+        return compressed
+
     def _compressToolResultsForHistory(self, messages: List[Dict[str, Any]], user_prompt: str = '') -> List[Dict[str, Any]]:
         """
         Compress tool results before persisting them to conversation history.
@@ -665,12 +693,8 @@ This is wrong because it uses subprocess instead of the provided tools.
                     tool_name = data.get('tool', '')
                     if tool_name == 'ReadFile':
                         full_content = data.get('content', '')
-                        # Try LLM-driven summarization first
-                        llm_summary = self._summarizeToolResultsWithLLM(full_content, user_prompt)
-                        if llm_summary:
-                            data['content'] = llm_summary
-                        else:
-                            data['content'] = self._fallbackCompressReadFile(full_content)
+                        # Local deterministic compression (fast, no extra API call)
+                        data['content'] = self._fallbackCompressReadFile(full_content)
                         data.pop('size', None)
                         data.pop('total_lines', None)
                         compressed.append({
@@ -952,6 +976,57 @@ This is wrong because it uses subprocess instead of the provided tools.
 
         raise RuntimeError(f"Failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
 
+    def chatIsolated(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Send a non-streaming chat request with isolated messages.
+        Does NOT read from or write to conversation_history.
+        Used for self-correction to avoid context bloat from failed attempts.
+        """
+        if not self.api_key:
+            raise RuntimeError("API key not configured")
+        
+        url = self._getChatUrl()
+        payload = self._buildPayload(messages, stream=False)
+        
+        last_error = None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                request = self._buildRequest(url, payload)
+                with self._openRequest(request) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                
+                if self._isClaude():
+                    data = self._normalizeClaudeResponse(data)
+                
+                assistant_message = data['choices'][0]['message']
+                content = self._coerceText(assistant_message.get('content', ''))
+                reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
+                
+                return self._buildResponse(content, reasoning_content, data.get('usage', {}), data)
+                
+            except urllib.error.HTTPError as e:
+                last_error = e
+                error_body = e.read().decode('utf-8')
+                logger.warning(f"HTTP error on isolated chat attempt {attempt + 1}: {e.code}")
+                if e.code == 401:
+                    raise RuntimeError("Invalid API key.")
+                if e.code == 429:
+                    import time
+                    time.sleep(2 ** attempt)
+                    continue
+                if e.code >= 500:
+                    import time
+                    time.sleep(2 ** attempt)
+                    continue
+                raise RuntimeError(f"API request failed: {e.code} - {error_body}")
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Error on isolated chat attempt {attempt + 1}: {e}")
+                import time
+                time.sleep(2 ** attempt)
+        
+        raise RuntimeError(f"Isolated chat failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
+
     def _filterToolsByPhase(self, tools: List[Dict], phase: str) -> List[Dict]:
         """Filter available tools based on the current search phase."""
         if phase == "grep":
@@ -969,6 +1044,7 @@ This is wrong because it uses subprocess instead of the provided tools.
         context: Optional[Dict] = None,
         max_tool_rounds: int = 20,
         on_progress: Optional[Callable[[Dict], None]] = None,
+        on_delta: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """
         Send a chat request with tool calling support.
@@ -977,6 +1053,7 @@ This is wrong because it uses subprocess instead of the provided tools.
         1. Grep phase: LLM can call unlimited Grep/Glob to locate relevant files.
         2. ReadFile phase: LLM can call unlimited ReadFile to read full file contents.
         3. Generate phase: No tools. LLM writes final code directly.
+           If on_delta is provided, Phase 3 uses true streaming for real-time output.
 
         Args:
             prompt: User's input prompt
@@ -985,6 +1062,7 @@ This is wrong because it uses subprocess instead of the provided tools.
             context: Optional skill-based context
             max_tool_rounds: Maximum number of tool call rounds
             on_progress: Callback for progress updates (reasoning_content, content, round_info)
+            on_delta: Optional callback for streaming deltas during Phase 3 (generate)
 
         Returns:
             Dictionary with final response, code, tokens, cost, and tool call history
@@ -1014,20 +1092,59 @@ This is wrong because it uses subprocess instead of the provided tools.
 
             # Filter tools by current phase
             available_tools = self._filterToolsByPhase(tools, phase)
-            payload = self._buildPayload(messages, stream=False, tools=available_tools if available_tools else None)
             
             # Log payload for debugging (truncate for readability)
             logger.debug(f"Payload messages count: {len(messages)}")
             
             try:
                 api_start = time.time()
-                request = self._buildRequest(url, payload)
-                with self._openRequest(request) as response:
-                    data = json.loads(response.read().decode('utf-8'))
-                api_time = time.time() - api_start
-
-                if self._isClaude():
-                    data = self._normalizeClaudeResponse(data)
+                
+                if phase == "generate" and on_delta:
+                    # Phase 3: true streaming for real-time code generation output
+                    payload = self._buildPayload(messages, stream=True, tools=None)
+                    request = self._buildRequest(url, payload)
+                    content_parts: List[str] = []
+                    reasoning_parts: List[str] = []
+                    usage: Dict[str, Any] = {}
+                    with self._openRequest(request) as response:
+                        for data_line in self._iterSseDataLines(response):
+                            chunk = self._parseStreamChunk(data_line)
+                            if chunk['done']:
+                                break
+                            if chunk['usage']:
+                                usage = chunk['usage']
+                            if chunk['reasoning_content']:
+                                reasoning_parts.append(chunk['reasoning_content'])
+                            if chunk['content']:
+                                content_parts.append(chunk['content'])
+                            if on_delta and (chunk['content'] or chunk['reasoning_content']):
+                                on_delta({
+                                    'content': chunk['content'],
+                                    'reasoning_content': chunk['reasoning_content'],
+                                })
+                    content = ''.join(content_parts)
+                    reasoning_content = ''.join(reasoning_parts)
+                    api_time = time.time() - api_start
+                    # Assemble a mock response structure for unified downstream processing
+                    data = {
+                        'usage': usage,
+                        'choices': [{
+                            'message': {
+                                'content': content,
+                                'reasoning_content': reasoning_content,
+                                'tool_calls': None,
+                            }
+                        }]
+                    }
+                else:
+                    # Phase 1/2: non-streaming (need complete tool_calls JSON)
+                    payload = self._buildPayload(messages, stream=False, tools=available_tools if available_tools else None)
+                    request = self._buildRequest(url, payload)
+                    with self._openRequest(request) as response:
+                        data = json.loads(response.read().decode('utf-8'))
+                    api_time = time.time() - api_start
+                    if self._isClaude():
+                        data = self._normalizeClaudeResponse(data)
                 
                 assistant_message = data['choices'][0]['message']
                 content = self._coerceText(assistant_message.get('content', ''))
@@ -1077,6 +1194,10 @@ This is wrong because it uses subprocess instead of the provided tools.
                     elif phase == "readfile":
                         # Transition from readfile phase to generate phase
                         phase = "generate"
+                        
+                        # Compress ReadFile tool results to reduce token bloat in generate phase
+                        messages = self._compressMessagesForGenerate(messages)
+                        
                         transition_msg = {
                             'role': 'system',
                             'content': (

@@ -237,9 +237,18 @@ class SafeExecutor:
                 with open(vtk_log_path, 'r', encoding='utf-8', errors='ignore') as f:
                     vtk_output = f.read().strip()
                 if vtk_output:
-                    # Prefix lines so they're easily identifiable
-                    prefixed = "\n".join(f"[VTK] {line}" for line in vtk_output.splitlines())
-                    stderr_capture.write(f"\n[VTK ERRORS/WARNINGS]:\n{prefixed}\n")
+                    # Distinguish VTK errors from warnings for accurate self-correction triggers
+                    prefixed_lines = []
+                    for line in vtk_output.splitlines():
+                        line_lower = line.lower()
+                        if 'error' in line_lower:
+                            prefixed_lines.append(f"[VTK ERROR] {line}")
+                        elif 'warning' in line_lower:
+                            prefixed_lines.append(f"[VTK WARNING] {line}")
+                        else:
+                            prefixed_lines.append(f"[VTK] {line}")
+                    prefixed = "\n".join(prefixed_lines)
+                    stderr_capture.write(f"\n[VTK OUTPUT]:\n{prefixed}\n")
                 os.remove(vtk_log_path)
             except Exception:
                 pass
@@ -297,8 +306,14 @@ class SafeExecutor:
             callback: Function to call with result dict when done
             timeout: Override default timeout
         """
+        import time
+        scheduled_time = time.time()
+        
         def executeAndCallback():
+            actual_start = time.time()
             result = self.execute(code, timeout)
+            result['executor_scheduled'] = scheduled_time
+            result['executor_actual_start'] = actual_start
             if callback:
                 callback(result)
                 

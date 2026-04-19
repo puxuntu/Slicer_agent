@@ -114,6 +114,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.sendButton = self.ui.findChild(qt.QPushButton, "sendButton")
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
+        self.thinkingTimerLabel = self.ui.findChild(qt.QLabel, "thinkingTimerLabel")
 
     def setupUIProgrammatically(self):
         self.ui = ctk.ctkCollapsibleButton()
@@ -200,8 +201,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         inputLayout.addWidget(self.sendButton)
         mainLayout.addLayout(inputLayout)
 
+        statusTimerLayout = qt.QHBoxLayout()
         self.statusLabel = qt.QLabel("Ready")
-        mainLayout.addWidget(self.statusLabel)
+        self.thinkingTimerLabel = qt.QLabel("")
+        self.thinkingTimerLabel.setStyleSheet("color: #666; font-size: 11px;")
+        self.thinkingTimerLabel.setAlignment(qt.Qt.AlignRight | qt.Qt.AlignVCenter)
+        statusTimerLayout.addWidget(self.statusLabel, stretch=1)
+        statusTimerLayout.addWidget(self.thinkingTimerLabel)
+        mainLayout.addLayout(statusTimerLayout)
 
         self.tokenLabel = qt.QLabel("Tokens: 0 | Cost: $0.000")
         mainLayout.addWidget(self.tokenLabel)
@@ -217,6 +224,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.sendShortcut = qt.QShortcut(qt.QKeySequence("Ctrl+Return"), self.promptInput)
             self.sendShortcut.connect('activated()', self.onSendButtonClicked)
         # Note: Button connections removed - code is auto-executed
+        
+        # Thinking timer
+        self._thinkingTimer = qt.QTimer()
+        self._thinkingTimer.setInterval(100)
+        self._thinkingTimer.timeout.connect(self._updateThinkingTimer)
+        self._thinkingStartTime = None
         if hasattr(self, 'clearChatButton') and self.clearChatButton is not None:
             self.clearChatButton.clicked.connect(self.onClearChatButtonClicked)
         if hasattr(self, 'saveSettingsButton') and self.saveSettingsButton is not None:
@@ -309,6 +322,32 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             return
         self._setChatHtml(''.join(self._chatEntriesHtml) + self._buildStreamingEntryHtml())
 
+    def _updateThinkingTimer(self):
+        """Update the thinking timer display every 100ms."""
+        if self._thinkingStartTime is not None:
+            import time
+            elapsed = time.time() - self._thinkingStartTime
+            self.thinkingTimerLabel.text = f"⏱ {elapsed:.1f}s"
+    
+    def _startThinkingTimer(self):
+        """Start the thinking timer."""
+        import time
+        self._thinkingStartTime = time.time()
+        self.thinkingTimerLabel.text = "⏱ 0.0s"
+        self._thinkingTimer.start()
+    
+    def _stopThinkingTimer(self, final_status=None):
+        """Stop the thinking timer and show final elapsed time."""
+        self._thinkingTimer.stop()
+        if self._thinkingStartTime is not None:
+            import time
+            elapsed = time.time() - self._thinkingStartTime
+            if final_status:
+                self.thinkingTimerLabel.text = f"⏱ {final_status} {elapsed:.1f}s"
+            else:
+                self.thinkingTimerLabel.text = f"⏱ {elapsed:.1f}s"
+            self._thinkingStartTime = None
+    
     def _finalizeStreamingEntry(self):
         """Commit the current streaming assistant entry into chat history."""
         if self._streaming or self._streamReasoning or self._streamContent:
@@ -316,19 +355,59 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self._setChatHtml(''.join(self._chatEntriesHtml))
 
     def _drainStreamQueue(self):
-        """Drain queued streaming events on the Qt main thread."""
+        """Drain queued streaming events on the Qt main thread.
+        
+        Batches consecutive streaming deltas to avoid calling setHtml() hundreds
+        of times per second, which blocks the main thread and delays complete/error
+        events by tens of seconds.
+        """
+        # Collect all events currently in the queue
+        events = []
         while True:
             try:
-                event_type, payload = self._streamQueue.get_nowait()
+                events.append(self._streamQueue.get_nowait())
             except queue.Empty:
                 break
-
+        
+        if not events:
+            return
+        
+        # Batch consecutive non-round deltas into a single render pass
+        i = 0
+        while i < len(events):
+            event_type, payload = events[i]
+            
             if event_type == 'delta':
-                self._onStreamDelta(payload)
+                if payload.get('round'):
+                    # Tool progress deltas are committed entries, process immediately
+                    self._onStreamDelta(payload)
+                    i += 1
+                else:
+                    # Batch consecutive streaming deltas (reasoning/content)
+                    batched_reasoning = ""
+                    batched_content = ""
+                    batch_start = i
+                    while i < len(events):
+                        et, ep = events[i]
+                        if et != 'delta' or ep.get('round'):
+                            break
+                        batched_reasoning += ep.get('reasoning_content', '')
+                        batched_content += ep.get('content', '')
+                        i += 1
+                    # Apply batched deltas in one go
+                    if batched_reasoning or batched_content:
+                        self._streamReasoning += batched_reasoning
+                        self._streamContent += batched_content
+                        self._renderStreamingEntry()
+                    slicer.app.processEvents()
             elif event_type == 'complete':
                 self._onStreamComplete(payload)
+                i += 1
             elif event_type == 'error':
                 self._onStreamError(payload)
+                i += 1
+            else:
+                i += 1
 
     def _onStreamDelta(self, delta):
         """Apply one streamed delta on the main thread."""
@@ -374,6 +453,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.codeDisplay.setPlainText(response["code"])
             self._saveGeneratedCodeToFile(response["code"])
             # Auto-execute the generated code
+            if self._timing:
+                self._timing['autoexecute_start'] = time.time()
             self._autoExecuteCode()
 
         # Update token usage
@@ -382,6 +463,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             cost = response.get("cost", 0)
             self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
 
+        self._stopThinkingTimer("Done")
         self.statusLabel.text = "Ready"
         self.sendButton.setEnabled(True)
 
@@ -402,6 +484,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             self.appendToChat("Error", f"Failed to generate response: {error_msg}")
 
+        self._stopThinkingTimer("Error")
         self.statusLabel.text = "Ready"
         self.sendButton.setEnabled(True)
 
@@ -412,6 +495,13 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.promptInput.clear()
         self.appendToChat("You", prompt)
+        self._lastUserPrompt = prompt  # Save for isolated self-correction context
+        
+        # Record the current turn number for consistent debug file naming
+        if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
+            self._currentTurn = getattr(self.logic.llmClient, 'turn_number', 1)
+        else:
+            self._currentTurn = 1
 
         self.statusLabel.text = "Generating..."
         self.sendButton.setEnabled(False)
@@ -427,9 +517,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Initialize timing
         import time
         self._timing = {
-            'request_start': time.time(),
+            'turn_start': time.time(),
             'prompt': prompt,
         }
+        
+        # Start real-time thinking timer
+        self._startThinkingTimer()
 
         # Build context on the main thread (it reads the MRML scene)
         import time as _time
@@ -487,19 +580,17 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.statusLabel.text = "Ready"
             self.sendButton.setEnabled(True)
 
-    def _saveGeneratedCodeToFile(self, code):
-        """Save the generated code to a local text file for user reference."""
+    def _saveGeneratedCodeToFile(self, code, suffix=""):
+        """Save the generated code to a local text file for user reference.
+        
+        Args:
+            code: The generated Python code string.
+            suffix: Optional suffix for the filename (e.g. '_correction_1').
+        """
         try:
             moduleDir = os.path.dirname(__file__)
-            turn_number = 1
-            suffix = ""
-            if self.logic and hasattr(self.logic, 'llmClient') and self.logic.llmClient:
-                turn_number = getattr(self.logic.llmClient, 'turn_number', 1)
-                suffix = getattr(self.logic.llmClient, 'debug_suffix', "")
-            # turn_number is incremented right after the assistant response finishes,
-            # so the code generated in turn N is saved when turn_number equals N+1.
-            turn_number = max(1, turn_number - 1)
-            latestPath = os.path.join(moduleDir, f'{turn_number}_latest_generated_code{suffix}.txt')
+            turn_number = getattr(self, '_currentTurn', 1)
+            latestPath = os.path.join(moduleDir, f'{turn_number}{suffix}_code.txt')
             with open(latestPath, 'w', encoding='utf-8') as f:
                 f.write(code)
         except Exception as e:
@@ -511,8 +602,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             return
 
         # Pre-validation: check for syntax errors and common issues
+        import time
+        if self._timing:
+            self._timing['validation_start'] = time.time()
+        
         if self.logic and hasattr(self.logic, 'codeValidator'):
             validation = self.logic.codeValidator.validate(self.currentCode)
+            if self._timing:
+                self._timing['validation_end'] = time.time()
             if not validation['valid']:
                 # Syntax error detected before execution
                 error_msg = validation['reason']
@@ -528,15 +625,21 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     )
                 self._selfCorrectCode(error_msg, attempt, max_attempts)
                 return
+        else:
+            if self._timing:
+                self._timing['validation_end'] = time.time()
 
         self.statusLabel.text = f"Executing (attempt {attempt}/{max_attempts})..."
         slicer.app.processEvents()
 
-        import time
         if self._timing and 'execution_start' not in self._timing:
             self._timing['execution_start'] = time.time()
+        if self._timing:
+            self._timing['execution_async_call'] = time.time()
 
         def onExecutionComplete(result):
+            if self._timing:
+                self._timing['execution_callback_start'] = time.time()
             feedback_lines = []
             output_has_errors = False
             if result.get("timed_out", False):
@@ -557,9 +660,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     msg += f"\nOutput: {output}"
                 self.appendToChat("System", msg)
                 feedback_lines.append(f"Status: success\nExecution time: {execution_time:.2f}s\nOutput: {output}")
-                # Detect errors printed but caught by the script itself
+                # Detect actual errors (excluding VTK warnings which are often benign)
                 lower_output = output.lower()
-                if any(k in lower_output for k in ('error:', 'traceback', 'exception', 'failed', '[vtk]')):
+                if any(k in lower_output for k in ('error:', 'traceback', 'exception', 'failed', '[vtk error]')):
                     output_has_errors = True
                     feedback_lines.append("Warning: execution output contains error indicators even though no uncaught exception was raised.")
             else:
@@ -576,10 +679,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.logic.addExecutionFeedback(feedback_text)
 
             # Record execution timing
-            import time
             if self._timing:
                 self._timing['execution_end'] = time.time()
                 self._timing['execution_result'] = 'success' if result.get('success') else 'failed'
+                # Record executor internal timing
+                if 'executor_scheduled' in result:
+                    self._timing['executor_scheduled'] = result['executor_scheduled']
+                if 'executor_actual_start' in result:
+                    self._timing['executor_actual_start'] = result['executor_actual_start']
                 self._writeTimingReport()
 
             # Self-correction for failures or suspicious outputs (but not timeouts)
@@ -587,6 +694,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 if attempt < max_attempts:
                     self.appendToChat("System", "Auto-correcting...")
                     error_for_correction = result.get('error', '')
+                    if not error_for_correction and output_has_errors:
+                        # success=True but output contains error indicators (e.g. VTK errors)
+                        # Pass the output so LLM knows what to fix
+                        error_for_correction = output
                     self._selfCorrectCode(error_for_correction, attempt, max_attempts)
                 else:
                     self.statusLabel.text = "Ready"
@@ -599,7 +710,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
     
     def _selfCorrectCode(self, error_msg, attempt, max_attempts):
-        """Generate corrected code based on execution feedback in conversation history."""
+        """Generate corrected code with isolated context (no conversation history bloat)."""
         if not self.currentCode:
             return
 
@@ -608,52 +719,97 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             corrections = self._timing.setdefault('corrections', [])
             corrections.append({'attempt': attempt + 1, 'start': time.time()})
 
-        # Hard-correction prompt: force the model to output only a code block.
-        # The actual error is injected directly so the model knows what to fix.
         error_detail = error_msg if error_msg else "Unknown error"
-        correction_prompt = (
-            f"CRITICAL: The previous Python code execution failed with this error:\n"
-            f"{error_detail}\n\n"
-            "Your task is to fix this error and output the COMPLETE corrected Python code. "
-            "Do NOT explain the error. Do NOT apologize. Do NOT write any analysis or markdown text outside the code block. "
-            "Your ENTIRE response must be ONE single ```python code block containing the full corrected script and NOTHING else."
-        )
-
         self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
         
-        # Generate corrected code on the main thread
         def generateCorrection():
             try:
-                # Tag this turn so debug files are named with "_correction" suffix
+                self._startThinkingTimer()
                 if self.logic and self.logic.llmClient:
                     self.logic.llmClient.debug_suffix = "_correction"
                 
-                response = self.logic.generateResponse(correction_prompt)
+                # Build isolated context: system prompt + original request + failed code + error
+                system_content = ""
+                if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
+                    system_content = self.logic.llmClient._loadSystemPromptTemplate()
+                if not system_content:
+                    system_content = "You are an expert 3D Slicer Python coding assistant."
                 
-                # Reset suffix immediately after the LLM call finishes
+                isolated_messages = [{'role': 'system', 'content': system_content}]
+                
+                original_prompt = getattr(self, '_lastUserPrompt', '')
+                if original_prompt:
+                    isolated_messages.append({'role': 'user', 'content': original_prompt})
+                    isolated_messages.append({
+                        'role': 'assistant',
+                        'content': f'```python\n{self.currentCode}\n```'
+                    })
+                
+                isolated_messages.append({
+                    'role': 'user',
+                    'content': (
+                        f"CRITICAL: The previous Python code execution failed with this error:\n"
+                        f"{error_detail}\n\n"
+                        "Your task is to fix this error and output the COMPLETE corrected Python code. "
+                        "Do NOT explain the error. Do NOT apologize. Do NOT write any analysis or markdown text outside the code block. "
+                        "Your ENTIRE response must be ONE single ```python code block containing the full corrected script and NOTHING else."
+                    )
+                })
+                
+                # Save isolated prompt to debug file before sending
+                try:
+                    moduleDir = os.path.dirname(__file__)
+                    turn_number = getattr(self, '_currentTurn', 1)
+                    suffix = f"_correction_{attempt}"
+                    first_debug = os.path.join(moduleDir, f'{turn_number}{suffix}_first_prompt_debug.txt')
+                    with open(first_debug, 'w', encoding='utf-8') as f:
+                        for i, msg in enumerate(isolated_messages):
+                            f.write(f"{'='*60}\n")
+                            f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
+                            f.write(f"{'='*60}\n")
+                            f.write(f"{msg.get('content', '')}\n\n")
+                except Exception:
+                    pass
+                
+                response = self.logic.llmClient.chatIsolated(isolated_messages)
+                
+                # Save response to debug file
+                try:
+                    moduleDir = os.path.dirname(__file__)
+                    turn_number = getattr(self, '_currentTurn', 1)
+                    suffix = f"_correction_{attempt}"
+                    last_debug = os.path.join(moduleDir, f'{turn_number}{suffix}_last_prompt_debug.txt')
+                    with open(last_debug, 'w', encoding='utf-8') as f:
+                        f.write(f"{'='*60}\n")
+                        f.write("ISOLATED RESPONSE\n")
+                        f.write(f"{'='*60}\n\n")
+                        f.write(f"message:\n{response.get('message', '')}\n\n")
+                        f.write(f"reasoning_content:\n{response.get('reasoning_content', '')}\n\n")
+                        f.write(f"code:\n{response.get('code', '')}\n")
+                except Exception:
+                    pass
+                
                 if self.logic and self.logic.llmClient:
                     self.logic.llmClient.debug_suffix = ""
                 
                 if response.get("code"):
                     self.currentCode = response["code"]
                     self.codeDisplay.setPlainText(response["code"])
-                    self._saveGeneratedCodeToFile(response["code"])
-                    # Recursively execute with incremented attempt counter
+                    self._saveGeneratedCodeToFile(response["code"], suffix=f"_correction_{attempt}")
+                    self._stopThinkingTimer("Corrected")
                     self._autoExecuteCode(attempt + 1, max_attempts)
                 else:
-                    # If no code in response, show the raw response for debugging
                     raw_msg = response.get('message', '')[:300]
                     self.appendToChat("System", f"Correction response contained no code block. Raw response preview:\n{raw_msg}")
+                    self._stopThinkingTimer("Failed")
                     self.statusLabel.text = "Ready"
             except Exception as e:
-                # Make sure suffix is reset even on failure
+                self._stopThinkingTimer("Error")
                 if self.logic and self.logic.llmClient:
                     self.logic.llmClient.debug_suffix = ""
                 self.appendToChat("Error", f"Self-correction failed: {str(e)}")
                 self.statusLabel.text = "Ready"
         
-        # Run correction on the main thread via QTimer to avoid unsafe
-        # MRML scene access from a background thread.
         qt.QTimer.singleShot(0, generateCorrection)
 
     def _writeTimingReport(self):
@@ -715,11 +871,34 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                         )
             lines.append("")
 
+            # Auto-execute pipeline (fine-grained)
+            if 'autoexecute_start' in t:
+                lines.append("Auto-execute pipeline:")
+                if 'validation_start' in t and 'validation_end' in t:
+                    v_t = t['validation_end'] - t['validation_start']
+                    lines.append(f"  Syntax validation: {v_t:.3f}s")
+                if 'execution_async_call' in t and 'autoexecute_start' in t:
+                    async_t = t['execution_async_call'] - t['autoexecute_start']
+                    lines.append(f"  Pre-execution overhead: {async_t:.3f}s")
+                if 'executor_scheduled' in t and 'execution_async_call' in t:
+                    sched_t = t['executor_scheduled'] - t['execution_async_call']
+                    lines.append(f"  Executor scheduling delay: {sched_t:.3f}s")
+                if 'executor_actual_start' in t and 'executor_scheduled' in t:
+                    actual_delay = t['executor_actual_start'] - t['executor_scheduled']
+                    lines.append(f"  Qt event-loop delay (singleShot→run): {actual_delay:.3f}s")
+                if 'execution_start' in t and 'executor_actual_start' in t:
+                    exec_startup = t['execution_start'] - t['executor_actual_start']
+                    lines.append(f"  Executor startup overhead: {exec_startup:.3f}s")
+                if 'execution_callback_start' in t and 'execution_end' in t:
+                    cb_t = t['execution_callback_start'] - t['execution_end']
+                    lines.append(f"  Callback dispatch delay: {cb_t:.3f}s")
+                lines.append("")
+            
             # Execution
             if 'execution_start' in t:
                 if 'execution_end' in t:
                     exec_t = t['execution_end'] - t['execution_start']
-                    lines.append(f"Code execution: {exec_t:.3f}s (result: {t.get('execution_result', 'unknown')})")
+                    lines.append(f"Code execution (exec() only): {exec_t:.3f}s (result: {t.get('execution_result', 'unknown')})")
                 else:
                     lines.append(f"Code execution: started but not finished yet")
             lines.append("")
@@ -1103,24 +1282,11 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     tool_executor=self._executeTool,
                     context=context,
                     on_progress=_on_progress,
+                    on_delta=on_delta,  # Phase 3 uses true streaming
                 )
                 
-                # Stream the final response in small chunks for a smooth UI effect
-                if on_delta and response:
-                    reasoning = response.get('reasoning_content', '')
-                    message = response.get('message', '')
-                    chunk_size = 8
-                    import time
-                    if reasoning:
-                        for i in range(0, len(reasoning), chunk_size):
-                            chunk = reasoning[i:i+chunk_size]
-                            on_delta({'reasoning_content': chunk, 'content': ''})
-                            time.sleep(0.015)
-                    if message:
-                        for i in range(0, len(message), chunk_size):
-                            chunk = message[i:i+chunk_size]
-                            on_delta({'content': chunk, 'reasoning_content': ''})
-                            time.sleep(0.015)
+                # Phase 3 (generate) now streams in real-time via on_delta inside
+                # chatWithTools. No post-hoc chunking needed.
             except Exception as e:
                 logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
                 response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)

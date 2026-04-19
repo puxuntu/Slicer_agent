@@ -51,6 +51,9 @@ class SkillToolExecutor:
         Returns:
             Tool execution result
         """
+        import time
+        start = time.time()
+        
         if tool_name == "Grep":
             result = self._grep(arguments.get("pattern", ""), arguments.get("path", ""))
         elif tool_name == "ReadFile":
@@ -63,6 +66,10 @@ class SkillToolExecutor:
             result = self._glob(arguments.get("pattern", ""), arguments.get("path", ""))
         else:
             return {"error": f"Unknown tool: {tool_name}"}
+        
+        elapsed = time.time() - start
+        if isinstance(result, dict):
+            result["_tool_timing"] = f"{elapsed:.3f}s"
         
         # Normalize absolute paths in the result back to relative forward-slash paths
         if isinstance(result, dict):
@@ -364,25 +371,5 @@ def get_skill_tools() -> List[Dict]:
                 }
             }
         },
-        {
-            "type": "function",
-            "function": {
-                "name": "Glob",
-                "description": "Find files by pattern. Use when needed to locate relevant files, then write code.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "pattern": {
-                            "type": "string",
-                            "description": "Filename pattern (e.g., '*Volume*.py', '*.md')"
-                        },
-                        "path": {
-                            "type": "string",
-                            "description": "Relative path within skill to search"
-                        }
-                    },
-                    "required": ["pattern", "path"]
-                }
-            }
-        }
+
     ]
