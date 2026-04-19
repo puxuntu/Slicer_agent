@@ -559,7 +559,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 feedback_lines.append(f"Status: success\nExecution time: {execution_time:.2f}s\nOutput: {output}")
                 # Detect errors printed but caught by the script itself
                 lower_output = output.lower()
-                if any(k in lower_output for k in ('error:', 'traceback', 'exception', 'failed')):
+                if any(k in lower_output for k in ('error:', 'traceback', 'exception', 'failed', '[vtk]')):
                     output_has_errors = True
                     feedback_lines.append("Warning: execution output contains error indicators even though no uncaught exception was raised.")
             else:

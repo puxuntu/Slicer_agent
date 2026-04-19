@@ -13,7 +13,9 @@ import builtins
 import contextlib
 import io
 import logging
+import os
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -174,6 +176,23 @@ class SafeExecutor:
         traceback_str = None
         timed_out = False
         
+        # Temporarily redirect VTK error/warning output so that C++ layer messages
+        # (e.g. "[VTK] ModifySegmentByLabelmap: Invalid segment") are captured and
+        # can trigger the self-correction mechanism.
+        original_vtk_window = None
+        vtk_log_path = None
+        try:
+            original_vtk_window = vtk.vtkOutputWindow.GetInstance()
+            fd, vtk_log_path = tempfile.mkstemp(suffix='.vtklog')
+            os.close(fd)
+            vtk_file_window = vtk.vtkFileOutputWindow()
+            vtk_file_window.SetFileName(vtk_log_path)
+            vtk.vtkOutputWindow.SetInstance(vtk_file_window)
+        except Exception:
+            # If VTK redirection fails, continue without it
+            original_vtk_window = None
+            vtk_log_path = None
+
         try:
             # Execute with output capture
             with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
@@ -182,10 +201,6 @@ class SafeExecutor:
                 tree = ast.parse(code)
                 
                 # Whole-block atomic execution (same as Slicer Python Console).
-                # We no longer split into individual statements or call processEvents()
-                # between them, to avoid exposing intermediate VTK/MRML state to the
-                # GUI event loop (which can cause crashes when code manipulates
-                # low-level array views).
                 exec(compiled_code, exec_globals)
                 
                 # Try to get result of last expression
@@ -197,9 +212,6 @@ class SafeExecutor:
                         result_value = eval(compile(last_expr, '<string>', 'eval'), exec_globals)
                 except:
                     pass
-                
-                # Variables are already persisted in __main__.__dict__ because
-                # exec_globals and self._globals_dict point to the same dict.
                         
         except TimeoutError as e:
             timed_out = True
@@ -209,6 +221,28 @@ class SafeExecutor:
         except Exception as e:
             error_msg = str(e)
             traceback_str = traceback.format_exc()
+
+        finally:
+            # Restore original VTK output window
+            if original_vtk_window is not None:
+                try:
+                    vtk.vtkOutputWindow.SetInstance(original_vtk_window)
+                except Exception:
+                    pass
+
+        # Read captured VTK log and inject it into stderr so output_has_errors
+        # detection in SlicerAIAgent can trigger self-correction.
+        if vtk_log_path and os.path.exists(vtk_log_path):
+            try:
+                with open(vtk_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    vtk_output = f.read().strip()
+                if vtk_output:
+                    # Prefix lines so they're easily identifiable
+                    prefixed = "\n".join(f"[VTK] {line}" for line in vtk_output.splitlines())
+                    stderr_capture.write(f"\n[VTK ERRORS/WARNINGS]:\n{prefixed}\n")
+                os.remove(vtk_log_path)
+            except Exception:
+                pass
             
         # Calculate execution time
         execution_time = (datetime.now() - self._execution_start_time).total_seconds()
