@@ -7,6 +7,7 @@ System prompt is loaded from external markdown file.
 Compatible with OpenAI-compatible APIs including Kimi, OpenAI, and others.
 """
 
+import concurrent.futures
 import json
 import logging
 import os
@@ -1143,44 +1144,55 @@ This is wrong because it uses subprocess instead of the provided tools.
                     response['timing_report'] = timing_report
                     return response
                 
-                # Execute tool calls
+                # Execute tool calls in parallel (they are independent I/O operations)
                 tool_results = []
                 tool_names = []
                 tool_start = time.time()
-                for tool_call in tool_calls:
+
+                def _execute_single(tool_call):
                     tool_id = tool_call.get('id')
                     function = tool_call.get('function', {})
                     tool_name = function.get('name')
                     tool_args_str = function.get('arguments', '{}')
-                    
                     try:
                         tool_args = json.loads(tool_args_str)
                     except json.JSONDecodeError:
                         tool_args = {}
-                    
-                    # Execute the tool
-                    logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
                     try:
                         result = tool_executor(tool_name, tool_args)
-                        # Tool message format: role, tool_call_id, content
-                        tool_results.append({
-                            "role": "tool",
-                            "tool_call_id": tool_id,
-                            "content": json.dumps(result, ensure_ascii=False, default=str),
-                        })
-                        tool_calls_history.append({
-                            "tool": tool_name,
-                            "args": tool_args,
-                            "result": result,
-                        })
-                        tool_names.append(tool_name)
+                        return {
+                            "tool_result": {
+                                "role": "tool",
+                                "tool_call_id": tool_id,
+                                "content": json.dumps(result, ensure_ascii=False, default=str),
+                            },
+                            "history_entry": {
+                                "tool": tool_name,
+                                "args": tool_args,
+                                "result": result,
+                            },
+                            "name": tool_name,
+                        }
                     except Exception as e:
-                        tool_results.append({
-                            "role": "tool",
-                            "tool_call_id": tool_id,
-                            "content": json.dumps({"error": str(e)}, ensure_ascii=False),
-                        })
-                        tool_names.append(f"{tool_name}(error)")
+                        return {
+                            "tool_result": {
+                                "role": "tool",
+                                "tool_call_id": tool_id,
+                                "content": json.dumps({"error": str(e)}, ensure_ascii=False),
+                            },
+                            "history_entry": None,
+                            "name": f"{tool_name}(error)",
+                        }
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    outputs = list(executor.map(_execute_single, tool_calls))
+
+                for out in outputs:
+                    tool_results.append(out["tool_result"])
+                    if out["history_entry"] is not None:
+                        tool_calls_history.append(out["history_entry"])
+                    tool_names.append(out["name"])
+
                 tool_time = time.time() - tool_start
                 timing_report['api_calls'] += 1
                 timing_report['tool_rounds'] += 1

@@ -11,8 +11,14 @@ import re
 import json
 import subprocess
 import platform
+import logging
 from typing import List, Dict, Optional
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Path to bundled ripgrep binary (Windows)
+_RG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin", "rg.exe")
 
 
 class SkillToolExecutor:
@@ -104,42 +110,59 @@ class SkillToolExecutor:
         }
     
     def _grep_windows(self, pattern: str, path: str) -> List[Dict]:
-        """Windows grep using PowerShell."""
+        """Windows grep using ripgrep (rg) if available, else Python fallback."""
         results = []
-        
-        # Use PowerShell Select-String for better regex support
-        # Escape the pattern for PowerShell
-        escaped_pattern = pattern.replace("'", "''")
-        ps_cmd = rf'Select-String -Path "{path}\*" -Pattern \'{escaped_pattern}\' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20 | ForEach-Object {{ "{{0}}:{{1}}:{{2}}" -f $_.Path,$_.LineNumber,$_.Line }}'
-        
+
+        # Prefer bundled or system ripgrep
+        rg_exe = _RG_PATH if os.path.isfile(_RG_PATH) else "rg"
+
         try:
+            # ripgrep: -n (line numbers), -i (ignore case), --max-count 20 per file,
+            # -m 20 (stop after 20 matches total), --max-columns 200 (limit line length)
+            cmd = [
+                rg_exe,
+                "-n",
+                "-i",
+                "-m", "20",
+                "--max-columns", "200",
+                "--no-heading",
+                "--color", "never",
+                pattern,
+                path,
+            ]
             result = subprocess.run(
-                ["powershell", "-Command", ps_cmd],
+                cmd,
                 capture_output=True,
-                timeout=30  # Increased timeout for large skill directories
+                timeout=15,
             )
-            
-            # Decode with error handling
+
             stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
-            
-            if result.returncode == 0 or stdout:
-                for line in stdout.strip().split('\n'):
+
+            if result.returncode in (0, 1):  # 0 = found, 1 = not found
+                for line in stdout.strip().split('\n')[:20]:
                     line = line.strip()
-                    if ':' in line:
-                        parts = line.split(':', 2)
-                        if len(parts) >= 3:
-                            results.append({
-                                "file": parts[0],
-                                "line": int(parts[1]) if parts[1].isdigit() else 0,
-                                "content": parts[2][:200]  # Limit length
-                            })
+                    if not line:
+                        continue
+                    # rg output format: path:line:content
+                    # Need to handle paths that contain colons (e.g., C:\...)
+                    # Find the first two colons that separate path, line, content
+                    # Strategy: find the first colon after the drive letter, then next colon
+                    match = re.match(r'^(.+?):(\d+):(.*)$', line)
+                    if match:
+                        results.append({
+                            "file": match.group(1),
+                            "line": int(match.group(2)),
+                            "content": match.group(3)[:200],
+                        })
+        except FileNotFoundError:
+            logger.warning("ripgrep (rg) not found, falling back to Python grep")
         except Exception as e:
-            logger.warning(f"PowerShell grep failed: {e}")
-        
-        # Fallback to Python if PowerShell fails
+            logger.warning(f"ripgrep failed: {e}")
+
+        # Fallback to Python if rg is unavailable or fails
         if not results:
             results = self._grep_python(pattern, path)
-        
+
         return results
     
     def _grep_unix(self, pattern: str, path: str) -> List[Dict]:
