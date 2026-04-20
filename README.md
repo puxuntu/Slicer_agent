@@ -50,7 +50,11 @@ load an example volume and generate a volume rendering
   Your browser does not support the video tag.
 </video>
 
-The agent searches for volume-loading APIs, reads the relevant documentation, generates code to download the MRHead sample volume, and creates a GPU volume rendering with a preset transfer function.
+The agent searches for volume-loading APIs, reads the relevant documentation, generates code to download the MRHead sample volume, and creates a GPU volume rendering with a preset transfer function
+
+https://github.com/user-attachments/assets/256e8913-5942-4db3-b5b9-7841796f4eb3
+
+.
 
 ---
 
