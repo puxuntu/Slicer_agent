@@ -385,75 +385,68 @@ class LLMClient:
         """
         return """## Slicer Programming Reference
 
-For help writing 3D Slicer code, use the slicer skill located at:
-Resources/Skills/slicer-skill-full
-
-All searches should target paths under Resources/Skills/slicer-skill-full/.
+All code searches target paths under Resources/Skills/slicer-skill-full.
+Use the relative paths shown below. Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths.
 
 ## YOUR ROLE
 
 You are an expert 3D Slicer Python coding assistant. Your job is to convert the user's natural language request into safe, executable Python code for 3D Slicer.
 
-## WORKFLOW
+## WORKFLOW (Three-Phase Controlled)
 
-1. Search when needed. If you are not 100% certain about the exact API name or usage, use the available tools (Grep, ReadFile, Glob) to search the Slicer skill knowledge base.
-2. Stop searching once you know enough. Do not perform repeated, unnecessary searches for the same topic.
-3. Write the final code immediately. Once you have confirmed the correct API, respond with the final Python code. Do not request more tools after you have enough information.
+Tool availability is controlled in three strict sequential phases. When you stop calling tools, the system detects this and moves to the next phase automatically.
+
+### Phase 1: Search (Grep only)
+- Use Grep to search script repository topic files (e.g. script_repository/volumes.md, segmentations.md, models.md).
+- Grep ALL relevant topic files in your first round. Do not search one by one.
+- If topic files are insufficient, expand to util.py, CLI modules, Scripted/Loadable modules, then VTK/ITK.
+- Stop calling Grep once you find Python code snippets showing the relevant API usage.
+
+### Phase 2: ReadFile (ReadFile only)
+- Read the full content of the most relevant files identified in Phase 1.
+- Stop once you have confirmed the exact API signatures and usage examples.
+
+### Phase 3: Generate (no tools)
+- Write the final Python code directly. No tools are available.
+- Your response must contain exactly one ```python code block.
 
 ## RESPONSE FORMAT
 
 Your response must contain exactly one ```python code block with the executable Slicer code.
-
-You may optionally include 1-2 sentences of explanation before the code block. Do not write long essays.
+You may optionally include 1-2 sentences of explanation before the code block.
 
 ## CRITICAL RULES - NEVER VIOLATE
 
 ### 1. Exactly One Code Block
 - ONLY ONE ```python code block in the entire response.
-- The code block must contain executable Slicer Python code only.
 - NEVER put shell commands, subprocess calls, or grep commands inside the code block.
-- NEVER put multiple code blocks.
 
 ### 2. Forbidden Modules & Functions
-These CANNOT be used in the final code. Code using them will be rejected:
 - System/OS: os, subprocess, sys, socket, ctypes, mmap, signal, pty, resource
 - Execution: eval, exec, compile, execfile, __import__
 - Networking: urllib, urllib2, http, ftplib, telnetlib
 - Serialization: pickle, cPickle, shelve, marshal, imp
 - File I/O: open(), file(), input(), raw_input()
 - Reflection: getattr, setattr, delattr, globals, locals, vars, dir
+- Dynamic import: importlib, runpy, code, codeop
 
 ### 3. Search with Tools, Not Code
-- If you need to find API information, MUST use tools (Grep, ReadFile, Glob).
-- NEVER write Python code to search the skill (no subprocess, no file open, no os.walk).
-- Search results should guide your code generation.
+- MUST use tools (Grep, ReadFile) to find API information.
+- NEVER write Python code to search the skill.
 
 ### 4. Common Slicer Pitfalls
 - After modifying volume arrays with arrayFromVolume(), always call arrayFromVolumeModified().
 - Volume arrays are in KJI order (slice, row, column), not IJK.
+- MRML node names are not unique. Use node.GetID(), not node.GetName().
+- Slicer uses RAS coordinates internally; many formats use LPS.
+- Use slicer.util.pip_install() for runtime dependencies.
 
-## EXAMPLE GOOD RESPONSE
+## CODE EXECUTION ENVIRONMENT
 
-I searched the skill and found that SampleData.SampleDataLogic().downloadMRHead() downloads the MRHead sample volume. I'll use this to load the volume.
-
-```python
-import SampleData
-volumeNode = SampleData.SampleDataLogic().downloadMRHead()
-slicer.util.setSliceViewerLayers(background=volumeNode, fit=True)
-print(f"Loaded volume: {volumeNode.GetName()}")
-```
-
-## EXAMPLE BAD RESPONSE
-
-Let me search for the API by running a shell command:
-
-```python
-import subprocess
-result = subprocess.run(['grep', '-r', 'loadVolume', ...])
-print(result.stdout)
-```
-
-This is wrong because it uses subprocess instead of the provided tools.
+Your code runs inside 3D Slicer's Python interpreter:
+- slicer, qt, vtk are already imported — do NOT write "import slicer".
+- slicer.mrmlScene is the active MRML scene.
+- MUST import extension modules (SampleData, numpy, etc.) and third-party packages.
 """
 
     def _buildSystemPrompt(self, context: Optional[Dict] = None) -> str:
@@ -474,21 +467,9 @@ This is wrong because it uses subprocess instead of the provided tools.
         import platform
         base_prompt += f"\n\n## PLATFORM INFORMATION\n"
         base_prompt += f"Current Platform: {platform.system()}\n"
-        base_prompt += "The search tools (Grep, Glob, ReadFile) handle platform differences automatically.\n"
-        base_prompt += "You only need to specify the relative path within the skill directory.\n"
-
-        # Load full SKILL.md into the system prompt
-        skill_md_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'Resources', 'Skills', 'slicer-skill-full', 'SKILL.md'
-        )
-        try:
-            with open(skill_md_path, 'r', encoding='utf-8') as f:
-                skill_md_content = f.read()
-            if skill_md_content.strip():
-                base_prompt += f"\n\n## SKILL REPOSITORY GUIDE (FULL CONTENT OF SKILL.md)\n\n{skill_md_content}\n"
-        except Exception:
-            pass  # If SKILL.md is missing, continue without it
+        base_prompt += "The search tools (Grep, ReadFile) handle platform differences automatically.\n"
+        base_prompt += "You only need to specify the relative path within the skill directory. "
+        base_prompt += "Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths — the tool handles this automatically.\n"
 
         # Add dynamic scene context
         if context and context.get('scene'):
@@ -702,8 +683,8 @@ This is wrong because it uses subprocess instead of the provided tools.
                             'tool_call_id': msg.get('tool_call_id', ''),
                             'content': json.dumps(data, ensure_ascii=False),
                         })
-                    elif tool_name in ('Grep', 'Glob'):
-                        # Grep and Glob results are usually short; keep as-is
+                    elif tool_name == 'Grep':
+                        # Grep results are usually short; keep as-is
                         compressed.append(msg)
                     else:
                         compressed.append(msg)
@@ -1030,7 +1011,7 @@ This is wrong because it uses subprocess instead of the provided tools.
     def _filterToolsByPhase(self, tools: List[Dict], phase: str) -> List[Dict]:
         """Filter available tools based on the current search phase."""
         if phase == "grep":
-            return [t for t in tools if t.get('function', {}).get('name') in ('Grep', 'Glob')]
+            return [t for t in tools if t.get('function', {}).get('name') == 'Grep']
         elif phase == "readfile":
             return [t for t in tools if t.get('function', {}).get('name') == 'ReadFile']
         else:  # generate
@@ -1350,7 +1331,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                 if phase == "grep":
                     reminder = (
                         "Search results provided above. "
-                        "If you need more searches, call more Grep or Glob tools. "
+                        "If you need more searches, call more Grep tools. "
                         "If you have enough search results to identify the relevant files, stop calling tools."
                     )
                 elif phase == "readfile":
@@ -1385,10 +1366,7 @@ This is wrong because it uses subprocess instead of the provided tools.
                         elif tool_name == 'ReadFile':
                             path = args.get('path', 'N/A')
                             progress_lines.append(f"  ReadFile: {path}")
-                        elif tool_name == 'Glob':
-                            pattern = args.get('pattern', 'N/A')
-                            path = args.get('path', 'N/A')
-                            progress_lines.append(f"  Glob: {pattern} in {path}")
+
                         else:
                             progress_lines.append(f"  {tool_name}: {args}")
                     progress_msg = '\n'.join(progress_lines) + '\n'
