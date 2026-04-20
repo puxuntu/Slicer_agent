@@ -12,7 +12,7 @@
 
 **SlicerAIAgent** aims to lower this barrier by letting users describe what they want in natural language, while an LLM (Kimi / Claude) reasons about the task, searches the Slicer knowledge base, and generates executable Python code automatically.
 
-The agent doesn't just "hallucinate" code. It follows a **rigid three-phase workflow**: search for relevant APIs → read source files to confirm exact signatures → generate the final script. If execution fails, it self-corrects in isolation without bloating the conversation history.
+The agent doesn't just "hallucinate" code. It follows a three-phase workflow: search for relevant APIs → read source files to confirm exact signatures → generate the final script.
 
 ---
 
