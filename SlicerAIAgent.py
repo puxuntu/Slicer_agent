@@ -852,20 +852,25 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append(f"LLM response generation: {gen:.3f}s")
             if 'llm_timing' in t:
                 lt = t['llm_timing']
+                rounds = lt.get('rounds', [])
+                # Count tool types across all rounds
+                grep_count = sum(1 for r in rounds if 'Grep' in r.get('tools', []))
+                readfile_count = sum(1 for r in rounds if 'ReadFile' in r.get('tools', []))
                 lines.append(f"  API calls: {lt.get('api_calls', 0)}")
                 lines.append(f"  Total API time: {lt.get('total_api_time', 0):.3f}s")
                 lines.append(f"  Total tool time: {lt.get('total_tool_time', 0):.3f}s")
                 lines.append(f"  Total other time: {lt.get('total_other_time', 0):.3f}s")
                 lines.append(f"  Tool rounds: {lt.get('tool_rounds', 0)}")
+                lines.append(f"  Grep calls: {grep_count}")
+                lines.append(f"  ReadFile calls: {readfile_count}")
                 # Per-round breakdown
-                rounds = lt.get('rounds', [])
                 if rounds:
                     lines.append("")
                     lines.append("  Per-round breakdown:")
                     for r in rounds:
-                        tools = ', '.join(r.get('tools', [])) or 'transition'
+                        tools = ', '.join(r.get('tools', [])) or 'done'
                         lines.append(
-                            f"    Round {r['round']} [{r['phase']}] | "
+                            f"    Round {r['round']} | "
                             f"api={r['api_time']:.3f}s tool={r.get('tool_time', 0):.3f}s "
                             f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]"
                         )
@@ -1282,11 +1287,10 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     tool_executor=self._executeTool,
                     context=context,
                     on_progress=_on_progress,
-                    on_delta=on_delta,  # Phase 3 uses true streaming
                 )
                 
-                # Phase 3 (generate) now streams in real-time via on_delta inside
-                # chatWithTools. No post-hoc chunking needed.
+                # Tool calling returns complete response (no streaming during tool rounds).
+                # Final code generation is non-streaming; the UI displays the complete result.
             except Exception as e:
                 logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
                 response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)

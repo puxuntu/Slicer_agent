@@ -392,23 +392,29 @@ Use the relative paths shown below. Do NOT prepend 'Resources/Skills/slicer-skil
 
 You are an expert 3D Slicer Python coding assistant. Your job is to convert the user's natural language request into safe, executable Python code for 3D Slicer.
 
-## WORKFLOW (Three-Phase Controlled)
+## WORKFLOW
 
-Tool availability is controlled in three strict sequential phases. When you stop calling tools, the system detects this and moves to the next phase automatically.
+You have two tools available: Grep and ReadFile. Use them autonomously to gather information, then output the final Python code.
 
-### Phase 1: Search (Grep only)
-- Use Grep to search script repository topic files (e.g. script_repository/volumes.md, segmentations.md, models.md).
-- Grep ALL relevant topic files in your first round. Do not search one by one.
-- If topic files are insufficient, expand to util.py, CLI modules, Scripted/Loadable modules, then VTK/ITK.
-- Stop calling Grep once you find Python code snippets showing the relevant API usage.
+### Recommended Search Strategy
+1. Analyze the request into sub-tasks.
+2. Map sub-tasks to script repository topic files (volumes.md, segmentations.md, models.md, etc.).
+3. Batch Grep ALL relevant topic files in your first round. Do not search one by one.
+4. If topic files are insufficient, expand to util.py, CLI modules, Scripted/Loadable modules, then VTK/ITK.
+5. ReadFile the most relevant files to confirm exact API signatures.
+6. Output final code in a single ```python block.
 
-### Phase 2: ReadFile (ReadFile only)
-- Read the full content of the most relevant files identified in Phase 1.
-- Stop once you have confirmed the exact API signatures and usage examples.
+### When to Stop
+- Once you have found the exact API signatures and usage examples needed.
+- Do not search for "completeness" — search for "sufficiency".
+- Do not perform more than 3 rounds of Grep searches total.
+- Do not read more than 5 files total.
 
-### Phase 3: Generate (no tools)
-- Write the final Python code directly. No tools are available.
-- Your response must contain exactly one ```python code block.
+### Autonomous Decision Rules
+- You may call Grep and ReadFile in ANY order and ANY combination.
+- Call multiple tools in parallel whenever possible.
+- Do NOT output intermediate analysis or planning text — only tool calls or the final code block.
+- When you have enough information, immediately output the ```python code block without asking for permission.
 
 ## RESPONSE FORMAT
 
@@ -631,7 +637,7 @@ Your code runs inside 3D Slicer's Python interpreter:
 
     def _compressMessagesForGenerate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Compress ReadFile tool results in messages before the generate phase.
+        Compress ReadFile tool results in messages when conversation grows large.
         Reduces token consumption by keeping only code blocks and truncating prose.
         """
         compressed: List[Dict[str, Any]] = []
@@ -1008,15 +1014,6 @@ Your code runs inside 3D Slicer's Python interpreter:
         
         raise RuntimeError(f"Isolated chat failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
 
-    def _filterToolsByPhase(self, tools: List[Dict], phase: str) -> List[Dict]:
-        """Filter available tools based on the current search phase."""
-        if phase == "grep":
-            return [t for t in tools if t.get('function', {}).get('name') == 'Grep']
-        elif phase == "readfile":
-            return [t for t in tools if t.get('function', {}).get('name') == 'ReadFile']
-        else:  # generate
-            return []
-
     def chatWithTools(
         self,
         prompt: str,
@@ -1025,16 +1022,13 @@ Your code runs inside 3D Slicer's Python interpreter:
         context: Optional[Dict] = None,
         max_tool_rounds: int = 20,
         on_progress: Optional[Callable[[Dict], None]] = None,
-        on_delta: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """
         Send a chat request with tool calling support.
 
-        Three-phase search strategy:
-        1. Grep phase: LLM can call unlimited Grep/Glob to locate relevant files.
-        2. ReadFile phase: LLM can call unlimited ReadFile to read full file contents.
-        3. Generate phase: No tools. LLM writes final code directly.
-           If on_delta is provided, Phase 3 uses true streaming for real-time output.
+        The LLM has access to ALL tools (Grep + ReadFile) from the start and autonomously
+        decides when to search, when to read, and when to generate code. The loop terminates
+        when the LLM outputs a ```python code block.
 
         Args:
             prompt: User's input prompt
@@ -1043,7 +1037,6 @@ Your code runs inside 3D Slicer's Python interpreter:
             context: Optional skill-based context
             max_tool_rounds: Maximum number of tool call rounds
             on_progress: Callback for progress updates (reasoning_content, content, round_info)
-            on_delta: Optional callback for streaming deltas during Phase 3 (generate)
 
         Returns:
             Dictionary with final response, code, tokens, cost, and tool call history
@@ -1065,142 +1058,53 @@ Your code runs inside 3D Slicer's Python interpreter:
             'rounds': [],
         }
 
-        phase = "grep"  # phases: "grep" -> "readfile" -> "generate"
-
         for round_num in range(max_tool_rounds):
-            logger.info(f"Tool calling round {round_num + 1}, phase: {phase}")
+            logger.info(f"Tool calling round {round_num + 1}")
             round_start = time.time()
 
-            # Filter tools by current phase
-            available_tools = self._filterToolsByPhase(tools, phase)
-            
             # Log payload for debugging (truncate for readability)
             logger.debug(f"Payload messages count: {len(messages)}")
-            
+
             try:
                 api_start = time.time()
-                
-                if phase == "generate" and on_delta:
-                    # Phase 3: true streaming for real-time code generation output
-                    payload = self._buildPayload(messages, stream=True, tools=None)
-                    request = self._buildRequest(url, payload)
-                    content_parts: List[str] = []
-                    reasoning_parts: List[str] = []
-                    usage: Dict[str, Any] = {}
-                    with self._openRequest(request) as response:
-                        for data_line in self._iterSseDataLines(response):
-                            chunk = self._parseStreamChunk(data_line)
-                            if chunk['done']:
-                                break
-                            if chunk['usage']:
-                                usage = chunk['usage']
-                            if chunk['reasoning_content']:
-                                reasoning_parts.append(chunk['reasoning_content'])
-                            if chunk['content']:
-                                content_parts.append(chunk['content'])
-                            if on_delta and (chunk['content'] or chunk['reasoning_content']):
-                                on_delta({
-                                    'content': chunk['content'],
-                                    'reasoning_content': chunk['reasoning_content'],
-                                })
-                    content = ''.join(content_parts)
-                    reasoning_content = ''.join(reasoning_parts)
-                    api_time = time.time() - api_start
-                    # Assemble a mock response structure for unified downstream processing
-                    data = {
-                        'usage': usage,
-                        'choices': [{
-                            'message': {
-                                'content': content,
-                                'reasoning_content': reasoning_content,
-                                'tool_calls': None,
-                            }
-                        }]
-                    }
-                else:
-                    # Phase 1/2: non-streaming (need complete tool_calls JSON)
-                    payload = self._buildPayload(messages, stream=False, tools=available_tools if available_tools else None)
-                    request = self._buildRequest(url, payload)
-                    with self._openRequest(request) as response:
-                        data = json.loads(response.read().decode('utf-8'))
-                    api_time = time.time() - api_start
-                    if self._isClaude():
-                        data = self._normalizeClaudeResponse(data)
-                
+
+                # All rounds are non-streaming (tool calling needs complete JSON)
+                payload = self._buildPayload(messages, stream=False, tools=tools)
+                request = self._buildRequest(url, payload)
+                with self._openRequest(request) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                api_time = time.time() - api_start
+                if self._isClaude():
+                    data = self._normalizeClaudeResponse(data)
+
                 assistant_message = data['choices'][0]['message']
                 content = self._coerceText(assistant_message.get('content', ''))
                 reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
-                
+
                 # Check if there are tool calls
                 tool_calls = assistant_message.get('tool_calls')
-                
+
                 if not tool_calls:
-                    # No tool calls from LLM - handle phase transition (still an API round)
+                    # No tool calls from LLM - check if this is final code
                     timing_report['api_calls'] += 1
                     timing_report['total_api_time'] += api_time
                     other_time = max(0, time.time() - round_start - api_time)
                     timing_report['total_other_time'] += other_time
+
+                    code = self._extractCode(content)
+
                     timing_report['rounds'].append({
                         'round': round_num + 1,
-                        'phase': phase,
+                        'phase': 'generate' if code else 'text',
                         'api_time': round(api_time, 3),
                         'tool_time': 0.0,
+                        'other_time': round(other_time, 3),
                         'round_time': round(time.time() - round_start, 3),
                         'tools': [],
                     })
 
-                    if phase == "grep":
-                        # Transition from search phase to readfile phase
-                        phase = "readfile"
-                        transition_msg = {
-                            'role': 'system',
-                            'content': (
-                                'Search phase complete. All Grep results are provided above. '
-                                'Now use ReadFile to read the FULL content of the most relevant files. '
-                                'You may call multiple ReadFile in parallel. '
-                                'Read only files that contain the exact API signatures and usage examples needed to write the code.'
-                            ),
-                        }
-                        messages.append(transition_msg)
-                        intermediate_messages.append(transition_msg)
-                        if on_progress:
-                            on_progress({
-                                'reasoning_content': f'[Transition] Round {round_num + 1}: Search phase complete. Moving to ReadFile phase...\n',
-                                'content': '',
-                                'round': round_num + 1,
-                                'phase': phase,
-                            })
-                        continue
-
-                    elif phase == "readfile":
-                        # Transition from readfile phase to generate phase
-                        phase = "generate"
-                        
-                        # Compress ReadFile tool results to reduce token bloat in generate phase
-                        messages = self._compressMessagesForGenerate(messages)
-                        
-                        transition_msg = {
-                            'role': 'system',
-                            'content': (
-                                'File reading phase complete. All file contents are provided above. '
-                                'Now write the final Python code directly. '
-                                'DO NOT use any more tools. '
-                                'Your response must contain exactly one ```python code block with the complete executable script.'
-                            ),
-                        }
-                        messages.append(transition_msg)
-                        intermediate_messages.append(transition_msg)
-                        if on_progress:
-                            on_progress({
-                                'reasoning_content': f'[Transition] Round {round_num + 1}: File reading phase complete. Generating code...\n',
-                                'content': '',
-                                'round': round_num + 1,
-                                'phase': phase,
-                            })
-                        continue
-
-                    else:  # phase == "generate"
-                        # Final response - DEBUG: Write the complete messages (including any tool results) to a local file
+                    if code:
+                        # Final response with code - DEBUG: write messages to file
                         try:
                             debug_path = os.path.join(
                                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -1225,27 +1129,45 @@ Your code runs inside 3D Slicer's Python interpreter:
                         except Exception:
                             pass
 
-                    # Persist full turn including tool calling trajectory (compressed for history)
-                    self.conversation_history.append({'role': 'user', 'content': prompt})
-                    if intermediate_messages:
-                        compressed_messages = self._compressToolResultsForHistory(intermediate_messages, user_prompt=prompt)
-                        self.conversation_history.extend(compressed_messages)
-                    assistant_entry = {'role': 'assistant', 'content': content}
-                    if reasoning_content:
-                        assistant_entry['reasoning_content'] = reasoning_content
-                    self.conversation_history.append(assistant_entry)
-                    self.turn_number += 1
+                        # Persist full turn including tool calling trajectory (compressed for history)
+                        self.conversation_history.append({'role': 'user', 'content': prompt})
+                        if intermediate_messages:
+                            compressed_messages = self._compressToolResultsForHistory(intermediate_messages, user_prompt=prompt)
+                            self.conversation_history.extend(compressed_messages)
+                        assistant_entry = {'role': 'assistant', 'content': content}
+                        if reasoning_content:
+                            assistant_entry['reasoning_content'] = reasoning_content
+                        self.conversation_history.append(assistant_entry)
+                        self.turn_number += 1
 
-                    response = self._buildResponse(
-                        content,
-                        reasoning_content,
-                        data.get('usage', {}),
-                        data,
-                    )
-                    response['tool_calls_history'] = tool_calls_history
-                    response['timing_report'] = timing_report
-                    return response
-                
+                        response = self._buildResponse(
+                            content,
+                            reasoning_content,
+                            data.get('usage', {}),
+                            data,
+                        )
+                        response['tool_calls_history'] = tool_calls_history
+                        response['timing_report'] = timing_report
+                        return response
+
+                    # No code - intermediate text, append and continue
+                    messages.append({
+                        'role': 'assistant',
+                        'content': content,
+                    })
+                    if reasoning_content:
+                        messages[-1]['reasoning_content'] = reasoning_content
+                    intermediate_messages.append(messages[-1])
+
+                    if on_progress:
+                        on_progress({
+                            'reasoning_content': f'[Text] Round {round_num + 1}: LLM output text without tools or code. Continuing...\n',
+                            'content': '',
+                            'round': round_num + 1,
+                            'phase': 'text',
+                        })
+                    continue
+
                 # Execute tool calls in parallel (they are independent I/O operations)
                 tool_results = []
                 tool_names = []
@@ -1302,24 +1224,33 @@ Your code runs inside 3D Slicer's Python interpreter:
                 timing_report['total_tool_time'] += tool_time
                 other_time = max(0, time.time() - round_start - api_time - tool_time)
                 timing_report['total_other_time'] += other_time
+
+                # Determine phase label for progress
+                has_grep = any(n == 'Grep' for n in tool_names)
+                has_readfile = any(n == 'ReadFile' for n in tool_names)
+                if has_grep and has_readfile:
+                    phase_label = "Search+Read"
+                elif has_readfile:
+                    phase_label = "Read"
+                else:
+                    phase_label = "Search"
+
                 timing_report['rounds'].append({
                     'round': round_num + 1,
-                    'phase': phase,
+                    'phase': phase_label.lower(),
                     'api_time': round(api_time, 3),
                     'tool_time': round(tool_time, 3),
                     'other_time': round(other_time, 3),
                     'round_time': round(time.time() - round_start, 3),
                     'tools': tool_names,
                 })
-                
+
                 # Add assistant message with tool_calls to conversation
-                # Must include content (can be empty string), tool_calls, and reasoning_content for k2 models
                 assistant_msg = {
                     "role": "assistant",
                     "content": content if content else "",
                     "tool_calls": tool_calls,
                 }
-                # Add reasoning_content if present (required for thinking-enabled models)
                 if reasoning_content:
                     assistant_msg["reasoning_content"] = reasoning_content
                 messages.append(assistant_msg)
@@ -1327,38 +1258,13 @@ Your code runs inside 3D Slicer's Python interpreter:
                 # Add tool results
                 messages.extend(tool_results)
                 intermediate_messages.extend(tool_results)
-                # Add phase-appropriate reminder
-                if phase == "grep":
-                    reminder = (
-                        "Search results provided above. "
-                        "If you need more searches, call more Grep tools. "
-                        "If you have enough search results to identify the relevant files, stop calling tools."
-                    )
-                elif phase == "readfile":
-                    reminder = (
-                        "File contents provided above. "
-                        "If you need to read more files, call more ReadFile tools. "
-                        "If you have enough information to write the code, stop calling tools."
-                    )
-                else:
-                    reminder = "Tool results provided above. Now provide your final answer with the Python code. DO NOT request more tools."
-                # Remove any previous identical reminders to keep the prompt clean
-                messages = [m for m in messages if not (m.get("role") == "system" and m.get("content") == reminder)]
-                reminder_msg = {
-                    "role": "system",
-                    "content": reminder,
-                }
-                messages.append(reminder_msg)
-                # Do NOT append reminder_msg to intermediate_messages; it should not persist into conversation history
-                
+
                 # Report progress with detailed tool info
                 if on_progress:
-                    phase_label = {"grep": "Search", "readfile": "Read", "generate": "Generate"}.get(phase, "Search")
                     progress_lines = [f"[{phase_label}] Round {round_num + 1}:"]
                     for tc in tool_calls_history[-len(tool_results):]:
                         tool_name = tc['tool']
                         args = tc['args']
-                        # Build detailed description based on tool type
                         if tool_name == 'Grep':
                             pattern = args.get('pattern', 'N/A')
                             path = args.get('path', 'N/A')
@@ -1366,18 +1272,16 @@ Your code runs inside 3D Slicer's Python interpreter:
                         elif tool_name == 'ReadFile':
                             path = args.get('path', 'N/A')
                             progress_lines.append(f"  ReadFile: {path}")
-
                         else:
                             progress_lines.append(f"  {tool_name}: {args}")
                     progress_msg = '\n'.join(progress_lines) + '\n'
-                    on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1, 'phase': phase})
-                
+                    on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1, 'phase': phase_label.lower()})
+
                 logger.info(f"Round {round_num + 1} complete. Added {len(tool_results)} tool results. Proceeding to next round.")
-                
+
             except urllib.error.HTTPError as e:
                 error_body = e.read().decode('utf-8', errors='ignore')
                 logger.error(f"HTTP Error {e.code} in chatWithTools round {round_num + 1}: {error_body}")
-                # Log messages for debugging
                 try:
                     debug_msgs = json.dumps(messages, indent=2, default=str, ensure_ascii=False)[:3000]
                     logger.debug(f"Messages sent: {debug_msgs}")
@@ -1387,7 +1291,7 @@ Your code runs inside 3D Slicer's Python interpreter:
             except Exception as e:
                 logger.error(f"Error in chatWithTools round {round_num + 1}: {e}")
                 raise
-        
+
         # Max rounds reached, return last response
         logger.warning(f"Max tool rounds ({max_tool_rounds}) reached")
         response = self._buildResponse(
