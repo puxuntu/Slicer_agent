@@ -8,39 +8,9 @@
 
 ## Motivation
 
-### The Gap for Clinical Users
+When a clinician opens 3D Slicer, the goal is already clear — for example, comparing a patient's pre-operative CT with a 6-month follow-up after mandible reconstruction to assess bone graft integration. But turning that intent into results means navigating a dense UI, hunting through documentation, switching between segmentation tools and 3D views, and manually tuning dozens of parameters. The input data and desired outcome are certain; it is the execution path that is burdensome.
 
-When a clinician opens 3D Slicer, they already have a **clear goal in mind**. The input data and the desired outcome are well-defined, but the path from intent to result is anything but straightforward:
-
-- Navigating a complex UI with dozens of modules, panels, and menus
-- Switching back and forth between segmentation tools, volume rendering settings, and 3D view controls
-- Searching documentation, tutorials, or forums to figure out which button does what
-- Manually tuning parameters step by step — one mistake means starting over
-
-**The goal is certain, but the execution is burdensome.**
-
-### End-to-End Automation
-
-**SlicerAIAgent** bridges this gap by letting clinicians describe their goal in plain language. The agent then handles the entire workflow:
-
-1. **Search** — Queries the Slicer source tree, documentation, and script repository to find the right APIs
-2. **Confirm** — Reads the full content of relevant files to verify exact function signatures and usage patterns
-3. **Generate** — Produces a complete, executable Python script tailored to the task
-4. **Execute** — Runs the code directly inside Slicer, operating the software on the user's behalf
-
-The clinician never touches a script, never hunts through menus, and never second-guesses which parameter to tweak. They state the intent; the agent delivers the result.
-
-### The Bigger Picture
-
-Software interaction is shifting from **GUI-driven** to **intent-driven**. Users should not have to learn complex interface layouts to accomplish a task — they should simply say what they want.
-
-This shift is especially compelling in medical software:
-
-- A clinician's expertise lies in medical judgment, not in navigating software menus
-- Time spent wrestling with UI is time not spent on diagnosis or treatment planning
-- Standardized procedures can be reproduced reliably from natural language instructions, reducing human error
-
-SlicerAIAgent is an early step toward that future in the 3D Slicer ecosystem.
+SlicerAIAgent closes this gap by letting clinicians state their goal in plain language and handling the rest end to end: searching the Slicer knowledge base for the right APIs, confirming exact function signatures, generating executable Python code, and running it directly inside Slicer to manipulate the scene. No scripting, no menu diving, no parameter guessing. This points toward a broader shift in medical software — from learning complex interfaces to simply stating intent and letting the agent operate the application on the user's behalf.
 
 ---
 
