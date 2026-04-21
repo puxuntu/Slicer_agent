@@ -728,7 +728,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 if self.logic and self.logic.llmClient:
                     self.logic.llmClient.debug_suffix = "_correction"
                 
-                # Build isolated context: system prompt + original request + failed code + error
+                # Build isolated context with prior search results retained
                 system_content = ""
                 if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
                     system_content = self.logic.llmClient._loadSystemPromptTemplate()
@@ -740,19 +740,35 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 original_prompt = getattr(self, '_lastUserPrompt', '')
                 if original_prompt:
                     isolated_messages.append({'role': 'user', 'content': original_prompt})
+                
+                # Inject prior tool trajectory so LLM doesn't fix blind
+                prior_tool_messages = []
+                if self.logic and self.logic.llmClient:
+                    for msg in self.logic.llmClient.conversation_history[-15:]:
+                        if msg.get('role') in ('assistant', 'tool'):
+                            prior_tool_messages.append(msg)
+                if prior_tool_messages:
+                    isolated_messages.extend(prior_tool_messages)
                     isolated_messages.append({
-                        'role': 'assistant',
-                        'content': f'```python\n{self.currentCode}\n```'
+                        'role': 'system',
+                        'content': 'The messages above show the tool searches and file reads from the original attempt. Use them for reference.'
                     })
+                
+                isolated_messages.append({
+                    'role': 'assistant',
+                    'content': f'```python\n{self.currentCode}\n```'
+                })
                 
                 isolated_messages.append({
                     'role': 'user',
                     'content': (
                         f"CRITICAL: The previous Python code execution failed with this error:\n"
                         f"{error_detail}\n\n"
-                        "Your task is to fix this error and output the COMPLETE corrected Python code. "
-                        "Do NOT explain the error. Do NOT apologize. Do NOT write any analysis or markdown text outside the code block. "
-                        "Your ENTIRE response must be ONE single ```python code block containing the full corrected script and NOTHING else."
+                        "You have Grep and ReadFile tools available. "
+                        "If the error is caused by an incorrect API signature, missing parameter, or wrong module path, "
+                        "use the tools to verify the correct usage before fixing. "
+                        "Do NOT search unnecessarily — if you are confident in the fix, apply it directly.\n\n"
+                        "Your task is to fix the error and output the COMPLETE corrected Python code in ONE ```python block."
                     )
                 })
                 
@@ -771,7 +787,17 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 except Exception:
                     pass
                 
-                response = self.logic.llmClient.chatIsolated(isolated_messages)
+                # Use tool-calling isolated chat so LLM can re-search if needed
+                def _on_correction_progress(progress):
+                    self._streamQueue.put(('delta', dict(progress)))
+                
+                response = self.logic.llmClient.chatWithToolsIsolated(
+                    messages=isolated_messages,
+                    tools=self.logic.skillTools,
+                    tool_executor=self.logic._executeTool,
+                    max_tool_rounds=10,
+                    on_progress=_on_correction_progress,
+                )
                 
                 # Save response to debug file
                 try:

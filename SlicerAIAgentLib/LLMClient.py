@@ -1014,41 +1014,23 @@ Your code runs inside 3D Slicer's Python interpreter:
         
         raise RuntimeError(f"Isolated chat failed after {self.MAX_RETRIES} attempts. Last error: {last_error}")
 
-    def chatWithTools(
+    def _runToolLoop(
         self,
-        prompt: str,
+        messages: List[Dict[str, Any]],
+        url: str,
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
-        context: Optional[Dict] = None,
-        max_tool_rounds: int = 20,
+        max_tool_rounds: int,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
-        Send a chat request with tool calling support.
-
-        The LLM has access to ALL tools (Grep + ReadFile) from the start and autonomously
-        decides when to search, when to read, and when to generate code. The loop terminates
-        when the LLM outputs a ```python code block.
-
-        Args:
-            prompt: User's input prompt
-            tools: List of tool definitions for the AI
-            tool_executor: Function that executes tool calls (name, args) -> result
-            context: Optional skill-based context
-            max_tool_rounds: Maximum number of tool call rounds
-            on_progress: Callback for progress updates (reasoning_content, content, round_info)
-
-        Returns:
-            Dictionary with final response, code, tokens, cost, and tool call history
+        Core tool-calling loop. Operates on messages in-place.
+        Does NOT touch conversation_history or turn_number.
+        Returns dict with content, reasoning_content, data, timing_report,
+        tool_calls_history, intermediate_messages, and has_code flag.
         """
-        if not self.api_key:
-            raise RuntimeError("API key not configured")
-
-        messages = self._buildMessages(prompt, context)
-        url = self._getChatUrl()
         tool_calls_history = []
-        intermediate_messages = []  # Persist tool calling trajectory to conversation history
-
+        intermediate_messages = []
         timing_report = {
             'api_calls': 0,
             'tool_rounds': 0,
@@ -1062,13 +1044,11 @@ Your code runs inside 3D Slicer's Python interpreter:
             logger.info(f"Tool calling round {round_num + 1}")
             round_start = time.time()
 
-            # Log payload for debugging (truncate for readability)
             logger.debug(f"Payload messages count: {len(messages)}")
 
             try:
                 api_start = time.time()
 
-                # All rounds are non-streaming (tool calling needs complete JSON)
                 payload = self._buildPayload(messages, stream=False, tools=tools)
                 request = self._buildRequest(url, payload)
                 with self._openRequest(request) as response:
@@ -1081,11 +1061,9 @@ Your code runs inside 3D Slicer's Python interpreter:
                 content = self._coerceText(assistant_message.get('content', ''))
                 reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
 
-                # Check if there are tool calls
                 tool_calls = assistant_message.get('tool_calls')
 
                 if not tool_calls:
-                    # No tool calls from LLM - check if this is final code
                     timing_report['api_calls'] += 1
                     timing_report['total_api_time'] += api_time
                     other_time = max(0, time.time() - round_start - api_time)
@@ -1104,53 +1082,16 @@ Your code runs inside 3D Slicer's Python interpreter:
                     })
 
                     if code:
-                        # Final response with code - DEBUG: write messages to file
-                        try:
-                            debug_path = os.path.join(
-                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                f'{self.turn_number}_last_prompt_debug{self.debug_suffix}.txt'
-                            )
-                            with open(debug_path, 'w', encoding='utf-8') as f:
-                                total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
-                                users_seen = 0
-                                for i, msg in enumerate(messages):
-                                    if msg.get('role') == 'user':
-                                        users_seen += 1
-                                        turn_label = self.turn_number - total_user_msgs + users_seen
-                                        f.write(f"\n{'-'*40}\n")
-                                        f.write(f"--- Turn {turn_label} ---\n")
-                                        f.write(f"{'-'*40}\n")
-                                    f.write(f"{'='*60}\n")
-                                    f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
-                                    f.write(f"{'='*60}\n")
-                                    if 'tool_calls' in msg:
-                                        f.write("[tool_calls present]\n")
-                                    f.write(f"{msg.get('content', '')}\n\n")
-                        except Exception:
-                            pass
+                        return {
+                            'content': content,
+                            'reasoning_content': reasoning_content,
+                            'data': data,
+                            'timing_report': timing_report,
+                            'tool_calls_history': tool_calls_history,
+                            'intermediate_messages': intermediate_messages,
+                            'has_code': True,
+                        }
 
-                        # Persist full turn including tool calling trajectory (compressed for history)
-                        self.conversation_history.append({'role': 'user', 'content': prompt})
-                        if intermediate_messages:
-                            compressed_messages = self._compressToolResultsForHistory(intermediate_messages, user_prompt=prompt)
-                            self.conversation_history.extend(compressed_messages)
-                        assistant_entry = {'role': 'assistant', 'content': content}
-                        if reasoning_content:
-                            assistant_entry['reasoning_content'] = reasoning_content
-                        self.conversation_history.append(assistant_entry)
-                        self.turn_number += 1
-
-                        response = self._buildResponse(
-                            content,
-                            reasoning_content,
-                            data.get('usage', {}),
-                            data,
-                        )
-                        response['tool_calls_history'] = tool_calls_history
-                        response['timing_report'] = timing_report
-                        return response
-
-                    # No code - intermediate text, append and continue
                     messages.append({
                         'role': 'assistant',
                         'content': content,
@@ -1168,7 +1109,7 @@ Your code runs inside 3D Slicer's Python interpreter:
                         })
                     continue
 
-                # Execute tool calls in parallel (they are independent I/O operations)
+                # Execute tool calls in parallel
                 tool_results = []
                 tool_names = []
                 tool_start = time.time()
@@ -1225,7 +1166,6 @@ Your code runs inside 3D Slicer's Python interpreter:
                 other_time = max(0, time.time() - round_start - api_time - tool_time)
                 timing_report['total_other_time'] += other_time
 
-                # Determine phase label for progress
                 has_grep = any(n == 'Grep' for n in tool_names)
                 has_readfile = any(n == 'ReadFile' for n in tool_names)
                 if has_grep and has_readfile:
@@ -1245,7 +1185,6 @@ Your code runs inside 3D Slicer's Python interpreter:
                     'tools': tool_names,
                 })
 
-                # Add assistant message with tool_calls to conversation
                 assistant_msg = {
                     "role": "assistant",
                     "content": content if content else "",
@@ -1255,11 +1194,9 @@ Your code runs inside 3D Slicer's Python interpreter:
                     assistant_msg["reasoning_content"] = reasoning_content
                 messages.append(assistant_msg)
                 intermediate_messages.append(assistant_msg)
-                # Add tool results
                 messages.extend(tool_results)
                 intermediate_messages.extend(tool_results)
 
-                # Report progress with detailed tool info
                 if on_progress:
                     progress_lines = [f"[{phase_label}] Round {round_num + 1}:"]
                     for tc in tool_calls_history[-len(tool_results):]:
@@ -1268,12 +1205,12 @@ Your code runs inside 3D Slicer's Python interpreter:
                         if tool_name == 'Grep':
                             pattern = args.get('pattern', 'N/A')
                             path = args.get('path', 'N/A')
-                            progress_lines.append(f"  Grep: \"{pattern}\" → {path}")
+                            progress_lines.append(f'  Grep: "{pattern}" → {path}')
                         elif tool_name == 'ReadFile':
                             path = args.get('path', 'N/A')
-                            progress_lines.append(f"  ReadFile: {path}")
+                            progress_lines.append(f'  ReadFile: {path}')
                         else:
-                            progress_lines.append(f"  {tool_name}: {args}")
+                            progress_lines.append(f'  {tool_name}: {args}')
                     progress_msg = '\n'.join(progress_lines) + '\n'
                     on_progress({'reasoning_content': progress_msg, 'content': '', 'round': round_num + 1, 'phase': phase_label.lower()})
 
@@ -1292,8 +1229,157 @@ Your code runs inside 3D Slicer's Python interpreter:
                 logger.error(f"Error in chatWithTools round {round_num + 1}: {e}")
                 raise
 
-        # Max rounds reached, return last response
         logger.warning(f"Max tool rounds ({max_tool_rounds}) reached")
+        return {
+            'content': content,
+            'reasoning_content': reasoning_content,
+            'data': data,
+            'timing_report': timing_report,
+            'tool_calls_history': tool_calls_history,
+            'intermediate_messages': intermediate_messages,
+            'has_code': False,
+        }
+
+    def chatWithTools(
+        self,
+        prompt: str,
+        tools: List[Dict],
+        tool_executor: Callable[[str, Dict], Dict],
+        context: Optional[Dict] = None,
+        max_tool_rounds: int = 20,
+        on_progress: Optional[Callable[[Dict], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Send a chat request with tool calling support.
+
+        The LLM has access to ALL tools (Grep + ReadFile) from the start and autonomously
+        decides when to search, when to read, and when to generate code. The loop terminates
+        when the LLM outputs a ```python code block.
+
+        Args:
+            prompt: User's input prompt
+            tools: List of tool definitions for the AI
+            tool_executor: Function that executes tool calls (name, args) -> result
+            context: Optional skill-based context
+            max_tool_rounds: Maximum number of tool call rounds
+            on_progress: Callback for progress updates (reasoning_content, content, round_info)
+
+        Returns:
+            Dictionary with final response, code, tokens, cost, and tool call history
+        """
+        if not self.api_key:
+            raise RuntimeError("API key not configured")
+
+        messages = self._buildMessages(prompt, context)
+        url = self._getChatUrl()
+
+        result = self._runToolLoop(
+            messages=messages,
+            url=url,
+            tools=tools,
+            tool_executor=tool_executor,
+            max_tool_rounds=max_tool_rounds,
+            on_progress=on_progress,
+        )
+
+        content = result['content']
+        reasoning_content = result['reasoning_content']
+        data = result['data']
+        timing_report = result['timing_report']
+        tool_calls_history = result['tool_calls_history']
+        intermediate_messages = result['intermediate_messages']
+
+        if result['has_code']:
+            # Final response with code - DEBUG: write messages to file
+            try:
+                debug_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    f'{self.turn_number}_last_prompt_debug{self.debug_suffix}.txt'
+                )
+                with open(debug_path, 'w', encoding='utf-8') as f:
+                    total_user_msgs = sum(1 for m in messages if m.get('role') == 'user')
+                    users_seen = 0
+                    for i, msg in enumerate(messages):
+                        if msg.get('role') == 'user':
+                            users_seen += 1
+                            turn_label = self.turn_number - total_user_msgs + users_seen
+                            f.write(f"\n{'-'*40}\n")
+                            f.write(f"--- Turn {turn_label} ---\n")
+                            f.write(f"{'-'*40}\n")
+                        f.write(f"{'='*60}\n")
+                        f.write(f"MESSAGE {i+1} | role: {msg.get('role', 'unknown')}\n")
+                        f.write(f"{'='*60}\n")
+                        if 'tool_calls' in msg:
+                            f.write("[tool_calls present]\n")
+                        f.write(f"{msg.get('content', '')}\n\n")
+            except Exception:
+                pass
+
+            # Persist full turn including tool calling trajectory (compressed for history)
+            self.conversation_history.append({'role': 'user', 'content': prompt})
+            if intermediate_messages:
+                compressed_messages = self._compressToolResultsForHistory(intermediate_messages, user_prompt=prompt)
+                self.conversation_history.extend(compressed_messages)
+            assistant_entry = {'role': 'assistant', 'content': content}
+            if reasoning_content:
+                assistant_entry['reasoning_content'] = reasoning_content
+            self.conversation_history.append(assistant_entry)
+            self.turn_number += 1
+
+        response = self._buildResponse(
+            content,
+            reasoning_content,
+            data.get('usage', {}),
+            data,
+        )
+        response['tool_calls_history'] = tool_calls_history
+        response['timing_report'] = timing_report
+        return response
+
+    def chatWithToolsIsolated(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict],
+        tool_executor: Callable[[str, Dict], Dict],
+        max_tool_rounds: int = 10,
+        on_progress: Optional[Callable[[Dict], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Run tool-calling loop with fully isolated context.
+        Does NOT read from or write to conversation_history.
+        Does NOT increment turn_number.
+        Accepts a pre-built messages list (e.g. for self-correction).
+
+        Args:
+            messages: Pre-built message list (including system prompt, user request, etc.)
+            tools: List of tool definitions
+            tool_executor: Function that executes tool calls
+            max_tool_rounds: Maximum rounds (default 10, stricter than main turn)
+            on_progress: Optional progress callback
+
+        Returns:
+            Dictionary with response, code, tokens, cost, timing_report, tool_calls_history
+        """
+        if not self.api_key:
+            raise RuntimeError("API key not configured")
+
+        url = self._getChatUrl()
+
+        result = self._runToolLoop(
+            messages=messages,
+            url=url,
+            tools=tools,
+            tool_executor=tool_executor,
+            max_tool_rounds=max_tool_rounds,
+            on_progress=on_progress,
+        )
+
+        content = result['content']
+        reasoning_content = result['reasoning_content']
+        data = result['data']
+        timing_report = result['timing_report']
+        tool_calls_history = result['tool_calls_history']
+
         response = self._buildResponse(
             content,
             reasoning_content,
