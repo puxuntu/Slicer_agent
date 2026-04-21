@@ -62,22 +62,6 @@ The agent chains multiple Slicer operations: loading data → threshold-based se
 
 The system simply provides the tools and waits for the LLM to output a ` ```python` code block — no manual phase orchestration required.
 
-### Performance Optimization
-
-| Optimization | Description | Impact |
-|-------------|-------------|--------|
-| **Zero-wait tool orchestration** | The LLM controls the entire workflow — searching, reading, and generating without any system-imposed phase switches or idle API rounds | **~2× speedup** on typical tasks |
-| **Parallel tool execution** | Grep and ReadFile calls within the same round are executed concurrently via `ThreadPoolExecutor` | Reduces wall-clock tool time |
-| **Local result compression** | ReadFile results are compressed deterministically (keep code blocks, truncate prose) before persisting to history | Prevents context bloat without extra LLM calls |
-| **Batched UI updates** | Streaming deltas are accumulated and flushed in batches rather than per-delta | Eliminates main-thread blocking |
-
-### Safety & Reliability
-
-- **Syntax pre-validation** — Generated code is checked with `ast.parse` before execution.
-- **Forbidden module list** — Code using `os`, `subprocess`, `eval`, `pickle`, `urllib`, etc. is rejected.
-- **Self-correction loop** — If execution fails (Python exception or VTK error), the agent builds an isolated prompt (original request + failed code + error) and retries up to 5 times.
-- **Conversation history isolation** — Failed self-correction attempts never pollute the main conversation context.
-
 ---
 
 ## Related Projects
