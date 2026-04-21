@@ -10,7 +10,7 @@
 
 ### The Gap for Clinical Users
 
-When a clinician opens 3D Slicer, they already have a **clear goal in mind**: *"I have this CT scan, and I need to segment the liver, then generate a 3D model for surgical planning."*
+When a clinician opens 3D Slicer, they already have a **clear goal in mind**: *"I have a patient's pre-operative CT and a 6-month follow-up CT after mandible reconstruction. I need to load both DICOM series, register the follow-up to the pre-op scan, segment the mandible bone at both time points, build 3D surface models, overlay them to visualize alignment, compute bone volume changes to evaluate graft integration, highlight areas of bone resorption and new bone growth with different colors, and save the annotated 3D scene for the surgical team."*
 
 The input data and the desired outcome are well-defined. But the path from intent to result is anything but straightforward:
 
