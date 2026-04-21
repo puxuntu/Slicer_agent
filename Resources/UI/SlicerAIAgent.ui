@@ -61,6 +61,11 @@
           </property>
           <item>
            <property name="text">
+            <string>kimi-k2.6</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>kimi-k2.5</string>
            </property>
           </item>

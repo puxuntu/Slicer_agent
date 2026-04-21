@@ -105,8 +105,6 @@ Once Grep results identify the relevant files, use ReadFile to read the **full c
 
 - Once you have found the exact API signatures and usage examples needed.
 - Do not search for "completeness" — search for "sufficiency".
-- Do not perform more than 3 rounds of Grep searches total.
-- Do not read more than 5 files total.
 - If you find yourself searching the same pattern repeatedly, stop and generate the best code you can.
 
 ### Autonomous Decision Rules

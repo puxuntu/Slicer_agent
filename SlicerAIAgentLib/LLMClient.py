@@ -49,6 +49,7 @@ class LLMClient:
     # See: https://platform.moonshot.cn/docs/pricing and https://www.anthropic.com/pricing
     MODEL_PRICING = {
         # Kimi / Moonshot models
+        "kimi-k2.6": {"input": 0.0006, "output": 0.0028},
         "kimi-k2.5": {"input": 0.002, "output": 0.006},
         "kimi-k2-thinking": {"input": 0.002, "output": 0.006},
         "kimi-k2-turbo-preview": {"input": 0.001, "output": 0.003},
@@ -297,7 +298,7 @@ class LLMClient:
         system_content = self._buildSystemPrompt(context)
         messages.append({"role": "system", "content": system_content})
 
-        history_to_include = self.conversation_history[-50:]  # Keep last 50 messages for context
+        history_to_include = self.conversation_history[-200:]  # Keep last 200 messages for context
         messages.extend(history_to_include)
 
         messages.append({"role": "user", "content": prompt})
@@ -380,80 +381,17 @@ class LLMClient:
     
     def _getFallbackSystemPrompt(self) -> str:
         """
-        Get a fallback system prompt if the file cannot be loaded.
-        Matches the structure of Resources/Prompts/system_prompt.md.
+        Minimal fallback system prompt when the external file cannot be loaded.
+        This should never be used in normal operation — it exists only as a
+        safety net to prevent the system from crashing if the prompt file is missing.
         """
-        return """## Slicer Programming Reference
-
-All code searches target paths under Resources/Skills/slicer-skill-full.
-Use the relative paths shown below. Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths.
-
-## YOUR ROLE
-
-You are an expert 3D Slicer Python coding assistant. Your job is to convert the user's natural language request into safe, executable Python code for 3D Slicer.
-
-## WORKFLOW
-
-You have two tools available: Grep and ReadFile. Use them autonomously to gather information, then output the final Python code.
-
-### Recommended Search Strategy
-1. Analyze the request into sub-tasks.
-2. Map sub-tasks to script repository topic files (volumes.md, segmentations.md, models.md, etc.).
-3. Batch Grep ALL relevant topic files in your first round. Do not search one by one.
-4. If topic files are insufficient, expand to util.py, CLI modules, Scripted/Loadable modules, then VTK/ITK.
-5. ReadFile the most relevant files to confirm exact API signatures.
-6. Output final code in a single ```python block.
-
-### When to Stop
-- Once you have found the exact API signatures and usage examples needed.
-- Do not search for "completeness" — search for "sufficiency".
-- Do not perform more than 3 rounds of Grep searches total.
-- Do not read more than 5 files total.
-
-### Autonomous Decision Rules
-- You may call Grep and ReadFile in ANY order and ANY combination.
-- Call multiple tools in parallel whenever possible.
-- Do NOT output intermediate analysis or planning text — only tool calls or the final code block.
-- When you have enough information, immediately output the ```python code block without asking for permission.
-
-## RESPONSE FORMAT
-
-Your response must contain exactly one ```python code block with the executable Slicer code.
-You may optionally include 1-2 sentences of explanation before the code block.
-
-## CRITICAL RULES - NEVER VIOLATE
-
-### 1. Exactly One Code Block
-- ONLY ONE ```python code block in the entire response.
-- NEVER put shell commands, subprocess calls, or grep commands inside the code block.
-
-### 2. Forbidden Modules & Functions
-- System/OS: os, subprocess, sys, socket, ctypes, mmap, signal, pty, resource
-- Execution: eval, exec, compile, execfile, __import__
-- Networking: urllib, urllib2, http, ftplib, telnetlib
-- Serialization: pickle, cPickle, shelve, marshal, imp
-- File I/O: open(), file(), input(), raw_input()
-- Reflection: getattr, setattr, delattr, globals, locals, vars, dir
-- Dynamic import: importlib, runpy, code, codeop
-
-### 3. Search with Tools, Not Code
-- MUST use tools (Grep, ReadFile) to find API information.
-- NEVER write Python code to search the skill.
-
-### 4. Common Slicer Pitfalls
-- After modifying volume arrays with arrayFromVolume(), always call arrayFromVolumeModified().
-- Volume arrays are in KJI order (slice, row, column), not IJK.
-- MRML node names are not unique. Use node.GetID(), not node.GetName().
-- Slicer uses RAS coordinates internally; many formats use LPS.
-- Use slicer.util.pip_install() for runtime dependencies.
-
-## CODE EXECUTION ENVIRONMENT
-
-Your code runs inside 3D Slicer's Python interpreter:
-- slicer, qt, vtk are already imported — do NOT write "import slicer".
-- slicer.mrmlScene is the active MRML scene.
-- MUST import extension modules (SampleData, numpy, etc.) and third-party packages.
-"""
+        return (
+            "WARNING: The external system prompt file could not be loaded. "
+            "The agent is running with a minimal fallback prompt. "
+            "Please check that Resources/Prompts/system_prompt.md exists.\n\n"
+            "You are an expert 3D Slicer Python coding assistant. "
+            "Use Grep and ReadFile tools to find API information, then output code."
+        )
 
     def _buildSystemPrompt(self, context: Optional[Dict] = None) -> str:
         """
@@ -625,20 +563,73 @@ Your code runs inside 3D Slicer's Python interpreter:
             logger.warning(f"LLM summarization failed, will fallback: {e}")
             return ""
 
-    def _fallbackCompressReadFile(self, full_content: str) -> str:
-        """Fallback deterministic compression when LLM summarization fails."""
+    def _compressReadFileResult(self, full_content: str, grep_keywords: List[str] = None) -> str:
+        """
+        Three-layer deterministic compression for ReadFile results.
+        
+        Layer 1: Extract all ```python code blocks (highest priority, never truncated).
+        Layer 2: Paragraph-aware extraction for prose matching grep keywords.
+        Layer 3: Fallback truncation to first 1200 chars.
+        
+        Args:
+            full_content: The full file content from ReadFile.
+            grep_keywords: Optional list of grep patterns that led to this ReadFile.
+                          Used for paragraph-aware context extraction.
+        
+        Returns:
+            Compressed content string.
+        """
+        parts = []
+        
+        # Layer 1: Extract all ```python code blocks (complete, never truncated)
         code_blocks = re.findall(r'```python\s*\n(.*?)\n```', full_content, re.DOTALL)
         if code_blocks:
-            return '\n\n'.join(['```python\n' + cb + '\n```' for cb in code_blocks])
-        summarized = full_content[:500]
-        if len(full_content) > 500:
-            summarized += f"\n... [truncated from {len(full_content)} chars]"
-        return summarized
+            parts.extend(['```python\n' + cb + '\n```' for cb in code_blocks])
+        
+        # Layer 2: Paragraph-aware extraction for prose
+        if grep_keywords:
+            paragraphs = full_content.split('\n\n')
+            for keyword in grep_keywords:
+                if not keyword:
+                    continue
+                keyword_lower = keyword.lower()
+                for para in paragraphs:
+                    if keyword_lower in para.lower():
+                        stripped = para.strip()
+                        if stripped and stripped not in parts:
+                            parts.append(stripped)
+                        break  # Only first matching paragraph per keyword
+        
+        # Layer 3: Fallback truncation
+        if not parts:
+            truncated = full_content[:1200]
+            if len(full_content) > 1200:
+                truncated += f"\n... [truncated from {len(full_content)} chars]"
+            parts.append(truncated)
+        
+        return '\n\n'.join(parts)
+
+    def _compressGrepResult(self, result_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Compress Grep results when they exceed a threshold.
+        Keeps first 60 lines, truncates the rest with a hint.
+        """
+        content = result_data.get('content', '')
+        lines = content.split('\n')
+        if len(lines) <= 100:
+            return result_data
+        
+        kept_lines = lines[:60]
+        truncated_count = len(lines) - 60
+        kept_lines.append(f"... [{truncated_count} more matches truncated]")
+        kept_lines.append("Use ReadFile to see full context of the most relevant files above.")
+        result_data['content'] = '\n'.join(kept_lines)
+        return result_data
 
     def _compressMessagesForGenerate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Compress ReadFile tool results in messages when conversation grows large.
-        Reduces token consumption by keeping only code blocks and truncating prose.
+        Compress ReadFile and Grep tool results in messages when conversation grows large.
+        Triggered when total message length exceeds a threshold.
         """
         compressed: List[Dict[str, Any]] = []
         for msg in messages:
@@ -648,8 +639,15 @@ Your code runs inside 3D Slicer's Python interpreter:
                     tool_name = data.get('tool', '')
                     if tool_name == 'ReadFile':
                         full_content = data.get('content', '')
-                        data['content'] = self._fallbackCompressReadFile(full_content)
+                        data['content'] = self._compressReadFileResult(full_content)
                         data.pop('size', None)
+                        compressed.append({
+                            'role': 'tool',
+                            'tool_call_id': msg.get('tool_call_id', ''),
+                            'content': json.dumps(data, ensure_ascii=False),
+                        })
+                    elif tool_name == 'Grep':
+                        data = self._compressGrepResult(data)
                         compressed.append({
                             'role': 'tool',
                             'tool_call_id': msg.get('tool_call_id', ''),
@@ -681,7 +679,7 @@ Your code runs inside 3D Slicer's Python interpreter:
                     if tool_name == 'ReadFile':
                         full_content = data.get('content', '')
                         # Local deterministic compression (fast, no extra API call)
-                        data['content'] = self._fallbackCompressReadFile(full_content)
+                        data['content'] = self._compressReadFileResult(full_content)
                         data.pop('size', None)
                         data.pop('total_lines', None)
                         compressed.append({
@@ -690,7 +688,7 @@ Your code runs inside 3D Slicer's Python interpreter:
                             'content': json.dumps(data, ensure_ascii=False),
                         })
                     elif tool_name == 'Grep':
-                        # Grep results are usually short; keep as-is
+                        # Grep results are usually short; keep as-is for history
                         compressed.append(msg)
                     else:
                         compressed.append(msg)
@@ -1044,6 +1042,12 @@ Your code runs inside 3D Slicer's Python interpreter:
             logger.info(f"Tool calling round {round_num + 1}")
             round_start = time.time()
 
+            # Compress messages if conversation grows too large
+            total_chars = sum(len(str(m.get('content', ''))) for m in messages)
+            if total_chars > 100000:
+                logger.info(f"Message length {total_chars} exceeds 100000, compressing tool results")
+                messages = self._compressMessagesForGenerate(messages)
+
             logger.debug(f"Payload messages count: {len(messages)}")
 
             try:
@@ -1152,8 +1156,32 @@ Your code runs inside 3D Slicer's Python interpreter:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     outputs = list(executor.map(_execute_single, tool_calls))
 
+                # Collect Grep patterns from this round's tool calls for keyword-aware compression
+                grep_keywords = []
+                for tc in tool_calls:
+                    func = tc.get('function', {})
+                    if func.get('name') == 'Grep':
+                        try:
+                            args = json.loads(func.get('arguments', '{}'))
+                            grep_keywords.append(args.get('pattern', ''))
+                        except Exception:
+                            pass
+
                 for out in outputs:
-                    tool_results.append(out["tool_result"])
+                    tool_result = out["tool_result"]
+                    # Compress ReadFile results with keyword awareness before adding to messages
+                    try:
+                        data = json.loads(tool_result.get('content', '{}'))
+                        if data.get('tool') == 'ReadFile':
+                            full_content = data.get('content', '')
+                            data['content'] = self._compressReadFileResult(full_content, grep_keywords)
+                            tool_result['content'] = json.dumps(data, ensure_ascii=False)
+                        elif data.get('tool') == 'Grep':
+                            data = self._compressGrepResult(data)
+                            tool_result['content'] = json.dumps(data, ensure_ascii=False)
+                    except Exception:
+                        pass  # Keep original on parse failure
+                    tool_results.append(tool_result)
                     if out["history_entry"] is not None:
                         tool_calls_history.append(out["history_entry"])
                     tool_names.append(out["name"])
@@ -1246,7 +1274,7 @@ Your code runs inside 3D Slicer's Python interpreter:
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
         context: Optional[Dict] = None,
-        max_tool_rounds: int = 20,
+        max_tool_rounds: int = 50,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -1326,6 +1354,8 @@ Your code runs inside 3D Slicer's Python interpreter:
             self.conversation_history.append(assistant_entry)
             self.turn_number += 1
 
+        intermediate_messages = result['intermediate_messages']
+
         response = self._buildResponse(
             content,
             reasoning_content,
@@ -1334,6 +1364,7 @@ Your code runs inside 3D Slicer's Python interpreter:
         )
         response['tool_calls_history'] = tool_calls_history
         response['timing_report'] = timing_report
+        response['intermediate_messages'] = intermediate_messages
         return response
 
     def chatWithToolsIsolated(
@@ -1341,7 +1372,7 @@ Your code runs inside 3D Slicer's Python interpreter:
         messages: List[Dict[str, Any]],
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
-        max_tool_rounds: int = 10,
+        max_tool_rounds: int = 50,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -1354,11 +1385,12 @@ Your code runs inside 3D Slicer's Python interpreter:
             messages: Pre-built message list (including system prompt, user request, etc.)
             tools: List of tool definitions
             tool_executor: Function that executes tool calls
-            max_tool_rounds: Maximum rounds (default 10, stricter than main turn)
+            max_tool_rounds: Maximum rounds (default 50)
             on_progress: Optional progress callback
 
         Returns:
-            Dictionary with response, code, tokens, cost, timing_report, tool_calls_history
+            Dictionary with response, code, tokens, cost, timing_report, tool_calls_history,
+            intermediate_messages
         """
         if not self.api_key:
             raise RuntimeError("API key not configured")

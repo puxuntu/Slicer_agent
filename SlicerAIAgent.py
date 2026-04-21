@@ -744,7 +744,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 # Inject prior tool trajectory so LLM doesn't fix blind
                 prior_tool_messages = []
                 if self.logic and self.logic.llmClient:
-                    for msg in self.logic.llmClient.conversation_history[-15:]:
+                    for msg in self.logic.llmClient.conversation_history:
                         if msg.get('role') in ('assistant', 'tool'):
                             prior_tool_messages.append(msg)
                 if prior_tool_messages:
@@ -795,9 +795,15 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     messages=isolated_messages,
                     tools=self.logic.skillTools,
                     tool_executor=self.logic._executeTool,
-                    max_tool_rounds=10,
+                    max_tool_rounds=50,
                     on_progress=_on_correction_progress,
                 )
+                
+                # Save correction timing report
+                if self._timing and response.get('timing_report'):
+                    corrections = self._timing.get('corrections', [])
+                    if corrections:
+                        corrections[-1]['timing_report'] = response['timing_report']
                 
                 # Save response to debug file
                 try:
@@ -823,6 +829,40 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     self.codeDisplay.setPlainText(response["code"])
                     self._saveGeneratedCodeToFile(response["code"], suffix=f"_correction_{attempt}")
                     self._stopThinkingTimer("Corrected")
+                    
+                    # Update conversation_history: replace wrong code with corrected code
+                    if self.logic and self.logic.llmClient:
+                        history = self.logic.llmClient.conversation_history
+                        # Find last assistant message containing a code block and replace it
+                        for i in range(len(history) - 1, -1, -1):
+                            msg = history[i]
+                            if msg.get('role') == 'assistant' and '```' in msg.get('content', ''):
+                                history[i] = {
+                                    'role': 'assistant',
+                                    'content': response.get('message', f"```python\n{response['code']}\n```")
+                                }
+                                if response.get('reasoning_content'):
+                                    history[i]['reasoning_content'] = response['reasoning_content']
+                                break
+                        
+                        # Append correction marker
+                        history.append({
+                            'role': 'system',
+                            'content': (
+                                f"CORRECTION: The previous code failed with: {error_detail}. "
+                                f"After correction attempt {attempt + 1}, the working version is above. "
+                                f"The original search results remain valid."
+                            )
+                        })
+                        
+                        # Append compressed correction-phase tool results
+                        correction_messages = response.get('intermediate_messages', [])
+                        if correction_messages:
+                            compressed = self.logic.llmClient._compressToolResultsForHistory(
+                                correction_messages, user_prompt=original_prompt
+                            )
+                            history.extend(compressed)
+                    
                     self._autoExecuteCode(attempt + 1, max_attempts)
                 else:
                     raw_msg = response.get('message', '')[:300]
@@ -939,6 +979,15 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append(f"Self-correction attempts: {len(t['corrections'])}")
                 for corr in t['corrections']:
                     lines.append(f"  Attempt {corr['attempt']}: start={corr['start']:.3f}s")
+                    if 'timing_report' in corr:
+                        ct = corr['timing_report']
+                        lines.append(f"    API calls: {ct.get('api_calls', 0)}")
+                        lines.append(f"    Total API time: {ct.get('total_api_time', 0):.3f}s")
+                        lines.append(f"    Total tool time: {ct.get('total_tool_time', 0):.3f}s")
+                        lines.append(f"    Tool rounds: {ct.get('tool_rounds', 0)}")
+                        rounds = ct.get('rounds', [])
+                        if rounds:
+                            lines.append(f"    Rounds: {len(rounds)}")
             else:
                 lines.append("Self-correction attempts: 0")
             lines.append("")
@@ -1016,7 +1065,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 "claude-haiku-4-5-20251001",
                 "claude-haiku-4-5-20251001-thinking",
             ]
-        return ["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+        return ["kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
 
     def _defaultBaseUrlForProvider(self, provider: str) -> str:
         if provider == "Claude":
