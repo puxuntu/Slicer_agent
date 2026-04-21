@@ -12,7 +12,7 @@
 
 **SlicerAIAgent** aims to lower this barrier by letting users describe what they want in natural language, while an LLM (Kimi / Claude) reasons about the task, searches the Slicer knowledge base, and generates executable Python code automatically.
 
-The agent doesn't just "hallucinate" code. It follows a three-phase workflow: search for relevant APIs → read source files to confirm exact signatures → generate the final script.
+The agent doesn't just "hallucinate" code. It **actively searches** the Slicer source tree, documentation, and script repository using built-in tools (Grep + ReadFile), confirms exact API signatures, and then generates the final script.
 
 ---
 
@@ -48,20 +48,37 @@ The agent chains multiple Slicer operations: loading data → threshold-based se
 
 | Component | Implementation |
 |-----------|----------------|
-| **LLM Backend** | OpenAI-compatible APIs (Kimi / Claude) with streaming SSE support |
-| **Tool Calling** | Three-phase strategy: `Grep` → `ReadFile` → `Generate` |
+| **LLM Backend** | OpenAI-compatible APIs (Kimi / Claude) |
+| **Tool Calling** | Autonomous strategy: LLM decides when to `Grep`, when to `ReadFile`, and when to generate code |
 | **Code Execution** | Runs in `__main__.__dict__` (same namespace as Slicer Python Console); VTK errors are intercepted and injected into stderr |
 | **Self-Correction** | Isolated `chatIsolated()` calls on failure; failed attempts do **not** pollute `conversation_history` |
 | **Real-time Feedback** | Thinking timer (⏱) shows elapsed LLM time; per-round performance logs written to `{turn}_performance_log.txt` |
-| **Streaming UI** | Deltas are batched before `setHtml()` to prevent main-thread blocking |
 
-### Three-Phase Workflow
+### Autonomous Tool-Calling Workflow
 
-1. **Search Phase** — The LLM uses `Grep` to locate files containing relevant APIs (e.g., `downloadMRHead`, `setSliceViewerLayers`).
-2. **ReadFile Phase** — The LLM reads the full content of the most relevant files to confirm exact function signatures and usage patterns.
-3. **Generate Phase** — No tools available. The LLM writes a single ` ```python ` code block with the complete executable script.
+Unlike earlier designs that forced the LLM through rigid sequential phases, **SlicerAIAgent gives the LLM both `Grep` and `ReadFile` tools from the start**. The LLM autonomously decides:
 
-If the generated code fails at runtime (Python exception or VTK error), the agent enters **self-correction mode**: it sends an isolated prompt (original request + failed code + error) and retries execution up to 5 times.
+1. **Search** — Call `Grep` to locate files containing relevant APIs (e.g., `downloadMRHead`, `setSliceViewerLayers`). Multiple searches can be batched in parallel.
+2. **Read** — Call `ReadFile` to read the full content of the most relevant files to confirm exact function signatures and usage patterns. Multiple files can be read in parallel.
+3. **Generate** — When the LLM has enough information, it outputs a single ` ```python ` code block and the loop terminates immediately.
+
+There are **no forced phase transitions** and **no transition messages**. The system only provides tools and detects the termination signal (a ` ```python` code block).
+
+### Performance Optimization
+
+| Optimization | Description | Impact |
+|-------------|-------------|--------|
+| **Eliminated transition rounds** | Removed rigid phase restrictions that caused ~57% API time waste (132s of 231s) on empty "phase switching" rounds | **~2× speedup** on typical tasks |
+| **Parallel tool execution** | Grep and ReadFile calls within the same round are executed concurrently via `ThreadPoolExecutor` | Reduces wall-clock tool time |
+| **Local result compression** | ReadFile results are compressed deterministically (keep code blocks, truncate prose) before persisting to history | Prevents context bloat without extra LLM calls |
+| **Batched UI updates** | Streaming deltas are accumulated and flushed in batches rather than per-delta | Eliminates main-thread blocking |
+
+### Safety & Reliability
+
+- **Syntax pre-validation** — Generated code is checked with `ast.parse` before execution.
+- **Forbidden module list** — Code using `os`, `subprocess`, `eval`, `pickle`, `urllib`, etc. is rejected.
+- **Self-correction loop** — If execution fails (Python exception or VTK error), the agent builds an isolated prompt (original request + failed code + error) and retries up to 5 times.
+- **Conversation history isolation** — Failed self-correction attempts never pollute the main conversation context.
 
 ---
 
