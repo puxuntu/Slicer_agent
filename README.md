@@ -56,19 +56,19 @@ The agent chains multiple Slicer operations: loading data → threshold-based se
 
 ### Autonomous Tool-Calling Workflow
 
-Unlike earlier designs that forced the LLM through rigid sequential phases, **SlicerAIAgent gives the LLM both `Grep` and `ReadFile` tools from the start**. The LLM autonomously decides:
+**SlicerAIAgent gives the LLM both `Grep` and `ReadFile` tools from the start**, letting it autonomously decide the best path to a solution:
 
 1. **Search** — Call `Grep` to locate files containing relevant APIs (e.g., `downloadMRHead`, `setSliceViewerLayers`). Multiple searches can be batched in parallel.
 2. **Read** — Call `ReadFile` to read the full content of the most relevant files to confirm exact function signatures and usage patterns. Multiple files can be read in parallel.
 3. **Generate** — When the LLM has enough information, it outputs a single ` ```python ` code block and the loop terminates immediately.
 
-There are **no forced phase transitions** and **no transition messages**. The system only provides tools and detects the termination signal (a ` ```python` code block).
+The system simply provides the tools and waits for the LLM to output a ` ```python` code block — no manual phase orchestration required.
 
 ### Performance Optimization
 
 | Optimization | Description | Impact |
 |-------------|-------------|--------|
-| **Eliminated transition rounds** | Removed rigid phase restrictions that caused ~57% API time waste (132s of 231s) on empty "phase switching" rounds | **~2× speedup** on typical tasks |
+| **Zero-wait tool orchestration** | The LLM controls the entire workflow — searching, reading, and generating without any system-imposed phase switches or idle API rounds | **~2× speedup** on typical tasks |
 | **Parallel tool execution** | Grep and ReadFile calls within the same round are executed concurrently via `ThreadPoolExecutor` | Reduces wall-clock tool time |
 | **Local result compression** | ReadFile results are compressed deterministically (keep code blocks, truncate prose) before persisting to history | Prevents context bloat without extra LLM calls |
 | **Batched UI updates** | Streaming deltas are accumulated and flushed in batches rather than per-delta | Eliminates main-thread blocking |
