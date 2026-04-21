@@ -10,9 +10,7 @@
 
 ### The Gap for Clinical Users
 
-When a clinician opens 3D Slicer, they already have a **clear goal in mind**: *"I have a patient's pre-operative CT and a 6-month follow-up CT after mandible reconstruction. I need to load both DICOM series, register the follow-up to the pre-op scan, segment the mandible bone at both time points, build 3D surface models, overlay them to visualize alignment, compute bone volume changes to evaluate graft integration, highlight areas of bone resorption and new bone growth with different colors, and save the annotated 3D scene for the surgical team."*
-
-The input data and the desired outcome are well-defined. But the path from intent to result is anything but straightforward:
+When a clinician opens 3D Slicer, they already have a **clear goal in mind**. The input data and the desired outcome are well-defined, but the path from intent to result is anything but straightforward:
 
 - Navigating a complex UI with dozens of modules, panels, and menus
 - Switching back and forth between segmentation tools, volume rendering settings, and 3D view controls
@@ -120,3 +118,5 @@ The system simply provides the tools and waits for the LLM to output a ` ```pyth
 * **[SlicerDeveloperAgent](https://github.com/muratmaga/SlicerDeveloperAgent)** — A Slicer extension by Murat Maga that embeds an AI coding agent directly inside 3D Slicer using Gemini, letting users prompt, run, and iterate on scripts and modules without leaving the application. See the [Discourse discussion](https://discourse.slicer.org/t/developer-agent-for-slicer/44787) for background.
 * **[NA-MIC Project Week 44 — Claude Scientific Skill for Imaging Data Commons](https://projectweek.na-mic.org/PW44_2026_GranCanaria/Projects/ClaudeScientificSkillForImagingDataCommons/)** — A project that developed a Claude skill for the [Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov/) (IDC), published at [ImagingDataCommons/idc-claude-skill](https://github.com/ImagingDataCommons/idc-claude-skill).
 * **[SlicerChat: Building a Local Chatbot for 3D Slicer](https://arxiv.org/abs/2407.11987)** (Barr, 2024) — Explores integrating a locally-run LLM (Code-Llama Instruct) into 3D Slicer to assist users with the software's steep learning curve, investigating the effects of fine-tuning, model size, and domain knowledge (Python samples, Markdown docs, Discourse forums) on answer quality.
+* **[Talk2View](https://talk2view.com/)** — A platform for conversational interaction with medical imaging data and visualization tools.
+
