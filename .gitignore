@@ -48,6 +48,7 @@ Resources/Skills/slicer-skill-full/**
 *_prompt_debug.txt
 *_code.txt
 *_performance_log.txt
+test_prompt_*.txt
 
 # Internal documentation (not published)
 EXECUTION_FLOW.md
