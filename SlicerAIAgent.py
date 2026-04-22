@@ -736,29 +736,32 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if self.logic and self.logic.llmClient:
             self.logic.llmClient.debug_suffix = "_correction"
         
+        # Build system prompt on the main thread BEFORE starting the background thread.
+        # _buildSceneContext() calls slicer.mrmlScene.GetSceneXMLString() which is a Qt
+        # method and must run on the main thread.
+        system_content = "You are an expert 3D Slicer Python coding assistant."
+        if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_buildSystemPrompt'):
+            try:
+                context = {"scene": self.logic._buildSceneContext()} if self.logic else None
+                system_content = self.logic.llmClient._buildSystemPrompt(context)
+            except Exception:
+                if hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
+                    system_content = self.logic.llmClient._loadSystemPromptTemplate()
+        elif self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
+            system_content = self.logic.llmClient._loadSystemPromptTemplate()
+        
         # Capture state needed by the background thread
         _logic = self.logic
         _currentCode = self.currentCode
         _lastUserPrompt = getattr(self, '_lastUserPrompt', '')
         _currentTurn = getattr(self, '_currentTurn', 1)
+        _system_content = system_content
         
         def _run_correction():
             """Run chatWithToolsIsolated in a background thread so the main Qt event loop
             stays alive and _processStreamQueue can consume progress deltas in real time."""
             try:
-                # Build isolated context with prior search results retained
-                system_content = "You are an expert 3D Slicer Python coding assistant."
-                if _logic and _logic.llmClient and hasattr(_logic.llmClient, '_buildSystemPrompt'):
-                    try:
-                        context = {"scene": _logic._buildSceneContext()} if _logic else None
-                        system_content = _logic.llmClient._buildSystemPrompt(context)
-                    except Exception:
-                        if hasattr(_logic.llmClient, '_loadSystemPromptTemplate'):
-                            system_content = _logic.llmClient._loadSystemPromptTemplate()
-                elif _logic and _logic.llmClient and hasattr(_logic.llmClient, '_loadSystemPromptTemplate'):
-                    system_content = _logic.llmClient._loadSystemPromptTemplate()
-                
-                isolated_messages = [{'role': 'system', 'content': system_content}]
+                isolated_messages = [{'role': 'system', 'content': _system_content}]
                 
                 if _lastUserPrompt:
                     isolated_messages.append({'role': 'user', 'content': _lastUserPrompt})
