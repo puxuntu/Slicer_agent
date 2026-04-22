@@ -899,6 +899,27 @@ def get_skill_tools() -> List[Dict]:
         {
             "type": "function",
             "function": {
+                "name": "Glob",
+                "description": "List files matching a glob pattern (e.g., '*.py', '*.h', '*Test*') within a directory tree. Recursively searches subdirectories. Returns up to 20 matches. Use this to explore directory contents or find all files of a certain type.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {
+                            "type": "string",
+                            "description": "Glob pattern (e.g., '*.py', 'vtkMRML*.h', '*Test*')"
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Relative path within skill to search under (e.g., 'slicer-source/Modules/Loadable/Volumes')"
+                        }
+                    },
+                    "required": ["pattern", "path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "ReadFile",
                 "description": "Read the content of a file from the skill knowledge base. For files under 500 lines, returns the full content. For larger files, provide a 'query' parameter to extract only relevant sections (e.g., the function or heading matching your keyword).",
                 "parameters": {

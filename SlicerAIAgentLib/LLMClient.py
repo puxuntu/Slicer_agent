@@ -404,7 +404,7 @@ class LLMClient:
             "The agent is running with a minimal fallback prompt. "
             "Please check that Resources/Prompts/system_prompt.md exists.\n\n"
             "You are an expert 3D Slicer Python coding assistant. "
-            "Use FindFile, SearchSymbol, Grep, and ReadFile tools to find API information, then output code."
+            "Use FindFile, SearchSymbol, Grep, Glob, and ReadFile tools to find API information, then output code."
         )
 
     def _buildSystemPrompt(self, context: Optional[Dict] = None) -> str:
@@ -425,7 +425,7 @@ class LLMClient:
         import platform
         base_prompt += f"\n\n## PLATFORM INFORMATION\n"
         base_prompt += f"Current Platform: {platform.system()}\n"
-        base_prompt += "The search tools (FindFile, SearchSymbol, Grep, ReadFile) handle platform differences automatically.\n"
+        base_prompt += "The search tools (FindFile, SearchSymbol, Grep, Glob, ReadFile) handle platform differences automatically.\n"
         base_prompt += "You only need to specify the relative path within the skill directory. "
         base_prompt += "Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths — the tool handles this automatically.\n"
 
@@ -1219,7 +1219,7 @@ class LLMClient:
         """
         Send a chat request with tool calling support.
 
-        The LLM has access to ALL tools (FindFile, SearchSymbol, Grep, ReadFile) from the start and autonomously
+        The LLM has access to ALL tools (FindFile, SearchSymbol, Grep, Glob, ReadFile) from the start and autonomously
         decides when to search, when to read, and when to generate code. The loop terminates
         when the LLM outputs a ```python code block.
 
