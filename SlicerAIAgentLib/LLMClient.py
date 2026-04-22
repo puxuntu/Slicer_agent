@@ -298,7 +298,8 @@ class LLMClient:
         system_content = self._buildSystemPrompt(context)
         messages.append({"role": "system", "content": system_content})
 
-        history_to_include = self.conversation_history[-200:]  # Keep last 200 messages for context
+        # FIFO character-based history limit: keep non-system history within 100,000 chars
+        history_to_include = self._trimHistoryFIFO(self.conversation_history)
         messages.extend(history_to_include)
 
         messages.append({"role": "user", "content": prompt})
@@ -330,6 +331,19 @@ class LLMClient:
 
         return messages
 
+    def _trimHistoryFIFO(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Trim conversation history to stay within 100,000 total characters.
+        Uses FIFO: drops the oldest messages first. All roles count toward the limit.
+        """
+        MAX_HISTORY_CHARS = 500_000
+        trimmed = list(history)
+        total_chars = sum(len(str(m.get('content', ''))) for m in trimmed)
+        while total_chars > MAX_HISTORY_CHARS and trimmed:
+            removed = trimmed.pop(0)
+            total_chars -= len(str(removed.get('content', '')))
+        return trimmed
+
     def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Build the API payload for chat completion requests."""
         if self._isClaude():
@@ -337,7 +351,7 @@ class LLMClient:
             payload: Dict[str, Any] = {
                 "model": self.model,
                 "messages": claude_messages,
-                "max_tokens": 4096,
+                "max_tokens": 8192,
             }
             if system:
                 payload["system"] = system
@@ -565,65 +579,38 @@ class LLMClient:
 
     def _compressReadFileResult(self, full_content: str, grep_keywords: List[str] = None) -> str:
         """
-        Three-layer deterministic compression for ReadFile results.
-        
-        Layer 1: Extract all ```python code blocks (highest priority, never truncated).
-        Layer 2: Paragraph-aware extraction for prose matching grep keywords.
-        Layer 3: Fallback truncation to first 1200 chars.
+        Keep only paragraphs matching grep keywords.
+        If no keywords provided, return original content unchanged.
         
         Args:
             full_content: The full file content from ReadFile.
             grep_keywords: Optional list of grep patterns that led to this ReadFile.
-                          Used for paragraph-aware context extraction.
         
         Returns:
-            Compressed content string.
+            Filtered content string (paragraphs matching keywords, or original if no keywords).
         """
+        if not grep_keywords:
+            return full_content
+        
         parts = []
+        paragraphs = full_content.split('\n\n')
+        for keyword in grep_keywords:
+            if not keyword:
+                continue
+            keyword_lower = keyword.lower()
+            for para in paragraphs:
+                if keyword_lower in para.lower():
+                    stripped = para.strip()
+                    if stripped and stripped not in parts:
+                        parts.append(stripped)
+                    break  # Only first matching paragraph per keyword
         
-        # Layer 1: Extract all ```python code blocks (complete, never truncated)
-        code_blocks = re.findall(r'```python\s*\n(.*?)\n```', full_content, re.DOTALL)
-        if code_blocks:
-            parts.extend(['```python\n' + cb + '\n```' for cb in code_blocks])
-        
-        # Layer 2: Paragraph-aware extraction for prose
-        if grep_keywords:
-            paragraphs = full_content.split('\n\n')
-            for keyword in grep_keywords:
-                if not keyword:
-                    continue
-                keyword_lower = keyword.lower()
-                for para in paragraphs:
-                    if keyword_lower in para.lower():
-                        stripped = para.strip()
-                        if stripped and stripped not in parts:
-                            parts.append(stripped)
-                        break  # Only first matching paragraph per keyword
-        
-        # Layer 3: Fallback truncation
-        if not parts:
-            truncated = full_content[:1200]
-            if len(full_content) > 1200:
-                truncated += f"\n... [truncated from {len(full_content)} chars]"
-            parts.append(truncated)
-        
-        return '\n\n'.join(parts)
+        return '\n\n'.join(parts) if parts else full_content
 
     def _compressGrepResult(self, result_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Compress Grep results when they exceed a threshold.
-        Keeps first 60 lines, truncates the rest with a hint.
+        Grep results are kept in full; no truncation is applied.
         """
-        content = result_data.get('content', '')
-        lines = content.split('\n')
-        if len(lines) <= 100:
-            return result_data
-        
-        kept_lines = lines[:60]
-        truncated_count = len(lines) - 60
-        kept_lines.append(f"... [{truncated_count} more matches truncated]")
-        kept_lines.append("Use ReadFile to see full context of the most relevant files above.")
-        result_data['content'] = '\n'.join(kept_lines)
         return result_data
 
     def _compressMessagesForGenerate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -641,18 +628,14 @@ class LLMClient:
                         full_content = data.get('content', '')
                         data['content'] = self._compressReadFileResult(full_content)
                         data.pop('size', None)
-                        compressed.append({
-                            'role': 'tool',
-                            'tool_call_id': msg.get('tool_call_id', ''),
-                            'content': json.dumps(data, ensure_ascii=False),
-                        })
+                        new_msg = dict(msg)
+                        new_msg['content'] = json.dumps(data, ensure_ascii=False)
+                        compressed.append(new_msg)
                     elif tool_name == 'Grep':
                         data = self._compressGrepResult(data)
-                        compressed.append({
-                            'role': 'tool',
-                            'tool_call_id': msg.get('tool_call_id', ''),
-                            'content': json.dumps(data, ensure_ascii=False),
-                        })
+                        new_msg = dict(msg)
+                        new_msg['content'] = json.dumps(data, ensure_ascii=False)
+                        compressed.append(new_msg)
                     else:
                         compressed.append(msg)
                 except Exception:
@@ -682,11 +665,9 @@ class LLMClient:
                         data['content'] = self._compressReadFileResult(full_content)
                         data.pop('size', None)
                         data.pop('total_lines', None)
-                        compressed.append({
-                            'role': 'tool',
-                            'tool_call_id': msg.get('tool_call_id', ''),
-                            'content': json.dumps(data, ensure_ascii=False),
-                        })
+                        new_msg = dict(msg)
+                        new_msg['content'] = json.dumps(data, ensure_ascii=False)
+                        compressed.append(new_msg)
                     elif tool_name == 'Grep':
                         # Grep results are usually short; keep as-is for history
                         compressed.append(msg)
@@ -1041,12 +1022,6 @@ class LLMClient:
         for round_num in range(max_tool_rounds):
             logger.info(f"Tool calling round {round_num + 1}")
             round_start = time.time()
-
-            # Compress messages if conversation grows too large
-            total_chars = sum(len(str(m.get('content', ''))) for m in messages)
-            if total_chars > 100000:
-                logger.info(f"Message length {total_chars} exceeds 100000, compressing tool results")
-                messages = self._compressMessagesForGenerate(messages)
 
             logger.debug(f"Payload messages count: {len(messages)}")
 

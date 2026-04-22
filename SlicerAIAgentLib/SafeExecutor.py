@@ -61,7 +61,6 @@ class SafeExecutor:
             timeout: Execution timeout in seconds (default: 30)
         """
         self.timeout = timeout or self.DEFAULT_TIMEOUT
-        self.execution_history = []
         self._globals_dict = self._buildGlobals()
         self._execution_start_time = None
         self._should_cancel = False
@@ -266,21 +265,6 @@ class SafeExecutor:
         if len(output) > self.MAX_OUTPUT_LENGTH:
             output = output[:self.MAX_OUTPUT_LENGTH] + "\n... [output truncated]"
         
-        # Record in history
-        execution_record = {
-            "timestamp": self._execution_start_time.isoformat(),
-            "code": code,
-            "success": error_msg is None and not timed_out,
-            "execution_time": execution_time,
-            "timed_out": timed_out,
-        }
-        if error_msg:
-            execution_record["error"] = error_msg
-        
-        self.execution_history.append(execution_record)
-        if len(self.execution_history) > 50:
-            self.execution_history = self.execution_history[-50:]
-        
         self._execution_start_time = None
         
         return {
@@ -320,14 +304,6 @@ class SafeExecutor:
         # Schedule execution on main thread via QTimer
         qt.QTimer.singleShot(10, executeAndCallback)
         
-    def getHistory(self) -> list:
-        """Get execution history."""
-        return self.execution_history.copy()
-        
-    def clearHistory(self):
-        """Clear execution history."""
-        self.execution_history = []
-        
     def addGlobal(self, name: str, value: Any):
         """
         Add a global variable for code execution.
@@ -350,5 +326,4 @@ class SafeExecutor:
             
     def cleanup(self):
         """Cleanup resources."""
-        self.execution_history = []
         # Do not reset _globals_dict since it points to __main__.__dict__

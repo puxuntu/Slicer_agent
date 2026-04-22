@@ -729,11 +729,18 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     self.logic.llmClient.debug_suffix = "_correction"
                 
                 # Build isolated context with prior search results retained
-                system_content = ""
-                if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
+                # Use _buildSystemPrompt (includes current MRML scene) instead of static template
+                system_content = "You are an expert 3D Slicer Python coding assistant."
+                if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_buildSystemPrompt'):
+                    try:
+                        context = {"scene": self.logic._buildSceneContext()} if self.logic else None
+                        system_content = self.logic.llmClient._buildSystemPrompt(context)
+                    except Exception:
+                        # Fall back to static template if dynamic build fails
+                        if hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
+                            system_content = self.logic.llmClient._loadSystemPromptTemplate()
+                elif self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
                     system_content = self.logic.llmClient._loadSystemPromptTemplate()
-                if not system_content:
-                    system_content = "You are an expert 3D Slicer Python coding assistant."
                 
                 isolated_messages = [{'role': 'system', 'content': system_content}]
                 
@@ -1378,14 +1385,32 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def addExecutionFeedback(self, feedback_text):
         """
-        Append code execution feedback to the LLM conversation history
-        so the model can reason about previous execution outcomes.
+        Append code execution feedback to the LLM conversation history.
+        Only keeps the most recent 2 feedback messages to prevent context bloat.
         """
-        if self.llmClient:
-            self.llmClient.conversation_history.append({
-                "role": "system",
-                "content": feedback_text,
-            })
+        if not self.llmClient:
+            return
+        
+        history = self.llmClient.conversation_history
+        MAX_FEEDBACK = 2
+        
+        # Find indices of existing execution feedback messages
+        feedback_indices = [
+            i for i, msg in enumerate(history)
+            if msg.get('role') == 'system'
+            and msg.get('content', '').startswith('Code execution result:')
+        ]
+        
+        # Remove oldest ones, keeping at most (MAX_FEEDBACK - 1) recent ones
+        # We delete from back to front so indices don't shift underneath us
+        to_remove = feedback_indices[:-(MAX_FEEDBACK - 1)] if len(feedback_indices) >= MAX_FEEDBACK else []
+        for idx in reversed(to_remove):
+            history.pop(idx)
+        
+        history.append({
+            "role": "system",
+            "content": feedback_text,
+        })
     
     def _executeTool(self, tool_name, tool_args):
         """

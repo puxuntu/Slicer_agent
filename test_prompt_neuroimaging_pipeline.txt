@@ -1,0 +1,17 @@
+Load the MRHead sample volume and execute the following advanced neuroimaging analysis pipeline. Do this as a single integrated script:
+
+1. Brain extraction: Use the Segment Editor to create a segmentation node. Add a segment for the brain mask and apply thresholding with Otsu auto-threshold to strip the skull from the MRHead volume.
+
+2. Ventricle segmentation: Add a second segment for the lateral ventricles. Use a manual threshold range of 15–25 Hounsfield Units to isolate the CSF-filled ventricles. Run the "Smoothing" effect with a 3D Gaussian kernel of 1.0 mm to clean up noise.
+
+3. 3D surface reconstruction: Export both the brain mask and ventricle segments as closed surface models. Apply a Laplacian smoothing filter with 10 iterations and 0.5 mm relaxation factor to the ventricle model.
+
+4. Anatomical landmarking: Place fiducial landmarks at the following structures using the Markups module: (a) anterior commissure, (b) posterior commissure, (c) apex of the fourth ventricle. Name each fiducial clearly.
+
+5. Corpus callosum ROI: Create a closed curve markup in the sagittal slice view tracing the outline of the corpus callosum (genu, body, and splenium). Use this curve to define a custom region of interest.
+
+6. Volume rendering setup: Configure a GPU volume rendering display node for the original MRHead with a custom scalar opacity transfer function: fully transparent below 10, linear ramp from 10–30 (CSF), plateau from 30–80 (gray matter), and high intensity from 80–200 (white matter). Set a gray→white color transfer function.
+
+7. Quantitative analysis: Calculate and print three metrics with 2-decimal precision: (a) total intracranial volume (cm³), (b) ventricular CSF volume (cm³), (c) ventricle-to-cranial-volume ratio as a percentage.
+
+8. Export pipeline: Export the ventricle surface model as an STL file to ~/slicer_output/ventricles.stl. Export the segmentation as a NIfTI label map to ~/slicer_output/segmentation.nii.gz. Create a screenshot of the 3D view with volume rendering and save it to ~/slicer_output/rendering.png.

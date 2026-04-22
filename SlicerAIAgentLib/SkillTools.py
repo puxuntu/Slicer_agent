@@ -137,8 +137,8 @@ class SkillToolExecutor:
 
     def _grep(self, pattern: str, path: str) -> Dict:
         """
-        Search for pattern in files.
-        Cross-platform implementation: ripgrep > platform-native > Python fallback.
+        Search for pattern in files using ripgrep.
+        Requires ripgrep (rg) to be installed.
         """
         # Normalize path
         if not os.path.isabs(path):
@@ -147,27 +147,21 @@ class SkillToolExecutor:
         if not os.path.exists(path):
             return {"error": f"Path not found: {path}"}
 
-        results = []
+        # Require ripgrep
+        if not self._find_rg():
+            return {
+                "error": (
+                    "ripgrep (rg) is not installed. "
+                    "Please install ripgrep and ensure it is in your PATH. "
+                    "Download: https://github.com/BurntSushi/ripgrep#installation"
+                )
+            }
 
-        # Priority 1: ripgrep (fastest, all platforms)
         try:
             results = self._grep_rg(pattern, path)
         except Exception as e:
             logger.warning(f"rg search failed: {e}")
-
-        # Priority 2: platform-native tools
-        if not results:
-            try:
-                if self.platform == "windows":
-                    results = self._grep_windows_native(pattern, path)
-                else:
-                    results = self._grep_unix(pattern, path)
-            except Exception as e:
-                logger.warning(f"Platform-native grep failed: {e}")
-
-        # Priority 3: pure Python fallback
-        if not results:
-            results = self._grep_python(pattern, path)
+            results = []
 
         return {
             "tool": "Grep",
@@ -177,93 +171,7 @@ class SkillToolExecutor:
             "count": len(results)
         }
 
-    def _grep_windows_native(self, pattern: str, path: str) -> List[Dict]:
-        """Windows fallback: PowerShell Select-String."""
-        results = []
-        escaped_pattern = pattern.replace("'", "''")
-        ps_cmd = rf'Select-String -Path "{path}\*" -Pattern \'{escaped_pattern}\' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20 | ForEach-Object {{ "{{0}}:{{1}}:{{2}}" -f $_.Path,$_.LineNumber,$_.Line }}'
 
-        try:
-            result = subprocess.run(
-                ["powershell", "-Command", ps_cmd],
-                capture_output=True,
-                timeout=30
-            )
-            stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
-            if result.returncode == 0 or stdout:
-                for line in stdout.strip().split('\n'):
-                    line = line.strip()
-                    if ':' in line:
-                        parts = line.split(':', 2)
-                        if len(parts) >= 3:
-                            results.append({
-                                "file": parts[0],
-                                "line": int(parts[1]) if parts[1].isdigit() else 0,
-                                "content": parts[2][:200]
-                            })
-        except Exception as e:
-            logger.warning(f"PowerShell grep failed: {e}")
-        return results
-
-    def _grep_unix(self, pattern: str, path: str) -> List[Dict]:
-        """Unix fallback: system grep."""
-        results = []
-        try:
-            result = subprocess.run(
-                ["grep", "-r", "-n", "-i", pattern, path],
-                capture_output=True,
-                timeout=30
-            )
-            stdout = result.stdout.decode('utf-8', errors='ignore') if result.stdout else ""
-            if result.returncode in [0, 1]:
-                lines = stdout.strip().split('\n')[:20]
-                for line in lines:
-                    if ':' in line:
-                        parts = line.split(':', 2)
-                        if len(parts) >= 3:
-                            results.append({
-                                "file": parts[0],
-                                "line": int(parts[1]) if parts[1].isdigit() else 0,
-                                "content": parts[2][:200]
-                            })
-        except Exception as e:
-            logger.warning(f"Unix grep failed: {e}")
-        return results
-    
-    def _grep_python(self, pattern: str, path: str) -> List[Dict]:
-        """Pure Python grep implementation (fallback)."""
-        results = []
-        regex = re.compile(pattern, re.IGNORECASE)
-        
-        if os.path.isfile(path):
-            files = [path]
-        else:
-            files = []
-            for root, _, filenames in os.walk(path):
-                for filename in filenames:
-                    if filename.endswith(('.md', '.py', '.h', '.cxx', '.cpp', '.txt')):
-                        files.append(os.path.join(root, filename))
-                if len(files) > 100:  # Limit files
-                    break
-        
-        for filepath in files[:50]:  # Limit files
-            try:
-                with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                    for i, line in enumerate(f, 1):
-                        if regex.search(line):
-                            results.append({
-                                "file": filepath,
-                                "line": i,
-                                "content": line.strip()[:200]  # Limit length
-                            })
-                            if len(results) >= 20:
-                                break
-                        if i > 1000:  # Limit lines per file
-                            break
-            except:
-                continue
-        
-        return results
     
     def _readfile(self, path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> Dict:
         """Read the full file content. Line range parameters are ignored to ensure the LLM always receives complete context in the current turn."""
