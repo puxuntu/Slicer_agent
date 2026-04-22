@@ -441,11 +441,15 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streaming = False
         self._finalizeStreamingEntry()
 
-        # Record LLM internal timing
+        # Record LLM internal timing and token usage
         if self._timing:
             self._timing['llm_timing'] = response.get('timing_report', {})
             import time
             self._timing['generation_complete'] = time.time()
+            if response.get('tokens'):
+                self._timing['tokens'] = response['tokens']
+            if response.get('cost') is not None:
+                self._timing['cost'] = response['cost']
 
         # Display generated code if any and auto-execute
         if response.get("code"):
@@ -572,6 +576,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 tokens = response["tokens"]
                 cost = response.get("cost", 0)
                 self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
+                if self._timing:
+                    self._timing['tokens'] = tokens
+                    self._timing['cost'] = cost
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -806,11 +813,16 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     on_progress=_on_correction_progress,
                 )
                 
-                # Save correction timing report
-                if self._timing and response.get('timing_report'):
+                # Save correction timing report and token usage
+                if self._timing:
                     corrections = self._timing.get('corrections', [])
                     if corrections:
-                        corrections[-1]['timing_report'] = response['timing_report']
+                        if response.get('timing_report'):
+                            corrections[-1]['timing_report'] = response['timing_report']
+                        if response.get('tokens'):
+                            corrections[-1]['tokens'] = response['tokens']
+                        if response.get('cost') is not None:
+                            corrections[-1]['cost'] = response['cost']
                 
                 # Save response to debug file
                 try:
@@ -912,6 +924,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if 'turn_start' in t and 'execution_end' in t:
                 total = t['execution_end'] - t['turn_start']
                 lines.append(f"Turn wall-clock time (including execution): {total:.3f}s")
+            if 'tokens' in t:
+                lines.append(f"Main generation tokens: {t['tokens']}")
+            if 'cost' in t:
+                lines.append(f"Main generation cost: ${t['cost']:.4f}")
             lines.append("")
 
             # Context building
@@ -942,10 +958,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     lines.append("  Per-round breakdown:")
                     for r in rounds:
                         tools = ', '.join(r.get('tools', [])) or 'done'
+                        tok = r.get('tokens', 0)
+                        tok_str = f" tokens={tok}" if tok else ""
                         lines.append(
                             f"    Round {r['round']} | "
                             f"api={r['api_time']:.3f}s tool={r.get('tool_time', 0):.3f}s "
-                            f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]"
+                            f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]{tok_str}"
                         )
             lines.append("")
 
@@ -986,6 +1004,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append(f"Self-correction attempts: {len(t['corrections'])}")
                 for corr in t['corrections']:
                     lines.append(f"  Attempt {corr['attempt']}: start={corr['start']:.3f}s")
+                    if 'tokens' in corr:
+                        lines.append(f"    Tokens: {corr['tokens']}")
+                    if 'cost' in corr:
+                        lines.append(f"    Cost: ${corr['cost']:.4f}")
                     if 'timing_report' in corr:
                         ct = corr['timing_report']
                         lines.append(f"    API calls: {ct.get('api_calls', 0)}")
@@ -997,6 +1019,17 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                             lines.append(f"    Rounds: {len(rounds)}")
             else:
                 lines.append("Self-correction attempts: 0")
+            lines.append("")
+
+            # Token & Cost summary
+            total_tokens = t.get('tokens', 0)
+            total_cost = t.get('cost', 0.0)
+            if 'corrections' in t:
+                for corr in t['corrections']:
+                    total_tokens += corr.get('tokens', 0)
+                    total_cost += corr.get('cost', 0.0)
+            lines.append(f"TOTAL TOKENS (main + corrections): {total_tokens}")
+            lines.append(f"TOTAL COST (main + corrections): ${total_cost:.4f}")
             lines.append("")
             lines.append("="*50)
 

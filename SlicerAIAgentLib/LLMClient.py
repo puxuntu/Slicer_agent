@@ -992,6 +992,7 @@ class LLMClient:
             'total_api_time': 0.0,
             'total_tool_time': 0.0,
             'total_other_time': 0.0,
+            'total_tokens': 0,
             'rounds': [],
         }
 
@@ -1019,6 +1020,9 @@ class LLMClient:
                 tool_calls = assistant_message.get('tool_calls')
 
                 if not tool_calls:
+                    usage = data.get('usage', {})
+                    round_tokens = usage.get('total_tokens', 0)
+                    timing_report['total_tokens'] += round_tokens
                     timing_report['api_calls'] += 1
                     timing_report['total_api_time'] += api_time
                     other_time = max(0, time.time() - round_start - api_time)
@@ -1034,6 +1038,7 @@ class LLMClient:
                         'other_time': round(other_time, 3),
                         'round_time': round(time.time() - round_start, 3),
                         'tools': [],
+                        'tokens': round_tokens,
                     })
 
                     if code:
@@ -1117,6 +1122,9 @@ class LLMClient:
                     tool_names.append(out["name"])
 
                 tool_time = time.time() - tool_start
+                usage = data.get('usage', {})
+                round_tokens = usage.get('total_tokens', 0)
+                timing_report['total_tokens'] += round_tokens
                 timing_report['api_calls'] += 1
                 timing_report['tool_rounds'] += 1
                 timing_report['total_api_time'] += api_time
@@ -1141,6 +1149,7 @@ class LLMClient:
                     'other_time': round(other_time, 3),
                     'round_time': round(time.time() - round_start, 3),
                     'tools': tool_names,
+                    'tokens': round_tokens,
                 })
 
                 assistant_msg = {
