@@ -176,11 +176,15 @@ class SafeExecutor:
         timed_out = False
         
         # Snapshot MRML scene state before execution so we can roll back on failure.
-        # SaveStateForUndo() captures all undo-enabled nodes; Undo() restores them.
-        # This prevents partial side effects (loaded volumes, created segmentations)
-        # from accumulating across self-correction attempts.
+        # Layer 1: SaveStateForUndo() / Undo() — handles undo-enabled nodes and
+        #   property changes on existing nodes.
+        # Layer 2: Node-ID-based cleanup — deletes any nodes whose IDs did not
+        #   exist before execution. This catches nodes that SaveStateForUndo()
+        #   misses because their UndoEnabled flag is False (common for display
+        #   nodes, storage nodes, and subject-hierarchy items).
         _undo_flag_before = False
         _undo_snapshot_taken = False
+        _node_ids_before = set()
         try:
             _undo_flag_before = slicer.mrmlScene.GetUndoFlag()
             if not _undo_flag_before:
@@ -188,7 +192,15 @@ class SafeExecutor:
             slicer.mrmlScene.SaveStateForUndo()
             _undo_snapshot_taken = True
         except Exception:
-            # If snapshot fails (e.g., scene is in an unusual state), proceed without it
+            pass
+        
+        # Record node IDs before execution (Layer 2 fallback).
+        try:
+            for i in range(slicer.mrmlScene.GetNumberOfNodes()):
+                node = slicer.mrmlScene.GetNthNode(i)
+                if node and node.GetID():
+                    _node_ids_before.add(node.GetID())
+        except Exception:
             pass
         
         # Temporarily redirect VTK error/warning output so that C++ layer messages
@@ -246,12 +258,27 @@ class SafeExecutor:
                     pass
             
             # Roll back MRML scene state if execution failed.
-            # This prevents partial side effects from accumulating across
-            # self-correction attempts (duplicate volumes, segmentations, etc.).
+            # Layer 1: Undo — restores undo-enabled nodes and their properties.
             if _undo_snapshot_taken and (error_msg is not None or timed_out):
                 try:
                     slicer.mrmlScene.Undo()
                     slicer.mrmlScene.ClearRedoStack()
+                except Exception:
+                    pass
+            
+            # Layer 2: Delete any nodes that were created during execution but
+            # were not captured by the undo snapshot (e.g., nodes with
+            # UndoEnabled=False such as display nodes, storage nodes, or
+            # subject-hierarchy items).
+            if _node_ids_before and (error_msg is not None or timed_out):
+                try:
+                    nodes_to_remove = []
+                    for i in range(slicer.mrmlScene.GetNumberOfNodes()):
+                        node = slicer.mrmlScene.GetNthNode(i)
+                        if node and node.GetID() and node.GetID() not in _node_ids_before:
+                            nodes_to_remove.append(node)
+                    for node in nodes_to_remove:
+                        slicer.mrmlScene.RemoveNode(node)
                 except Exception:
                     pass
             
