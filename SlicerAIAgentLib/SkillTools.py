@@ -308,9 +308,16 @@ class SkillToolExecutor:
             rg_exe, "-i", "--count-matches", "--no-heading",
             pattern, path,
         ]
+        # --- TEMP DEBUG for single-file 0-hits issue ---
+        print(f"[DEBUG Grep] count_cmd: {count_cmd}")
+        print(f"[DEBUG Grep] path exists: {os.path.exists(path)}, is_file: {os.path.isfile(path)}, is_dir: {os.path.isdir(path)}")
         try:
             count_result = subprocess.run(count_cmd, capture_output=True, timeout=15)
+            print(f"[DEBUG Grep] returncode: {count_result.returncode}")
+            print(f"[DEBUG Grep] stdout: {count_result.stdout.decode('utf-8', errors='ignore')[:500]!r}")
+            print(f"[DEBUG Grep] stderr: {count_result.stderr.decode('utf-8', errors='ignore')[:500]!r}")
         except Exception as e:
+            print(f"[DEBUG Grep] exception: {e}")
             return {"error": f"ripgrep count failed: {e}"}
 
         file_hits = {}
@@ -330,6 +337,7 @@ class SkillToolExecutor:
                             total_hits += count
                     except ValueError:
                         pass
+        print(f"[DEBUG Grep] file_hits after parse: {file_hits}")
 
         # Step 2: Get representative matches from top files
         sorted_files = sorted(file_hits.items(), key=lambda x: x[1], reverse=True)
@@ -343,8 +351,14 @@ class SkillToolExecutor:
                 "--no-heading", "--color", "never",
                 pattern, abs_path,
             ]
+            # --- TEMP DEBUG for empty representative_matches ---
+            print(f"[DEBUG GrepSample] file_path={file_path}, abs_path={abs_path}, exists={os.path.exists(abs_path)}")
+            print(f"[DEBUG GrepSample] sample_cmd: {sample_cmd}")
             try:
                 sample_result = subprocess.run(sample_cmd, capture_output=True, timeout=10)
+                print(f"[DEBUG GrepSample] returncode: {sample_result.returncode}")
+                print(f"[DEBUG GrepSample] stdout: {sample_result.stdout.decode('utf-8', errors='ignore')[:500]!r}")
+                print(f"[DEBUG GrepSample] stderr: {sample_result.stderr.decode('utf-8', errors='ignore')[:500]!r}")
                 if sample_result.returncode in (0, 1):
                     for line in sample_result.stdout.decode('utf-8', errors='ignore').strip().split('\n'):
                         match = re.match(r'^(.+?):(\d+):(.*)$', line)
@@ -354,8 +368,10 @@ class SkillToolExecutor:
                                 "line": int(match.group(2)),
                                 "content": match.group(3).strip(),
                             })
-            except Exception:
+            except Exception as e:
+                print(f"[DEBUG GrepSample] exception: {e}")
                 pass
+        print(f"[DEBUG Grep] representative count: {len(representative)}")
 
         files_summary = [
             {"file": f, "hits": h}
@@ -443,13 +459,26 @@ class SkillToolExecutor:
                     content = ''.join(lines[:500]) + "\n... [file truncated: provide query to locate specific section] ..."
                     strategy = "truncated"
             
-            return {
+            result = {
                 "tool": "ReadFile",
                 "path": path,
+                "query": query,
                 "content": content,
                 "total_lines": total_lines,
                 "strategy": strategy,
             }
+            # For markdown files, list all available headings so the LLM can decide if further reads are needed
+            if is_markdown:
+                headings = []
+                for line in lines:
+                    m = re.match(r'^(#{1,6})\s+(.+)$', line)
+                    if m:
+                        level = len(m.group(1))
+                        title = m.group(2).strip()
+                        headings.append(f"{'  ' * (level - 1)}{title}")
+                if headings:
+                    result["available_sections"] = headings[:30]  # cap at 30 to avoid bloat
+            return result
         except Exception as e:
             return {"error": f"Failed to read file: {str(e)}"}
 
