@@ -412,8 +412,15 @@ class SkillToolExecutor:
                         content = self._slice_markdown_by_query(lines, query)
                         strategy = "markdown_heading"
                     else:
-                        content = self._slice_by_grep_context(lines, query)
-                        strategy = "grep_context"
+                        # Try AST-based boundary slice first (exact function/class boundaries)
+                        ext = os.path.splitext(path)[1].lower()
+                        ast_slice = self._slice_by_ast_boundary(lines, query, ext)
+                        if ast_slice:
+                            content = ast_slice
+                            strategy = "ast_boundary"
+                        else:
+                            content = self._slice_by_grep_context(lines, query)
+                            strategy = "grep_context"
                 else:
                     content = ''.join(lines[:500]) + "\n... [file truncated: provide query to locate specific section] ..."
                     strategy = "truncated"
@@ -487,6 +494,96 @@ class SkillToolExecutor:
                 skipped = merged[i][0] - merged[i-1][1]
                 parts.append(f"\n... [{skipped} lines skipped] ...\n")
             parts.append(''.join(lines[start:end]))
+        
+        return ''.join(parts)
+    
+    def _slice_by_ast_boundary(self, lines: List[str], query: str, ext: str) -> Optional[str]:
+        """
+        Slice code by AST boundaries: return complete function/class bodies that match query.
+        Ensures function bodies are never truncated mid-definition.
+        Falls back to None if tree-sitter unavailable or parse fails.
+        """
+        if not self._tree_sitter_available:
+            return None
+        
+        parser = self._get_tree_sitter_parser(ext)
+        if not parser:
+            return None
+        
+        source = ''.join(lines)
+        try:
+            tree = parser.parse(bytes(source, 'utf8'))
+        except Exception:
+            return None
+        
+        query_lower = query.lower()
+        matches = []
+        
+        def _extract_node_name(node):
+            """Extract identifier name from function/class AST node."""
+            target_types = {
+                'function_definition': ('identifier', 'field_identifier'),
+                'class_definition': ('identifier',),
+                'class_specifier': ('type_identifier',),
+                'struct_specifier': ('type_identifier',),
+            }
+            expected = target_types.get(node.type, ('identifier', 'type_identifier', 'field_identifier'))
+            
+            def _find(n):
+                if n.type in expected:
+                    return n.text.decode('utf8')
+                for c in n.children:
+                    found = _find(c)
+                    if found:
+                        return found
+                return None
+            
+            return _find(node)
+        
+        def _walk(node):
+            if node.type in ('function_definition', 'class_definition', 'class_specifier', 'struct_specifier'):
+                name = _extract_node_name(node)
+                
+                # Strategy 1: name contains query
+                if name and query_lower in name.lower():
+                    matches.append((name, node))
+                    return  # Don't recurse into children to avoid nested duplicates
+                
+                # Strategy 2: body contains query (but node has a name)
+                if name:
+                    body = node.text.decode('utf8').lower()
+                    if query_lower in body:
+                        matches.append((name, node))
+                        return
+            
+            for child in node.children:
+                _walk(child)
+        
+        _walk(tree.root_node)
+        
+        if not matches:
+            return None
+        
+        # Deduplicate by line range
+        seen = set()
+        unique = []
+        for name, node in matches:
+            key = (node.start_point[0], node.end_point[0])
+            if key not in seen:
+                seen.add(key)
+                unique.append((name, node))
+        
+        MAX_MATCHES = 3
+        parts = []
+        for i, (name, node) in enumerate(unique[:MAX_MATCHES]):
+            start_line = node.start_point[0]
+            end_line = node.end_point[0]
+            node_type = node.type.replace('_', ' ')
+            parts.append(f"=== {node_type}: {name} (lines {start_line+1}-{end_line+1}) ===\n")
+            parts.append(''.join(lines[start_line:end_line+1]))
+        
+        if len(unique) > MAX_MATCHES:
+            parts.append(f"\n... [{len(unique) - MAX_MATCHES} more AST matches omitted, use more specific query] ...")
         
         return ''.join(parts)
     
