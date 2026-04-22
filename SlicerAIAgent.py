@@ -461,11 +461,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self._timing['autoexecute_start'] = time.time()
             self._autoExecuteCode()
 
-        # Update token usage
+        # Update per-turn cumulative token usage
         if response.get("tokens"):
-            tokens = response["tokens"]
-            cost = response.get("cost", 0)
-            self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
+            self._currentTurnTokens += response["tokens"]
+            self._currentTurnCost += response.get("cost", 0)
+            self._updateTokenLabel()
 
         self._stopThinkingTimer("Done")
         self.statusLabel.text = "Ready"
@@ -506,6 +506,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self._currentTurn = getattr(self.logic.llmClient, 'turn_number', 1)
         else:
             self._currentTurn = 1
+        
+        # Reset per-turn cumulative token/cost counters
+        self._currentTurnTokens = 0
+        self._currentTurnCost = 0.0
 
         self.statusLabel.text = "Generating..."
         self.sendButton.setEnabled(False)
@@ -573,12 +577,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self._autoExecuteCode()
 
             if response.get("tokens"):
-                tokens = response["tokens"]
-                cost = response.get("cost", 0)
-                self.tokenLabel.text = f"Tokens: {tokens} | Cost: ${cost:.4f}"
+                self._currentTurnTokens += response["tokens"]
+                self._currentTurnCost += response.get("cost", 0)
+                self._updateTokenLabel()
                 if self._timing:
-                    self._timing['tokens'] = tokens
-                    self._timing['cost'] = cost
+                    self._timing['tokens'] = self._currentTurnTokens
+                    self._timing['cost'] = self._currentTurnCost
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -839,6 +843,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 if response.get('cost') is not None:
                     corrections[-1]['cost'] = response['cost']
         
+        # Accumulate per-turn token/cost from self-correction
+        if response.get('tokens'):
+            self._currentTurnTokens += response['tokens']
+            self._currentTurnCost += response.get('cost', 0)
+            self._updateTokenLabel()
+        
         if self.logic and self.logic.llmClient:
             self.logic.llmClient.debug_suffix = ""
         
@@ -896,6 +906,13 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.appendToChat("Error", f"Self-correction failed: {error_msg}")
         self.statusLabel.text = "Ready"
 
+
+    def _updateTokenLabel(self):
+        """Update the token/cost label with per-turn cumulative usage."""
+        turn = getattr(self, '_currentTurn', 1)
+        tokens = getattr(self, '_currentTurnTokens', 0)
+        cost = getattr(self, '_currentTurnCost', 0.0)
+        self.tokenLabel.text = f"Turn {turn} | Cumulative: {tokens} tokens | ${cost:.4f}"
 
     def _writeTimingReport(self):
         """Write detailed performance timing to a text file."""

@@ -993,6 +993,8 @@ class LLMClient:
             'total_tool_time': 0.0,
             'total_other_time': 0.0,
             'total_tokens': 0,
+            'total_prompt_tokens': 0,
+            'total_completion_tokens': 0,
             'rounds': [],
         }
 
@@ -1022,7 +1024,11 @@ class LLMClient:
                 if not tool_calls:
                     usage = data.get('usage', {})
                     round_tokens = usage.get('total_tokens', 0)
+                    round_prompt = usage.get('prompt_tokens', 0)
+                    round_completion = usage.get('completion_tokens', 0)
                     timing_report['total_tokens'] += round_tokens
+                    timing_report['total_prompt_tokens'] += round_prompt
+                    timing_report['total_completion_tokens'] += round_completion
                     timing_report['api_calls'] += 1
                     timing_report['total_api_time'] += api_time
                     other_time = max(0, time.time() - round_start - api_time)
@@ -1124,7 +1130,11 @@ class LLMClient:
                 tool_time = time.time() - tool_start
                 usage = data.get('usage', {})
                 round_tokens = usage.get('total_tokens', 0)
+                round_prompt = usage.get('prompt_tokens', 0)
+                round_completion = usage.get('completion_tokens', 0)
                 timing_report['total_tokens'] += round_tokens
+                timing_report['total_prompt_tokens'] += round_prompt
+                timing_report['total_completion_tokens'] += round_completion
                 timing_report['api_calls'] += 1
                 timing_report['tool_rounds'] += 1
                 timing_report['total_api_time'] += api_time
@@ -1304,10 +1314,18 @@ class LLMClient:
 
         intermediate_messages = result['intermediate_messages']
 
+        # Use accumulated usage across all tool rounds so response['tokens']
+        # and response['cost'] reflect the total for this turn, not just the
+        # last API call.
+        accumulated_usage = {
+            'prompt_tokens': timing_report['total_prompt_tokens'],
+            'completion_tokens': timing_report['total_completion_tokens'],
+            'total_tokens': timing_report['total_tokens'],
+        }
         response = self._buildResponse(
             content,
             reasoning_content,
-            data.get('usage', {}),
+            accumulated_usage,
             data,
         )
         response['tool_calls_history'] = tool_calls_history
@@ -1360,10 +1378,16 @@ class LLMClient:
         timing_report = result['timing_report']
         tool_calls_history = result['tool_calls_history']
 
+        # Use accumulated usage across all tool rounds (same as chatWithTools).
+        accumulated_usage = {
+            'prompt_tokens': timing_report['total_prompt_tokens'],
+            'completion_tokens': timing_report['total_completion_tokens'],
+            'total_tokens': timing_report['total_tokens'],
+        }
         response = self._buildResponse(
             content,
             reasoning_content,
-            data.get('usage', {}),
+            accumulated_usage,
             data,
         )
         response['tool_calls_history'] = tool_calls_history
