@@ -477,7 +477,11 @@ class SkillToolExecutor:
                         title = m.group(2).strip()
                         headings.append(f"{'  ' * (level - 1)}{title}")
                 if headings:
-                    result["available_sections"] = headings[:30]  # cap at 30 to avoid bloat
+                    MAX_HEADINGS = 30
+                    if len(headings) > MAX_HEADINGS:
+                        result["available_sections"] = headings[:MAX_HEADINGS] + [f"... {len(headings) - MAX_HEADINGS} more headings omitted ..."]
+                    else:
+                        result["available_sections"] = headings
             return result
         except Exception as e:
             return {"error": f"Failed to read file: {str(e)}"}
