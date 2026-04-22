@@ -198,11 +198,29 @@ class SkillToolExecutor:
     
     def _relativize(self, path: str) -> str:
         """Convert an absolute path back to a relative forward-slash path."""
+        # If already relative, normalize separators only
+        if not os.path.isabs(path):
+            return path.replace(os.sep, '/')
+        
         try:
             rel = os.path.relpath(path, self.skill_path)
         except ValueError:
             # On Windows, relpath can fail if paths are on different drives
             rel = path
+        
+        # If relpath escapes skill_path (starts with ..), the path is not under skill_path
+        # or path resolution produced an anomaly. Try manual suffix extraction.
+        if rel.startswith('..'):
+            norm_path = os.path.normpath(path).replace(os.sep, '/').lower()
+            norm_skill = os.path.normpath(self.skill_path).replace(os.sep, '/').lower()
+            if norm_path.startswith(norm_skill):
+                suffix = norm_path[len(norm_skill):].lstrip('/')
+                return suffix
+            # Path genuinely outside skill_path — return basename to avoid leaking
+            # system directory structure to the LLM (which may reuse it in next round)
+            base = os.path.basename(path.rstrip(os.sep))
+            return base if base else path
+        
         return rel.replace(os.sep, '/')
 
     def execute(self, tool_name: str, arguments: Dict) -> Dict:
