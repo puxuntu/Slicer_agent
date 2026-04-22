@@ -308,16 +308,9 @@ class SkillToolExecutor:
             rg_exe, "-i", "--count-matches", "--no-heading",
             pattern, path,
         ]
-        # --- TEMP DEBUG for single-file 0-hits issue ---
-        print(f"[DEBUG Grep] count_cmd: {count_cmd}")
-        print(f"[DEBUG Grep] path exists: {os.path.exists(path)}, is_file: {os.path.isfile(path)}, is_dir: {os.path.isdir(path)}")
         try:
             count_result = subprocess.run(count_cmd, capture_output=True, timeout=15)
-            print(f"[DEBUG Grep] returncode: {count_result.returncode}")
-            print(f"[DEBUG Grep] stdout: {count_result.stdout.decode('utf-8', errors='ignore')[:500]!r}")
-            print(f"[DEBUG Grep] stderr: {count_result.stderr.decode('utf-8', errors='ignore')[:500]!r}")
         except Exception as e:
-            print(f"[DEBUG Grep] exception: {e}")
             return {"error": f"ripgrep count failed: {e}"}
 
         file_hits = {}
@@ -337,8 +330,16 @@ class SkillToolExecutor:
                             total_hits += count
                     except ValueError:
                         pass
-        print(f"[DEBUG Grep] file_hits after parse: {file_hits}")
-
+                elif os.path.isfile(path):
+                    # rg --count-matches --no-heading on a single file outputs just the number
+                    try:
+                        count = int(line)
+                        if count > 0:
+                            rel_path = self._relativize(path)
+                            file_hits[rel_path] = count
+                            total_hits += count
+                    except ValueError:
+                        pass
         # Step 2: Get representative matches from top files
         sorted_files = sorted(file_hits.items(), key=lambda x: x[1], reverse=True)
         representative = []
@@ -346,19 +347,17 @@ class SkillToolExecutor:
         for file_path, _ in sorted_files[:5]:
             abs_path = os.path.join(self.skill_path, file_path) if not os.path.isabs(file_path) else file_path
             sample_cmd = [
-                rg_exe, "-n", "-i", "-m", "3",
+                rg_exe, "-H", "-n", "-i", "-m", "3",
                 "--max-columns", "300",
-                "--no-heading", "--color", "never",
+                "--color", "never",
                 pattern, abs_path,
             ]
-            # --- TEMP DEBUG for empty representative_matches ---
-            print(f"[DEBUG GrepSample] file_path={file_path}, abs_path={abs_path}, exists={os.path.exists(abs_path)}")
-            print(f"[DEBUG GrepSample] sample_cmd: {sample_cmd}")
+            # Use --no-heading for directory searches to keep output format consistent.
+            # -H ensures filename is printed even for single-file searches.
+            if os.path.isdir(abs_path):
+                sample_cmd.insert(7, "--no-heading")
             try:
                 sample_result = subprocess.run(sample_cmd, capture_output=True, timeout=10)
-                print(f"[DEBUG GrepSample] returncode: {sample_result.returncode}")
-                print(f"[DEBUG GrepSample] stdout: {sample_result.stdout.decode('utf-8', errors='ignore')[:500]!r}")
-                print(f"[DEBUG GrepSample] stderr: {sample_result.stderr.decode('utf-8', errors='ignore')[:500]!r}")
                 if sample_result.returncode in (0, 1):
                     for line in sample_result.stdout.decode('utf-8', errors='ignore').strip().split('\n'):
                         match = re.match(r'^(.+?):(\d+):(.*)$', line)
@@ -368,10 +367,8 @@ class SkillToolExecutor:
                                 "line": int(match.group(2)),
                                 "content": match.group(3).strip(),
                             })
-            except Exception as e:
-                print(f"[DEBUG GrepSample] exception: {e}")
+            except Exception:
                 pass
-        print(f"[DEBUG Grep] representative count: {len(representative)}")
 
         files_summary = [
             {"file": f, "hits": h}
