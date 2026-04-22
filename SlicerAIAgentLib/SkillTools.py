@@ -30,6 +30,171 @@ class SkillToolExecutor:
     def __init__(self, skill_path: str):
         self.skill_path = skill_path
         self.platform = platform.system().lower()  # 'windows', 'linux', 'darwin'
+        self._tree_sitter_available = self._ensure_tree_sitter()
+    
+    def _ensure_tree_sitter(self) -> bool:
+        """
+        Check if tree-sitter and language parsers are available.
+        If not, attempt to install them automatically.
+        Returns True if available (either already installed or successfully installed).
+        """
+        try:
+            import tree_sitter
+            import tree_sitter_python
+            import tree_sitter_cpp
+            return True
+        except ImportError:
+            pass
+        
+        packages = ["tree-sitter", "tree-sitter-python", "tree-sitter-cpp"]
+        
+        # Try Slicer's built-in pip_install first (if running inside Slicer)
+        try:
+            import slicer
+            logger.info("Attempting to install tree-sitter via slicer.util.pip_install...")
+            for pkg in packages:
+                slicer.util.pip_install(pkg)
+        except ImportError:
+            # Not in Slicer; use subprocess pip
+            logger.info("Attempting to install tree-sitter via pip subprocess...")
+            import sys
+            for pkg in packages:
+                try:
+                    subprocess.run(
+                        [sys.executable, "-m", "pip", "install", pkg],
+                        check=True,
+                        capture_output=True
+                    )
+                except subprocess.CalledProcessError as e:
+                    logger.warning(f"Failed to install {pkg}: {e}")
+                    return False
+        except Exception as e:
+            logger.warning(f"Failed to install tree-sitter: {e}")
+            return False
+        
+        # Verify installation
+        try:
+            import tree_sitter
+            import tree_sitter_python
+            import tree_sitter_cpp
+            logger.info("tree-sitter successfully installed and available.")
+            return True
+        except ImportError:
+            logger.warning("tree-sitter installation verification failed.")
+            return False
+    
+    def _get_tree_sitter_parser(self, ext: str):
+        """Get a tree-sitter parser for the given file extension."""
+        try:
+            from tree_sitter import Language, Parser
+            if ext == '.py':
+                import tree_sitter_python as tspython
+                lang = Language(tspython.language())
+            elif ext in ('.cxx', '.cpp', '.h', '.hxx', '.c'):
+                import tree_sitter_cpp as tscpp
+                lang = Language(tscpp.language())
+            else:
+                return None
+            return Parser(lang)
+        except Exception:
+            return None
+    
+    def _extract_symbols_from_ast(self, node, filepath: str, pattern_lower: str, symbol_type: str, results: List[Dict], lines: List[str]):
+        """Recursively walk AST to find function/class definitions."""
+        node_type = node.type
+        
+        # Python
+        if node_type == 'function_definition':
+            name_node = None
+            for child in node.children:
+                if child.type == 'identifier':
+                    name_node = child
+                    break
+            if name_node and (symbol_type in ("all", "function")):
+                name = name_node.text.decode('utf8')
+                if pattern_lower in name.lower():
+                    line_num = node.start_point[0] + 1
+                    sig = lines[line_num - 1].strip()[:120] if line_num <= len(lines) else ""
+                    results.append({
+                        "name": name,
+                        "type": "function",
+                        "file": filepath,
+                        "line": line_num,
+                        "signature": sig
+                    })
+        
+        elif node_type == 'class_definition':
+            name_node = None
+            for child in node.children:
+                if child.type == 'identifier':
+                    name_node = child
+                    break
+            if name_node and (symbol_type in ("all", "class")):
+                name = name_node.text.decode('utf8')
+                if pattern_lower in name.lower():
+                    line_num = node.start_point[0] + 1
+                    sig = lines[line_num - 1].strip()[:120] if line_num <= len(lines) else ""
+                    results.append({
+                        "name": name,
+                        "type": "class",
+                        "file": filepath,
+                        "line": line_num,
+                        "signature": sig
+                    })
+        
+        # C/C++
+        elif node_type in ('function_definition', 'declaration'):
+            # For C++, we need to find the declarator to get the name
+            # function_definition in C++ grammar may have nested structure
+            # We'll do a simpler approach: look for function_declarator or identifier
+            def _find_name_in_node(n):
+                if n.type in ('identifier', 'field_identifier'):
+                    return n.text.decode('utf8')
+                for c in n.children:
+                    found = _find_name_in_node(c)
+                    if found:
+                        return found
+                return None
+            
+            # Only process if it looks like a function definition/declaration
+            has_body = any(c.type == 'compound_statement' for c in node.children)
+            is_declaration = node_type == 'declaration'
+            
+            if (has_body or is_declaration) and (symbol_type in ("all", "function")):
+                name = _find_name_in_node(node)
+                if name and pattern_lower in name.lower():
+                    line_num = node.start_point[0] + 1
+                    sig = lines[line_num - 1].strip()[:120] if line_num <= len(lines) else ""
+                    results.append({
+                        "name": name,
+                        "type": "function",
+                        "file": filepath,
+                        "line": line_num,
+                        "signature": sig
+                    })
+        
+        elif node_type in ('class_specifier', 'struct_specifier'):
+            name_node = None
+            for child in node.children:
+                if child.type == 'type_identifier':
+                    name_node = child
+                    break
+            if name_node and (symbol_type in ("all", "class")):
+                name = name_node.text.decode('utf8')
+                if pattern_lower in name.lower():
+                    line_num = node.start_point[0] + 1
+                    sig = lines[line_num - 1].strip()[:120] if line_num <= len(lines) else ""
+                    results.append({
+                        "name": name,
+                        "type": "class",
+                        "file": filepath,
+                        "line": line_num,
+                        "signature": sig
+                    })
+        
+        # Recurse into children
+        for child in node.children:
+            self._extract_symbols_from_ast(child, filepath, pattern_lower, symbol_type, results, lines)
     
     def _relativize(self, path: str) -> str:
         """Convert an absolute path back to a relative forward-slash path."""
@@ -408,6 +573,23 @@ class SkillToolExecutor:
                     lines = f.readlines()
             except Exception:
                 return
+            
+            # Use AST-based parsing for Python/C++ if tree-sitter is available
+            use_ast = self._tree_sitter_available and ext in ('.py', '.cxx', '.cpp', '.h', '.hxx', '.c')
+            
+            if use_ast:
+                parser = self._get_tree_sitter_parser(ext)
+                if parser:
+                    try:
+                        source = ''.join(lines)
+                        tree = parser.parse(bytes(source, 'utf8'))
+                        self._extract_symbols_from_ast(
+                            tree.root_node, filepath, pattern_lower, symbol_type, results, lines
+                        )
+                        return  # AST handled everything for this file
+                    except Exception:
+                        # AST parse failed, fall through to regex
+                        pass
             
             if ext == '.py':
                 # Python: def / class definitions
