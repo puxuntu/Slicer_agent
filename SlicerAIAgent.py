@@ -728,37 +728,41 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         error_detail = error_msg if error_msg else "Unknown error"
         self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
+        self._startThinkingTimer()
+        if self.logic and self.logic.llmClient:
+            self.logic.llmClient.debug_suffix = "_correction"
         
-        def generateCorrection():
+        # Capture state needed by the background thread
+        _logic = self.logic
+        _currentCode = self.currentCode
+        _lastUserPrompt = getattr(self, '_lastUserPrompt', '')
+        _currentTurn = getattr(self, '_currentTurn', 1)
+        
+        def _run_correction():
+            """Run chatWithToolsIsolated in a background thread so the main Qt event loop
+            stays alive and _processStreamQueue can consume progress deltas in real time."""
             try:
-                self._startThinkingTimer()
-                if self.logic and self.logic.llmClient:
-                    self.logic.llmClient.debug_suffix = "_correction"
-                
                 # Build isolated context with prior search results retained
-                # Use _buildSystemPrompt (includes current MRML scene) instead of static template
                 system_content = "You are an expert 3D Slicer Python coding assistant."
-                if self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_buildSystemPrompt'):
+                if _logic and _logic.llmClient and hasattr(_logic.llmClient, '_buildSystemPrompt'):
                     try:
-                        context = {"scene": self.logic._buildSceneContext()} if self.logic else None
-                        system_content = self.logic.llmClient._buildSystemPrompt(context)
+                        context = {"scene": _logic._buildSceneContext()} if _logic else None
+                        system_content = _logic.llmClient._buildSystemPrompt(context)
                     except Exception:
-                        # Fall back to static template if dynamic build fails
-                        if hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
-                            system_content = self.logic.llmClient._loadSystemPromptTemplate()
-                elif self.logic and self.logic.llmClient and hasattr(self.logic.llmClient, '_loadSystemPromptTemplate'):
-                    system_content = self.logic.llmClient._loadSystemPromptTemplate()
+                        if hasattr(_logic.llmClient, '_loadSystemPromptTemplate'):
+                            system_content = _logic.llmClient._loadSystemPromptTemplate()
+                elif _logic and _logic.llmClient and hasattr(_logic.llmClient, '_loadSystemPromptTemplate'):
+                    system_content = _logic.llmClient._loadSystemPromptTemplate()
                 
                 isolated_messages = [{'role': 'system', 'content': system_content}]
                 
-                original_prompt = getattr(self, '_lastUserPrompt', '')
-                if original_prompt:
-                    isolated_messages.append({'role': 'user', 'content': original_prompt})
+                if _lastUserPrompt:
+                    isolated_messages.append({'role': 'user', 'content': _lastUserPrompt})
                 
                 # Inject prior tool trajectory so LLM doesn't fix blind
                 prior_tool_messages = []
-                if self.logic and self.logic.llmClient:
-                    for msg in self.logic.llmClient.conversation_history:
+                if _logic and _logic.llmClient:
+                    for msg in _logic.llmClient.conversation_history:
                         if msg.get('role') in ('assistant', 'tool'):
                             prior_tool_messages.append(msg)
                 if prior_tool_messages:
@@ -770,7 +774,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 
                 isolated_messages.append({
                     'role': 'assistant',
-                    'content': f'```python\n{self.currentCode}\n```'
+                    'content': f'```python\n{_currentCode}\n```'
                 })
                 
                 isolated_messages.append({
@@ -789,9 +793,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 # Save isolated prompt to debug file before sending
                 try:
                     moduleDir = os.path.dirname(__file__)
-                    turn_number = getattr(self, '_currentTurn', 1)
                     suffix = f"_correction_{attempt}"
-                    first_debug = os.path.join(moduleDir, f'{turn_number}{suffix}_first_prompt_debug.txt')
+                    first_debug = os.path.join(moduleDir, f'{_currentTurn}{suffix}_first_prompt_debug.txt')
                     with open(first_debug, 'w', encoding='utf-8') as f:
                         for i, msg in enumerate(isolated_messages):
                             f.write(f"{'='*60}\n")
@@ -805,81 +808,94 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 def _on_correction_progress(progress):
                     self._streamQueue.put(('delta', dict(progress)))
                 
-                response = self.logic.llmClient.chatWithToolsIsolated(
+                response = _logic.llmClient.chatWithToolsIsolated(
                     messages=isolated_messages,
-                    tools=self.logic.skillTools,
-                    tool_executor=self.logic._executeTool,
+                    tools=_logic.skillTools,
+                    tool_executor=_logic._executeTool,
                     max_tool_rounds=50,
                     on_progress=_on_correction_progress,
                 )
                 
-                # Save correction timing report and token usage
-                if self._timing:
-                    corrections = self._timing.get('corrections', [])
-                    if corrections:
-                        if response.get('timing_report'):
-                            corrections[-1]['timing_report'] = response['timing_report']
-                        if response.get('tokens'):
-                            corrections[-1]['tokens'] = response['tokens']
-                        if response.get('cost') is not None:
-                            corrections[-1]['cost'] = response['cost']
-                
-                if self.logic and self.logic.llmClient:
-                    self.logic.llmClient.debug_suffix = ""
-                
-                if response.get("code"):
-                    self.currentCode = response["code"]
-                    self.codeDisplay.setPlainText(response["code"])
-                    self._saveGeneratedCodeToFile(response["code"], suffix=f"_correction_{attempt}")
-                    self._stopThinkingTimer("Corrected")
-                    
-                    # Update conversation_history: replace wrong code with corrected code
-                    if self.logic and self.logic.llmClient:
-                        history = self.logic.llmClient.conversation_history
-                        # Find last assistant message containing a code block and replace it
-                        for i in range(len(history) - 1, -1, -1):
-                            msg = history[i]
-                            if msg.get('role') == 'assistant' and '```' in msg.get('content', ''):
-                                history[i] = {
-                                    'role': 'assistant',
-                                    'content': response.get('message', f"```python\n{response['code']}\n```")
-                                }
-                                if response.get('reasoning_content'):
-                                    history[i]['reasoning_content'] = response['reasoning_content']
-                                break
-                        
-                        # Append correction marker
-                        history.append({
-                            'role': 'system',
-                            'content': (
-                                f"CORRECTION: The previous code failed with: {error_detail}. "
-                                f"After correction attempt {attempt + 1}, the working version is above. "
-                                f"The original search results remain valid."
-                            )
-                        })
-                        
-                        # Append compressed correction-phase tool results
-                        correction_messages = response.get('intermediate_messages', [])
-                        if correction_messages:
-                            compressed = self.logic.llmClient._compressToolResultsForHistory(
-                                correction_messages, user_prompt=original_prompt
-                            )
-                            history.extend(compressed)
-                    
-                    self._autoExecuteCode(attempt + 1, max_attempts)
-                else:
-                    raw_msg = response.get('message', '')[:300]
-                    self.appendToChat("System", f"Correction response contained no code block. Raw response preview:\n{raw_msg}")
-                    self._stopThinkingTimer("Failed")
-                    self.statusLabel.text = "Ready"
+                # Dispatch result handling to main thread for safe Qt UI updates
+                qt.QTimer.singleShot(0, lambda: self._handleCorrectionResult(
+                    response, attempt, max_attempts, error_detail, _lastUserPrompt
+                ))
             except Exception as e:
-                self._stopThinkingTimer("Error")
-                if self.logic and self.logic.llmClient:
-                    self.logic.llmClient.debug_suffix = ""
-                self.appendToChat("Error", f"Self-correction failed: {str(e)}")
-                self.statusLabel.text = "Ready"
+                qt.QTimer.singleShot(0, lambda: self._handleCorrectionError(str(e)))
         
-        qt.QTimer.singleShot(0, generateCorrection)
+        thread = threading.Thread(target=_run_correction, daemon=True)
+        thread.start()
+    
+    def _handleCorrectionResult(self, response, attempt, max_attempts, error_detail, original_prompt):
+        """Handle successful self-correction response on the main thread."""
+        # Save correction timing report and token usage
+        if self._timing:
+            corrections = self._timing.get('corrections', [])
+            if corrections:
+                if response.get('timing_report'):
+                    corrections[-1]['timing_report'] = response['timing_report']
+                if response.get('tokens'):
+                    corrections[-1]['tokens'] = response['tokens']
+                if response.get('cost') is not None:
+                    corrections[-1]['cost'] = response['cost']
+        
+        if self.logic and self.logic.llmClient:
+            self.logic.llmClient.debug_suffix = ""
+        
+        if response.get("code"):
+            self.currentCode = response["code"]
+            self.codeDisplay.setPlainText(response["code"])
+            self._saveGeneratedCodeToFile(response["code"], suffix=f"_correction_{attempt}")
+            self._stopThinkingTimer("Corrected")
+            
+            # Update conversation_history: replace wrong code with corrected code
+            if self.logic and self.logic.llmClient:
+                history = self.logic.llmClient.conversation_history
+                # Find last assistant message containing a code block and replace it
+                for i in range(len(history) - 1, -1, -1):
+                    msg = history[i]
+                    if msg.get('role') == 'assistant' and '```' in msg.get('content', ''):
+                        history[i] = {
+                            'role': 'assistant',
+                            'content': response.get('message', f"```python\n{response['code']}\n```")
+                        }
+                        if response.get('reasoning_content'):
+                            history[i]['reasoning_content'] = response['reasoning_content']
+                        break
+                
+                # Append correction marker
+                history.append({
+                    'role': 'system',
+                    'content': (
+                        f"CORRECTION: The previous code failed with: {error_detail}. "
+                        f"After correction attempt {attempt + 1}, the working version is above. "
+                        f"The original search results remain valid."
+                    )
+                })
+                
+                # Append compressed correction-phase tool results
+                correction_messages = response.get('intermediate_messages', [])
+                if correction_messages:
+                    compressed = self.logic.llmClient._compressToolResultsForHistory(
+                        correction_messages, user_prompt=original_prompt
+                    )
+                    history.extend(compressed)
+            
+            self._autoExecuteCode(attempt + 1, max_attempts)
+        else:
+            raw_msg = response.get('message', '')[:300]
+            self.appendToChat("System", f"Correction response contained no code block. Raw response preview:\n{raw_msg}")
+            self._stopThinkingTimer("Failed")
+            self.statusLabel.text = "Ready"
+    
+    def _handleCorrectionError(self, error_msg):
+        """Handle self-correction error on the main thread."""
+        self._stopThinkingTimer("Error")
+        if self.logic and self.logic.llmClient:
+            self.logic.llmClient.debug_suffix = ""
+        self.appendToChat("Error", f"Self-correction failed: {error_msg}")
+        self.statusLabel.text = "Ready"
+
 
     def _writeTimingReport(self):
         """Write detailed performance timing to a text file."""
