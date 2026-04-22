@@ -404,7 +404,7 @@ class LLMClient:
             "The agent is running with a minimal fallback prompt. "
             "Please check that Resources/Prompts/system_prompt.md exists.\n\n"
             "You are an expert 3D Slicer Python coding assistant. "
-            "Use Grep and ReadFile tools to find API information, then output code."
+            "Use FindFile, SearchSymbol, Grep, and ReadFile tools to find API information, then output code."
         )
 
     def _buildSystemPrompt(self, context: Optional[Dict] = None) -> str:
@@ -425,7 +425,7 @@ class LLMClient:
         import platform
         base_prompt += f"\n\n## PLATFORM INFORMATION\n"
         base_prompt += f"Current Platform: {platform.system()}\n"
-        base_prompt += "The search tools (Grep, ReadFile) handle platform differences automatically.\n"
+        base_prompt += "The search tools (FindFile, SearchSymbol, Grep, ReadFile) handle platform differences automatically.\n"
         base_prompt += "You only need to specify the relative path within the skill directory. "
         base_prompt += "Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths — the tool handles this automatically.\n"
 
@@ -578,34 +578,8 @@ class LLMClient:
             return ""
 
     def _compressReadFileResult(self, full_content: str, grep_keywords: List[str] = None) -> str:
-        """
-        Keep only paragraphs matching grep keywords.
-        If no keywords provided, return original content unchanged.
-        
-        Args:
-            full_content: The full file content from ReadFile.
-            grep_keywords: Optional list of grep patterns that led to this ReadFile.
-        
-        Returns:
-            Filtered content string (paragraphs matching keywords, or original if no keywords).
-        """
-        if not grep_keywords:
-            return full_content
-        
-        parts = []
-        paragraphs = full_content.split('\n\n')
-        for keyword in grep_keywords:
-            if not keyword:
-                continue
-            keyword_lower = keyword.lower()
-            for para in paragraphs:
-                if keyword_lower in para.lower():
-                    stripped = para.strip()
-                    if stripped and stripped not in parts:
-                        parts.append(stripped)
-                    break  # Only first matching paragraph per keyword
-        
-        return '\n\n'.join(parts) if parts else full_content
+        """ReadFile now handles slicing at the tool layer; this is a passthrough."""
+        return full_content
 
     def _compressGrepResult(self, result_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -614,6 +588,8 @@ class LLMClient:
         return result_data
 
     def _compressMessagesForGenerate(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # NOTE: This method is no longer called in _runToolLoop because
+        # per-turn payload compression was removed in favor of global history trimming.
         """
         Compress ReadFile and Grep tool results in messages when conversation grows large.
         Triggered when total message length exceeds a threshold.
@@ -1131,31 +1107,10 @@ class LLMClient:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     outputs = list(executor.map(_execute_single, tool_calls))
 
-                # Collect Grep patterns from this round's tool calls for keyword-aware compression
-                grep_keywords = []
-                for tc in tool_calls:
-                    func = tc.get('function', {})
-                    if func.get('name') == 'Grep':
-                        try:
-                            args = json.loads(func.get('arguments', '{}'))
-                            grep_keywords.append(args.get('pattern', ''))
-                        except Exception:
-                            pass
-
                 for out in outputs:
                     tool_result = out["tool_result"]
-                    # Compress ReadFile results with keyword awareness before adding to messages
-                    try:
-                        data = json.loads(tool_result.get('content', '{}'))
-                        if data.get('tool') == 'ReadFile':
-                            full_content = data.get('content', '')
-                            data['content'] = self._compressReadFileResult(full_content, grep_keywords)
-                            tool_result['content'] = json.dumps(data, ensure_ascii=False)
-                        elif data.get('tool') == 'Grep':
-                            data = self._compressGrepResult(data)
-                            tool_result['content'] = json.dumps(data, ensure_ascii=False)
-                    except Exception:
-                        pass  # Keep original on parse failure
+                    # ReadFile and Grep now handle their own output shaping at the tool layer.
+                    # No post-compression needed here.
                     tool_results.append(tool_result)
                     if out["history_entry"] is not None:
                         tool_calls_history.append(out["history_entry"])
@@ -1169,9 +1124,9 @@ class LLMClient:
                 other_time = max(0, time.time() - round_start - api_time - tool_time)
                 timing_report['total_other_time'] += other_time
 
-                has_grep = any(n == 'Grep' for n in tool_names)
+                has_search = any(n in ('Grep', 'FindFile', 'SearchSymbol') for n in tool_names)
                 has_readfile = any(n == 'ReadFile' for n in tool_names)
-                if has_grep and has_readfile:
+                if has_search and has_readfile:
                     phase_label = "Search+Read"
                 elif has_readfile:
                     phase_label = "Read"
@@ -1212,6 +1167,15 @@ class LLMClient:
                         elif tool_name == 'ReadFile':
                             path = args.get('path', 'N/A')
                             progress_lines.append(f'  ReadFile: {path}')
+                        elif tool_name == 'FindFile':
+                            pattern = args.get('pattern', 'N/A')
+                            path = args.get('path', 'N/A')
+                            progress_lines.append(f'  FindFile: "{pattern}" → {path}')
+                        elif tool_name == 'SearchSymbol':
+                            pattern = args.get('pattern', 'N/A')
+                            path = args.get('path', 'N/A')
+                            sym_type = args.get('type', 'all')
+                            progress_lines.append(f'  SearchSymbol({sym_type}): "{pattern}" → {path}')
                         else:
                             progress_lines.append(f'  {tool_name}: {args}')
                     progress_msg = '\n'.join(progress_lines) + '\n'
@@ -1255,7 +1219,7 @@ class LLMClient:
         """
         Send a chat request with tool calling support.
 
-        The LLM has access to ALL tools (Grep + ReadFile) from the start and autonomously
+        The LLM has access to ALL tools (FindFile, SearchSymbol, Grep, ReadFile) from the start and autonomously
         decides when to search, when to read, and when to generate code. The loop terminates
         when the LLM outputs a ```python code block.
 
