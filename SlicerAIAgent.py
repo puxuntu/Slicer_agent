@@ -824,22 +824,6 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                         if response.get('cost') is not None:
                             corrections[-1]['cost'] = response['cost']
                 
-                # Save response to debug file
-                try:
-                    moduleDir = os.path.dirname(__file__)
-                    turn_number = getattr(self, '_currentTurn', 1)
-                    suffix = f"_correction_{attempt}"
-                    last_debug = os.path.join(moduleDir, f'{turn_number}{suffix}_last_prompt_debug.txt')
-                    with open(last_debug, 'w', encoding='utf-8') as f:
-                        f.write(f"{'='*60}\n")
-                        f.write("ISOLATED RESPONSE\n")
-                        f.write(f"{'='*60}\n\n")
-                        f.write(f"message:\n{response.get('message', '')}\n\n")
-                        f.write(f"reasoning_content:\n{response.get('reasoning_content', '')}\n\n")
-                        f.write(f"code:\n{response.get('code', '')}\n")
-                except Exception:
-                    pass
-                
                 if self.logic and self.logic.llmClient:
                     self.logic.llmClient.debug_suffix = ""
                 
