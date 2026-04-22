@@ -175,6 +175,22 @@ class SafeExecutor:
         traceback_str = None
         timed_out = False
         
+        # Snapshot MRML scene state before execution so we can roll back on failure.
+        # SaveStateForUndo() captures all undo-enabled nodes; Undo() restores them.
+        # This prevents partial side effects (loaded volumes, created segmentations)
+        # from accumulating across self-correction attempts.
+        _undo_flag_before = False
+        _undo_snapshot_taken = False
+        try:
+            _undo_flag_before = slicer.mrmlScene.GetUndoFlag()
+            if not _undo_flag_before:
+                slicer.mrmlScene.SetUndoFlag(True)
+            slicer.mrmlScene.SaveStateForUndo()
+            _undo_snapshot_taken = True
+        except Exception:
+            # If snapshot fails (e.g., scene is in an unusual state), proceed without it
+            pass
+        
         # Temporarily redirect VTK error/warning output so that C++ layer messages
         # (e.g. "[VTK] ModifySegmentByLabelmap: Invalid segment") are captured and
         # can trigger the self-correction mechanism.
@@ -226,6 +242,23 @@ class SafeExecutor:
             if original_vtk_window is not None:
                 try:
                     vtk.vtkOutputWindow.SetInstance(original_vtk_window)
+                except Exception:
+                    pass
+            
+            # Roll back MRML scene state if execution failed.
+            # This prevents partial side effects from accumulating across
+            # self-correction attempts (duplicate volumes, segmentations, etc.).
+            if _undo_snapshot_taken and (error_msg is not None or timed_out):
+                try:
+                    slicer.mrmlScene.Undo()
+                    slicer.mrmlScene.ClearRedoStack()
+                except Exception:
+                    pass
+            
+            # Restore original undo flag regardless of outcome
+            if _undo_snapshot_taken:
+                try:
+                    slicer.mrmlScene.SetUndoFlag(_undo_flag_before)
                 except Exception:
                     pass
 
