@@ -1417,7 +1417,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (Grep, ReadFile, Glob)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile)
             tool_args: Tool arguments dict
             
         Returns:

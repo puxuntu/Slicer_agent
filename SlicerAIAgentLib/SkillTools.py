@@ -228,7 +228,7 @@ class SkillToolExecutor:
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (Grep, ReadFile, Glob)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile)
             arguments: Tool arguments
             
         Returns:
@@ -252,8 +252,6 @@ class SkillToolExecutor:
                 arguments.get("path", ""),
                 arguments.get("query")
             )
-        elif tool_name == "Glob":
-            result = self._glob(arguments.get("pattern", ""), arguments.get("path", ""))
         else:
             return {"error": f"Unknown tool: {tool_name}"}
         
@@ -635,37 +633,6 @@ class SkillToolExecutor:
         
         return ''.join(parts)
     
-    def _glob(self, pattern: str, path: str) -> Dict:
-        """Find files matching pattern."""
-        # Normalize path
-        if not os.path.isabs(path):
-            path = os.path.join(self.skill_path, path)
-        
-        if not os.path.exists(path):
-            return {"error": f"Path not found: {path}"}
-        
-        results = []
-        
-        try:
-            for root, _, filenames in os.walk(path):
-                for filename in filenames:
-                    if re.search(pattern.replace('*', '.*'), filename, re.IGNORECASE):
-                        results.append(os.path.join(root, filename))
-                        if len(results) >= 20:
-                            break
-                if len(results) >= 20:
-                    break
-        except Exception as e:
-            return {"error": f"Failed to glob: {str(e)}"}
-        
-        return {
-            "tool": "Glob",
-            "pattern": pattern,
-            "path": path,
-            "results": results,
-            "count": len(results)
-        }
-
     def _findfile(self, pattern: str, path: str) -> Dict:
         """Search for files by name pattern (case-insensitive)."""
         if not os.path.isabs(path):
@@ -890,27 +857,6 @@ def get_skill_tools() -> List[Dict]:
                         "path": {
                             "type": "string",
                             "description": "Relative path within skill (e.g., 'slicer-source/Docs/developer_guide/script_repository')"
-                        }
-                    },
-                    "required": ["pattern", "path"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "Glob",
-                "description": "List files matching a glob pattern (e.g., '*.py', '*.h', '*Test*') within a directory tree. Recursively searches subdirectories. Returns up to 20 matches. Use this to explore directory contents or find all files of a certain type.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "pattern": {
-                            "type": "string",
-                            "description": "Glob pattern (e.g., '*.py', 'vtkMRML*.h', '*Test*')"
-                        },
-                        "path": {
-                            "type": "string",
-                            "description": "Relative path within skill to search under (e.g., 'slicer-source/Modules/Loadable/Volumes')"
                         }
                     },
                     "required": ["pattern", "path"]
