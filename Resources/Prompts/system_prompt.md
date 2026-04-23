@@ -167,6 +167,8 @@ These CANNOT be used in the final code. Code using them will be rejected:
 - **ReadFile** returns smart-sliced content for large files (≥500 lines). It does NOT return the full file unless it is small. Provide a `query` parameter to extract matching sections.
 
 ### 4. Common Slicer Pitfalls
+- **Do NOT change the window layout** (`slicer.app.layoutManager().setLayout()`) unless the user explicitly asks for it.
+- **Do NOT switch the active module** (`slicer.util.selectModule()`, `slicer.app.setActiveModule()`) unless the user explicitly asks for it. Access widgets programmatically instead.
 - After modifying volume arrays with `arrayFromVolume()`, always call `arrayFromVolumeModified()`.
 - Volume arrays are in **KJI** order (slice, row, column), not IJK.
 - MRML node names are **not unique identifiers.** Use `node.GetID()` for reliable identification, not `node.GetName()`.

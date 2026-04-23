@@ -1021,6 +1021,8 @@ class LLMClient:
                 assistant_message = data['choices'][0]['message']
                 content = self._coerceText(assistant_message.get('content', ''))
                 reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
+                if reasoning_content:
+                    all_reasoning_parts.append(f"[Round {round_num + 1}]\n{reasoning_content}")
 
                 tool_calls = assistant_message.get('tool_calls')
 
@@ -1051,9 +1053,10 @@ class LLMClient:
                     })
 
                     if code:
+                        accumulated_reasoning = '\n\n'.join(all_reasoning_parts) if all_reasoning_parts else reasoning_content
                         return {
                             'content': content,
-                            'reasoning_content': reasoning_content,
+                            'reasoning_content': accumulated_reasoning,
                             'data': data,
                             'timing_report': timing_report,
                             'tool_calls_history': tool_calls_history,

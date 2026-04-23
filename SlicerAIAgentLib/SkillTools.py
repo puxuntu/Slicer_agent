@@ -31,6 +31,7 @@ class SkillToolExecutor:
         self.skill_path = skill_path
         self.platform = platform.system().lower()  # 'windows', 'linux', 'darwin'
         self._tree_sitter_available = self._ensure_tree_sitter()
+        self._read_history = {}  # path -> {"query": str, "strategy": str}
     
     def _ensure_tree_sitter(self) -> bool:
         """
@@ -120,7 +121,8 @@ class SkillToolExecutor:
                         "type": "function",
                         "file": filepath,
                         "line": line_num,
-                        "signature": sig
+                        "signature": sig,
+                        "source_type": self._infer_source_type(filepath),
                     })
         
         elif node_type == 'class_definition':
@@ -139,7 +141,8 @@ class SkillToolExecutor:
                         "type": "class",
                         "file": filepath,
                         "line": line_num,
-                        "signature": sig
+                        "signature": sig,
+                        "source_type": self._infer_source_type(filepath),
                     })
         
         # C/C++
@@ -170,7 +173,8 @@ class SkillToolExecutor:
                         "type": "function",
                         "file": filepath,
                         "line": line_num,
-                        "signature": sig
+                        "signature": sig,
+                        "source_type": self._infer_source_type(filepath),
                     })
         
         elif node_type in ('class_specifier', 'struct_specifier'):
@@ -189,13 +193,37 @@ class SkillToolExecutor:
                         "type": "class",
                         "file": filepath,
                         "line": line_num,
-                        "signature": sig
+                        "signature": sig,
+                        "source_type": self._infer_source_type(filepath),
                     })
         
         # Recurse into children
         for child in node.children:
             self._extract_symbols_from_ast(child, filepath, pattern_lower, symbol_type, results, lines)
     
+    def _infer_source_type(self, file_path: str) -> str:
+        """Infer the role of a file based on its path within the Slicer codebase."""
+        path_lower = file_path.lower().replace('\\', '/')
+        if '/testing/python/' in path_lower:
+            return 'test_example'
+        if '/docs/developer_guide/script_repository/' in path_lower:
+            return 'doc_example'
+        if '/editoreffects/' in path_lower or '/editor_effects/' in path_lower:
+            return 'effect_implementation'
+        if '/widgets/' in path_lower:
+            return 'ui_implementation'
+        if '/modules/cli/' in path_lower:
+            return 'cli_module'
+        if '/modules/scripted/' in path_lower:
+            return 'scripted_module'
+        if '/modules/loadable/' in path_lower:
+            return 'loadable_module'
+        if '/base/python/slicer/' in path_lower:
+            return 'python_api'
+        if '/libs/mrml/core/' in path_lower:
+            return 'mrml_definition'
+        return 'source'
+
     def _relativize(self, path: str) -> str:
         """Convert an absolute path back to a relative forward-slash path."""
         # If already relative, normalize separators only
@@ -345,31 +373,69 @@ class SkillToolExecutor:
         for file_path, _ in sorted_files[:5]:
             abs_path = os.path.join(self.skill_path, file_path) if not os.path.isabs(file_path) else file_path
             sample_cmd = [
-                rg_exe, "-H", "-n", "-i", "-m", "3",
-                "--max-columns", "300",
+                rg_exe, "-H", "-n", "-i", "-B", "5", "-A", "5", "-m", "3",
+                "--max-columns", "500",
                 "--color", "never",
                 pattern, abs_path,
             ]
-            # Use --no-heading for directory searches to keep output format consistent.
-            # -H ensures filename is printed even for single-file searches.
-            if os.path.isdir(abs_path):
-                sample_cmd.insert(7, "--no-heading")
             try:
                 sample_result = subprocess.run(sample_cmd, capture_output=True, timeout=10)
                 if sample_result.returncode in (0, 1):
-                    for line in sample_result.stdout.decode('utf-8', errors='ignore').strip().split('\n'):
-                        match = re.match(r'^(.+?):(\d+):(.*)$', line)
-                        if match:
+                    stdout = sample_result.stdout.decode('utf-8', errors='ignore').strip()
+                    if not stdout:
+                        continue
+                    # rg -B/-A output separates match blocks with '--'
+                    blocks = []
+                    current_block = []
+                    for line in stdout.split('\n'):
+                        if line == '--':
+                            if current_block:
+                                blocks.append(current_block)
+                                current_block = []
+                        else:
+                            current_block.append(line)
+                    if current_block:
+                        blocks.append(current_block)
+
+                    for block in blocks:
+                        matched_line = None
+                        for raw_line in block:
+                            m = re.match(r'^(.+?):(\d+):(.*)$', raw_line)
+                            if m:
+                                line_content = m.group(3)
+                                if pattern.lower() in line_content.lower():
+                                    matched_line = m
+                                    break
+                        if not matched_line and block:
+                            for raw_line in block:
+                                m = re.match(r'^(.+?):(\d+):(.*)$', raw_line)
+                                if m:
+                                    matched_line = m
+                                    break
+
+                        if matched_line:
+                            context_lines = []
+                            for raw_line in block:
+                                m = re.match(r'^(.+?):(\d+):(.*)$', raw_line)
+                                if m:
+                                    context_lines.append(m.group(3))
+                                else:
+                                    context_lines.append(raw_line)
                             representative.append({
-                                "file": self._relativize(match.group(1)),
-                                "line": int(match.group(2)),
-                                "content": match.group(3).strip(),
+                                "file": self._relativize(matched_line.group(1)),
+                                "line": int(matched_line.group(2)),
+                                "content": matched_line.group(3).strip(),
+                                "context": '\n'.join(context_lines),
                             })
             except Exception:
                 pass
 
         files_summary = [
-            {"file": f, "hits": h}
+            {
+                "file": f,
+                "hits": h,
+                "source_type": self._infer_source_type(f),
+            }
             for f, h in sorted_files[:20]
         ]
 
@@ -430,29 +496,60 @@ class SkillToolExecutor:
                 lines = f.readlines()
             
             total_lines = len(lines)
+            is_markdown = path.lower().endswith('.md')
+            
+            # Duplicate read detection
+            note = None
+            rel_path = self._relativize(path)
+            if rel_path in self._read_history:
+                prev = self._read_history[rel_path]
+                note = (
+                    f"[Note: This file was previously read with query='{prev['query']}' "
+                    f"(strategy={prev['strategy']}). "
+                    f"If the current content is insufficient, consider searching a different file.]"
+                )
             
             if total_lines < 500:
                 content = ''.join(lines)
                 strategy = "full"
             else:
-                is_markdown = path.lower().endswith('.md')
                 if query:
                     if is_markdown:
                         content = self._slice_markdown_by_query(lines, query)
                         strategy = "markdown_heading"
                     else:
-                        # Try AST-based boundary slice first (exact function/class boundaries)
-                        ext = os.path.splitext(path)[1].lower()
-                        ast_slice = self._slice_by_ast_boundary(lines, query, ext)
-                        if ast_slice:
-                            content = ast_slice
-                            strategy = "ast_boundary"
+                        # For test files, prefer test-method slicing over class-level AST
+                        is_test_file = '/Testing/Python/' in path.replace('\\', '/')
+                        if is_test_file:
+                            test_slice = self._slice_test_method(lines, query)
+                            if test_slice:
+                                content = test_slice
+                                strategy = "test_method"
+                            else:
+                                ext = os.path.splitext(path)[1].lower()
+                                ast_slice = self._slice_by_ast_boundary(lines, query, ext)
+                                if ast_slice:
+                                    content = ast_slice
+                                    strategy = "ast_boundary"
+                                else:
+                                    content = self._slice_by_grep_context(lines, query)
+                                    strategy = "grep_context"
                         else:
-                            content = self._slice_by_grep_context(lines, query)
-                            strategy = "grep_context"
+                            # Try AST-based boundary slice first (exact function/class boundaries)
+                            ext = os.path.splitext(path)[1].lower()
+                            ast_slice = self._slice_by_ast_boundary(lines, query, ext)
+                            if ast_slice:
+                                content = ast_slice
+                                strategy = "ast_boundary"
+                            else:
+                                content = self._slice_by_grep_context(lines, query)
+                                strategy = "grep_context"
                 else:
                     content = ''.join(lines[:500]) + "\n... [file truncated: provide query to locate specific section] ..."
                     strategy = "truncated"
+            
+            # Record this read for duplicate detection
+            self._read_history[rel_path] = {"query": query or "(none)", "strategy": strategy}
             
             result = {
                 "tool": "ReadFile",
@@ -461,7 +558,24 @@ class SkillToolExecutor:
                 "content": content,
                 "total_lines": total_lines,
                 "strategy": strategy,
+                "source_type": self._infer_source_type(path),
             }
+            notes = []
+            if note:
+                notes.append(note)
+            
+            # Gist-link dead-end detection
+            gist_links = re.findall(r'https?://gist\.github\.com/\S+', content)
+            has_local_code = bool(re.search(r'```python\s*\n', content))
+            if len(gist_links) > 2 and not has_local_code:
+                notes.append(
+                    "[Note: This section contains mainly external gist links with no local executable examples. "
+                    "Search for specific function names in test files instead.]"
+                )
+            
+            if notes:
+                result["_note"] = "\n".join(notes)
+            
             # For markdown files, list all available headings so the LLM can decide if further reads are needed
             if is_markdown:
                 headings = []
@@ -540,6 +654,52 @@ class SkillToolExecutor:
                 skipped = merged[i][0] - merged[i-1][1]
                 parts.append(f"\n... [{skipped} lines skipped] ...\n")
             parts.append(''.join(lines[start:end]))
+        
+        return ''.join(parts)
+    
+    def _slice_test_method(self, lines: List[str], query: str) -> Optional[str]:
+        """
+        Slice Python test files by test method boundaries.
+        Returns complete test method / TestSection bodies that match the query.
+        More precise than class-level AST slicing for test files.
+        """
+        query_lower = query.lower()
+        matches = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            # Match test methods: def test_xxx(...) or def TestSection_xxx(...)
+            match = re.match(r'^(\s*)def\s+(test_\w+|TestSection_\w+)\s*\(', line)
+            if match:
+                indent = match.group(1)
+                method_name = match.group(2)
+                start = i
+                i += 1
+                # Capture until next method/class at same or less indentation
+                while i < len(lines):
+                    next_line = lines[i]
+                    # Check if next line is a new def/class at same or less indent
+                    if re.match(rf'^{re.escape(indent)}(?:def\s+|class\s+)', next_line):
+                        break
+                    i += 1
+                end = i
+                body = ''.join(lines[start:end])
+                if query_lower in body.lower():
+                    matches.append((method_name, start, end))
+                continue
+            i += 1
+        
+        if not matches:
+            return None
+        
+        MAX_MATCHES = 3
+        parts = []
+        for i, (method_name, start, end) in enumerate(matches[:MAX_MATCHES]):
+            parts.append(f"=== test method: {method_name} (lines {start+1}-{end}) ===\n")
+            parts.append(''.join(lines[start:end]))
+        
+        if len(matches) > MAX_MATCHES:
+            parts.append(f"\n... [{len(matches) - MAX_MATCHES} more test methods omitted, use more specific query] ...")
         
         return ''.join(parts)
     
@@ -661,7 +821,11 @@ class SkillToolExecutor:
             "pattern": pattern,
             "path": path,
             "results": results,
-            "count": len(results)
+            "count": len(results),
+            "results_with_type": [
+                {"file": self._relativize(r), "source_type": self._infer_source_type(r)}
+                for r in results
+            ],
         }
 
     def _search_symbol(self, pattern: str, path: str, symbol_type: str = "all") -> Dict:
@@ -742,7 +906,8 @@ class SkillToolExecutor:
                                     "type": sym_type,
                                     "file": filepath,
                                     "line": i,
-                                    "signature": line.strip()[:120]
+                                    "signature": line.strip()[:120],
+                                    "source_type": self._infer_source_type(filepath),
                                 })
             
             elif ext == '.md':
@@ -758,7 +923,8 @@ class SkillToolExecutor:
                                 "type": f"heading_h{level}",
                                 "file": filepath,
                                 "line": i,
-                                "signature": line.strip()[:120]
+                                "signature": line.strip()[:120],
+                                "source_type": self._infer_source_type(filepath),
                             })
         
         if os.path.isfile(path):
