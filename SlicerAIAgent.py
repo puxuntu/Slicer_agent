@@ -451,6 +451,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if response.get('cost') is not None:
                 self._timing['cost'] = response['cost']
 
+        # Persist thinking/reasoning content to file
+        if response.get('reasoning_content'):
+            self._appendThinkingToFile(response['reasoning_content'], turn=getattr(self, '_currentTurn', 1))
+
         # Display generated code if any and auto-execute
         if response.get("code"):
             self.currentCode = response["code"]
@@ -583,6 +587,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 if self._timing:
                     self._timing['tokens'] = self._currentTurnTokens
                     self._timing['cost'] = self._currentTurnCost
+
+            # Persist thinking/reasoning content to file (non-streaming path)
+            if response.get('reasoning_content'):
+                self._appendThinkingToFile(response['reasoning_content'], turn=getattr(self, '_currentTurn', 1))
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -900,6 +908,22 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.appendToChat("System", f"Correction response contained no code block. Raw response preview:\n{raw_msg}")
             self._stopThinkingTimer("Failed")
             self.statusLabel.text = "Ready"
+    
+    def _appendThinkingToFile(self, reasoning_content: str, turn: int = 1):
+        """Append LLM thinking/reasoning content to a local text file."""
+        import os
+        from datetime import datetime
+        try:
+            moduleDir = os.path.dirname(__file__)
+            filepath = os.path.join(moduleDir, 'thinking_history.txt')
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with open(filepath, 'a', encoding='utf-8') as f:
+                f.write(f"{'='*60}\n")
+                f.write(f"Turn {turn} | {timestamp}\n")
+                f.write(f"{'='*60}\n")
+                f.write(f"{reasoning_content}\n\n")
+        except Exception as e:
+            logger.warning(f"Failed to write thinking history: {e}")
     
     def _handleCorrectionError(self, error_msg):
         """Handle self-correction error on the main thread."""
