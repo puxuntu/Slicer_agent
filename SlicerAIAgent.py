@@ -819,7 +819,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     messages=isolated_messages,
                     tools=_logic.skillTools,
                     tool_executor=_logic._executeTool,
-                    max_tool_rounds=50,
+                    max_tool_rounds=15,
                     on_progress=_on_correction_progress,
                 )
                 

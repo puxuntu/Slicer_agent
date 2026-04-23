@@ -997,6 +997,8 @@ class LLMClient:
             'total_completion_tokens': 0,
             'rounds': [],
         }
+        # Track how many times each file has been read to prevent loops.
+        readfile_counts = {}
 
         for round_num in range(max_tool_rounds):
             logger.info(f"Tool calling round {round_num + 1}")
@@ -1120,6 +1122,24 @@ class LLMClient:
 
                 for out in outputs:
                     tool_result = out["tool_result"]
+                    # Detect repeated ReadFile calls on the same file to break search loops.
+                    if out["history_entry"] is not None and out["history_entry"].get("tool") == "ReadFile":
+                        read_path = out["history_entry"]["args"].get("path", "")
+                        readfile_counts[read_path] = readfile_counts.get(read_path, 0) + 1
+                        if readfile_counts[read_path] > 2:
+                            # Inject a warning into the tool result content
+                            try:
+                                result_data = json.loads(tool_result["content"])
+                                if isinstance(result_data, dict):
+                                    warning = (
+                                        f"[WARNING] This file ({read_path}) has already been read {readfile_counts[read_path]} times. "
+                                        "If the previous reads did not contain what you need, the information likely does not exist in this file. "
+                                        "STOP repeating ReadFile on this file and either use a different file or generate the best code you can."
+                                    )
+                                    result_data["_repeated_read_warning"] = warning
+                                    tool_result["content"] = json.dumps(result_data, ensure_ascii=False, default=str)
+                            except Exception:
+                                pass
                     # ReadFile and Grep now handle their own output shaping at the tool layer.
                     # No post-compression needed here.
                     tool_results.append(tool_result)
@@ -1232,7 +1252,7 @@ class LLMClient:
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
         context: Optional[Dict] = None,
-        max_tool_rounds: int = 50,
+        max_tool_rounds: int = 15,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -1338,7 +1358,7 @@ class LLMClient:
         messages: List[Dict[str, Any]],
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
-        max_tool_rounds: int = 50,
+        max_tool_rounds: int = 15,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
