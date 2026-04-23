@@ -943,6 +943,8 @@ class LLMClient:
                 assistant_message = data['choices'][0]['message']
                 content = self._coerceText(assistant_message.get('content', ''))
                 reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
+                if reasoning_content:
+                    all_reasoning_parts.append(f"[Round {round_num + 1}]\n{reasoning_content}")
                 
                 return self._buildResponse(content, reasoning_content, data.get('usage', {}), data)
                 
@@ -986,6 +988,7 @@ class LLMClient:
         """
         tool_calls_history = []
         intermediate_messages = []
+        all_reasoning_parts = []  # accumulate reasoning across all tool rounds
         timing_report = {
             'api_calls': 0,
             'tool_rounds': 0,
@@ -1216,9 +1219,10 @@ class LLMClient:
                 raise
 
         logger.warning(f"Max tool rounds ({max_tool_rounds}) reached")
+        accumulated_reasoning = '\n\n'.join(all_reasoning_parts) if all_reasoning_parts else reasoning_content
         return {
             'content': content,
-            'reasoning_content': reasoning_content,
+            'reasoning_content': accumulated_reasoning,
             'data': data,
             'timing_report': timing_report,
             'tool_calls_history': tool_calls_history,
