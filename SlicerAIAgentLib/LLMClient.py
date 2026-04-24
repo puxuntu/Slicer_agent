@@ -216,11 +216,14 @@ class LLMClient:
         """Convert Anthropic Messages API response to OpenAI-compatible shape."""
         content_blocks = data.get('content', [])
         text_parts: List[str] = []
+        thinking_parts: List[str] = []
         tool_calls: List[Dict[str, Any]] = []
         for block in content_blocks:
             btype = block.get('type')
             if btype == 'text':
                 text_parts.append(block.get('text', ''))
+            elif btype == 'thinking':
+                thinking_parts.append(block.get('thinking', ''))
             elif btype == 'tool_use':
                 tool_calls.append({
                     'id': block.get('id', ''),
@@ -234,6 +237,8 @@ class LLMClient:
             'content': ''.join(text_parts),
             'role': 'assistant',
         }
+        if thinking_parts:
+            message['reasoning_content'] = '\n'.join(thinking_parts)
         if tool_calls:
             message['tool_calls'] = tool_calls
         usage_data = data.get('usage', {})
@@ -280,7 +285,13 @@ class LLMClient:
 
     def _supportsThinking(self) -> bool:
         """Return True if the current model should receive the thinking parameter."""
-        return self.model.startswith("kimi-k2")
+        if self.model.startswith("kimi-k2"):
+            return True
+        if self.model.endswith("-thinking"):
+            return True
+        if self.model.startswith("claude-") and ("-4-6" in self.model or "-4-5" in self.model):
+            return True
+        return False
 
     def _buildMessages(self, prompt: str, context: Optional[Dict] = None) -> List[Dict[str, Any]]:
         """
@@ -359,6 +370,11 @@ class LLMClient:
                 payload["stream"] = True
             if tools:
                 payload["tools"] = self._convertToolsForClaude(tools)
+            if self._supportsThinking():
+                # Anthropic thinking API requires budget_tokens and max_tokens > budget_tokens
+                budget = 4096
+                payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
+                payload["max_tokens"] = max(payload["max_tokens"], budget + 4096)
             return payload
 
         payload = {
