@@ -2,8 +2,8 @@
 SkillTools - Tool implementations for searching the Slicer skill.
 
 Provides cross-platform search functionality:
-- Windows: Uses PowerShell/findstr (if available) or Python fallback
-- Linux/macOS: Uses grep/find
+- All platforms: Uses ripgrep (rg) for fast aggregated search.
+  Windows falls back to a bundled rg.exe; Linux/macOS require system rg in PATH.
 """
 
 import os
@@ -374,7 +374,7 @@ class SkillToolExecutor:
 
     def _find_rg(self) -> Optional[str]:
         # 1. Windows bundled binary
-        if os.path.isfile(_RG_PATH):
+        if self.platform == 'windows' and os.path.isfile(_RG_PATH):
             return _RG_PATH
         # 2. System-installed rg (any platform: Linux, macOS, Windows with rg in PATH)
         try:
