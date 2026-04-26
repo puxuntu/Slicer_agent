@@ -4,7 +4,7 @@ import queue
 import threading
 import unittest
 import logging
-from typing import List
+from typing import Dict, List, Optional
 import vtk
 import qt
 import ctk
@@ -94,6 +94,13 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streamPollTimer.timeout.connect(self._drainStreamQueue)
         self._streamPollTimer.start()
 
+        # Index status polling (every 2 seconds)
+        self._indexStatusTimer = qt.QTimer()
+        self._indexStatusTimer.setInterval(2000)
+        self._indexStatusTimer.timeout.connect(self._updateIndexStatus)
+        self._indexStatusTimer.start()
+        self._updateIndexStatus()
+
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
@@ -115,6 +122,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
         self.thinkingTimerLabel = self.ui.findChild(qt.QLabel, "thinkingTimerLabel")
+        # Hybrid index status label (may not exist in older .ui files)
+        self.indexStatusLabel = self.ui.findChild(qt.QLabel, "indexStatusLabel")
+        if self.indexStatusLabel is None:
+            # Dynamically inject into the UI if not present in .ui file
+            self._injectIndexStatusLabel()
 
     def setupUIProgrammatically(self):
         self.ui = ctk.ctkCollapsibleButton()
@@ -213,6 +225,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.tokenLabel = qt.QLabel("Tokens: 0 | Cost: $0.000")
         mainLayout.addWidget(self.tokenLabel)
 
+        self.indexStatusLabel = qt.QLabel("Index: Checking...")
+        self.indexStatusLabel.setStyleSheet("font-size: 11px;")
+        mainLayout.addWidget(self.indexStatusLabel)
+
         self.setupConnections()
 
     def setupConnections(self):
@@ -257,9 +273,48 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.disconnect()
         if self._streamPollTimer:
             self._streamPollTimer.stop()
+        if hasattr(self, '_indexStatusTimer') and self._indexStatusTimer:
+            self._indexStatusTimer.stop()
         if self.logic:
             self.logic.cleanup()
         logger.info("SlicerAIAgent widget cleaned up")
+
+    def _injectIndexStatusLabel(self):
+        """Dynamically add index status label to the UI if not in .ui file."""
+        try:
+            parent = self.statusLabel.parent() if self.statusLabel else self.ui
+            if parent is None:
+                parent = self.ui
+            layout = parent.layout()
+            if layout is None:
+                layout = qt.QVBoxLayout(parent)
+                parent.setLayout(layout)
+            self.indexStatusLabel = qt.QLabel("Index: Checking...")
+            self.indexStatusLabel.setStyleSheet("font-size: 11px;")
+            layout.addWidget(self.indexStatusLabel)
+        except Exception as e:
+            logger.warning(f"Failed to inject index status label: {e}")
+            self.indexStatusLabel = None
+
+    def _updateIndexStatus(self):
+        """Update UI label to show current hybrid index status."""
+        if not hasattr(self, 'indexStatusLabel') or self.indexStatusLabel is None:
+            return
+        if not self.logic:
+            self.indexStatusLabel.text = "Index: Not initialized"
+            self.indexStatusLabel.setStyleSheet("font-size: 11px; color: #999;")
+            return
+
+        status = self.logic.get_index_status()
+        status_map = {
+            "Ready":    ("Index: Ready",     "font-size: 11px; color: #2e7d32;"),
+            "Missing":  ("Index: Not Built", "font-size: 11px; color: #c62828;"),
+            "Error":    ("Index: Error",     "font-size: 11px; color: #c62828;"),
+            "Unknown":  ("Index: Unknown",   "font-size: 11px; color: #999;"),
+        }
+        text, style = status_map.get(status, (f"Index: {status}", "font-size: 11px; color: #666;"))
+        self.indexStatusLabel.text = text
+        self.indexStatusLabel.setStyleSheet(style)
 
     def enter(self):
         if (hasattr(self, 'chatHistory') and self.chatHistory is not None and
@@ -444,6 +499,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Record LLM internal timing and token usage
         if self._timing:
             self._timing['llm_timing'] = response.get('timing_report', {})
+            if 'retrieval_timing' in response:
+                self._timing['retrieval_timing'] = response['retrieval_timing']
             import time
             self._timing['generation_complete'] = time.time()
             if response.get('tokens'):
@@ -979,6 +1036,28 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append(f"Scene context build: {t['context_build_time']:.3f}s")
                 lines.append("")
 
+            # Retrieval (multi-query decomposition)
+            if 'retrieval_timing' in t:
+                rt = t['retrieval_timing']
+                lines.append("Retrieval (multi-query decomposition):")
+                if 'decomposition_time' in rt:
+                    lines.append(f"  Query decomposition: {rt['decomposition_time']:.3f}s")
+                if 'sub_queries' in rt:
+                    for i, sq in enumerate(rt['sub_queries'], 1):
+                        lines.append(f"  Sub-query {i}: {sq}")
+                if 'retrieval_count' in rt:
+                    lines.append(f"  Retrieval calls: {rt['retrieval_count']}")
+                if 'merged_count' in rt:
+                    lines.append(f"  Merged unique chunks: {rt['merged_count']}")
+                if 'total_slots' in rt:
+                    lines.append(f"  Total slots target: {rt['total_slots']}")
+                if 'retrieval_per_query' in rt:
+                    total_retrieval_time = sum(pq.get('time', 0) for pq in rt['retrieval_per_query'])
+                    lines.append(f"  Total retrieval time: {total_retrieval_time:.3f}s")
+                    for pq in rt['retrieval_per_query']:
+                        lines.append(f"    - {pq.get('query', '')}: {pq.get('count', 0)} chunks in {pq.get('time', 0):.3f}s")
+                lines.append("")
+
             # LLM generation
             if 'turn_start' in t and 'generation_complete' in t:
                 gen = t['generation_complete'] - t['turn_start']
@@ -1346,6 +1425,11 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
 
+            # Hybrid index background check
+            self._indexBuilder = None
+            self._index_status = "Unknown"
+            self._start_index_background_check()
+
             logger.info("SlicerAIAgent logic components initialized")
         except Exception as e:
             import traceback
@@ -1388,6 +1472,65 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
     def hasApiKey(self):
         return bool(self.apiKey)
 
+    def _getHybridRetriever(self):
+        """Get the cached hybrid retriever if available."""
+        if self.toolExecutor and self.toolExecutor.has_hybrid_index():
+            return self.toolExecutor._hybrid_retriever
+        if self._indexBuilder and self._indexBuilder.index_exists():
+            return self._indexBuilder.load_retriever()
+        return None
+
+    def _buildRetrievalContext(self, prompt: str, timing: Optional[Dict] = None) -> str:
+        """
+        Perform hybrid pre-retrieval with query decomposition for complex requests.
+        Returns formatted context string or empty string.
+        """
+        try:
+            retriever = self._getHybridRetriever()
+            if not retriever or not retriever.is_ready():
+                return ""
+
+            import time
+            # Step 1: Query decomposition
+            t0 = time.time()
+            sub_queries = self.llmClient.decomposeQuery(prompt)
+            t1 = time.time()
+
+            # Step 2: Multi-retrieval (top-15 per sub-query)
+            all_results = []
+            per_query = []
+            for sq in sub_queries:
+                q_start = time.time()
+                results = retriever.search(sq, top_k=15)
+                q_end = time.time()
+                all_results.append(results)
+                per_query.append({
+                    'query': sq,
+                    'count': len(results),
+                    'time': round(q_end - q_start, 3)
+                })
+
+            # Step 3: Merge with quota and format
+            from SlicerAIAgentLib.SkillIndexer import HybridRetriever
+            total_slots = max(15, len(sub_queries) * 5)
+            merged = HybridRetriever.merge_results_with_quota(
+                all_results, quota_per_list=3, total_slots=total_slots
+            )
+            formatted = retriever.format_for_prompt(merged)
+
+            if timing is not None:
+                timing['decomposition_time'] = round(t1 - t0, 3)
+                timing['sub_queries'] = sub_queries
+                timing['retrieval_count'] = len(sub_queries)
+                timing['retrieval_per_query'] = per_query
+                timing['merged_count'] = len(merged)
+                timing['total_slots'] = total_slots
+
+            return formatted
+        except Exception as e:
+            logger.warning(f"Hybrid pre-retrieval failed: {e}")
+            return ""
+
     def generateResponse(self, prompt):
         """
         Generate AI response (non-streaming).
@@ -1404,7 +1547,12 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             raise RuntimeError("API key not configured")
 
         context = {"scene": self._buildSceneContext()}
+        retrieval_timing = {}
+        retrieval = self._buildRetrievalContext(prompt, retrieval_timing)
+        if retrieval:
+            context["retrieval_results"] = retrieval
         response = self.llmClient.chat(prompt, context=context)
+        response['retrieval_timing'] = retrieval_timing
         self.conversationStore.addExchange(prompt, response)
         return response
 
@@ -1432,6 +1580,13 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         if context is None:
             context = {"scene": self._buildSceneContext()}
 
+        # Inject hybrid retrieval results if not already present
+        retrieval_timing = {}
+        if "retrieval_results" not in context:
+            retrieval = self._buildRetrievalContext(prompt, retrieval_timing)
+            if retrieval:
+                context["retrieval_results"] = retrieval
+
         if use_tools and self.toolExecutor and self.skillTools:
             # Use tool calling for skill search
             try:
@@ -1457,6 +1612,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             # Fallback to regular streaming
             response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
         
+        response['retrieval_timing'] = retrieval_timing
         self.conversationStore.addExchange(prompt, response)
         return response
 
@@ -1494,7 +1650,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile, HybridSearch)
             tool_args: Tool arguments dict
             
         Returns:
@@ -1581,6 +1737,34 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             self.llmClient.cleanup()
         if self.executor:
             self.executor.cleanup()
+
+    def _start_index_background_check(self):
+        """
+        Check whether a hybrid index exists on disk.
+        Does NOT auto-build or auto-update — the user must run build_RAG.py manually.
+        """
+        try:
+            from SlicerAIAgentLib.SkillIndexer import IndexBuilder
+
+            # Use the same root directory as SlicerAIAgent.py so that the index
+            # path is deterministic regardless of how SkillIndexer.py resolves __file__.
+            self._index_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "Resources", "Code_RAG", "v1"
+            )
+            self._indexBuilder = IndexBuilder(self.skill_path, index_dir=self._index_dir)
+            if self._indexBuilder.index_exists():
+                self._index_status = "Ready"
+                logger.info(f"Hybrid index found: {self._index_dir}")
+            else:
+                self._index_status = "Missing"
+                logger.info(f"Hybrid index not found at {self._index_dir}. Run build_RAG.py to create it.")
+        except Exception as e:
+            logger.warning(f"Could not check index status: {e}")
+            self._index_status = "Error"
+
+    def get_index_status(self) -> str:
+        """Return current hybrid index status for UI display."""
+        return getattr(self, '_index_status', 'Unknown')
 
 #------------------------------------------------------------------
 # Test Class

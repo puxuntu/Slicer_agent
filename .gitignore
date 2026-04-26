@@ -44,6 +44,9 @@ CHANGES.md
 Resources/Skills/slicer-skill-full/
 Resources/Skills/slicer-skill-full/**
 
+# Hybrid retrieval index and model cache (large local artifacts)
+Resources/Code_RAG/
+
 # Debug / runtime output files
 *_prompt_debug.txt
 *_code.txt

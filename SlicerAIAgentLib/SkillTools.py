@@ -12,7 +12,7 @@ import json
 import subprocess
 import platform
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ class SkillToolExecutor:
         self.platform = platform.system().lower()  # 'windows', 'linux', 'darwin'
         self._tree_sitter_available = self._ensure_tree_sitter()
         self._read_history = {}  # path -> {"query": str, "strategy": str}
+        self._hybrid_retriever = self._init_hybrid_retriever()
     
     def _ensure_tree_sitter(self) -> bool:
         """
@@ -87,16 +88,13 @@ class SkillToolExecutor:
     def _get_tree_sitter_parser(self, ext: str):
         """Get a tree-sitter parser for the given file extension."""
         try:
-            from tree_sitter import Language, Parser
+            from tree_sitter_languages import get_parser
             if ext == '.py':
-                import tree_sitter_python as tspython
-                lang = Language(tspython.language())
+                return get_parser('python')
             elif ext in ('.cxx', '.cpp', '.h', '.hxx', '.c'):
-                import tree_sitter_cpp as tscpp
-                lang = Language(tscpp.language())
+                return get_parser('cpp')
             else:
                 return None
-            return Parser(lang)
         except Exception:
             return None
     
@@ -251,12 +249,32 @@ class SkillToolExecutor:
         
         return rel.replace(os.sep, '/')
 
+    def _init_hybrid_retriever(self) -> Any:
+        """
+        Attempt to load an existing hybrid index.
+        Returns HybridRetriever if available, else None.
+        """
+        try:
+            from .SkillIndexer import IndexBuilder
+            builder = IndexBuilder(self.skill_path)
+            retriever = builder.load_retriever()
+            if retriever and retriever.is_ready():
+                logger.info("Hybrid retriever loaded successfully.")
+                return retriever
+        except Exception as e:
+            logger.warning(f"Hybrid retriever initialization failed: {e}")
+        return None
+
+    def has_hybrid_index(self) -> bool:
+        """Return True if a hybrid index is loaded and ready."""
+        return self._hybrid_retriever is not None and self._hybrid_retriever.is_ready()
+
     def execute(self, tool_name: str, arguments: Dict) -> Dict:
         """
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile, HybridSearch)
             arguments: Tool arguments
             
         Returns:
@@ -279,6 +297,11 @@ class SkillToolExecutor:
             result = self._readfile(
                 arguments.get("path", ""),
                 arguments.get("query")
+            )
+        elif tool_name == "HybridSearch":
+            result = self._hybrid_search(
+                arguments.get("query", ""),
+                arguments.get("top_k", 15)
             )
         else:
             return {"error": f"Unknown tool: {tool_name}"}
@@ -309,8 +332,47 @@ class SkillToolExecutor:
                 result["file"] = self._relativize(result["file"])
         return result
     
+    def _hybrid_search(self, query: str, top_k: int = 15) -> Dict:
+        """Execute hybrid search against the pre-built index."""
+        if not self._hybrid_retriever:
+            return {
+                "tool": "HybridSearch",
+                "query": query,
+                "error": "Hybrid index not available. Please build index first."
+            }
+        try:
+            results = self._hybrid_retriever.search(query, top_k)
+            formatted = self._hybrid_retriever.format_for_prompt(results)
+            # Serialize results for JSON compatibility
+            serializable = []
+            for rc in results:
+                c = rc.chunk
+                serializable.append({
+                    "chunk_id": c.chunk_id,
+                    "file_path": c.file_path,
+                    "start_line": c.start_line,
+                    "end_line": c.end_line,
+                    "chunk_type": c.chunk_type,
+                    "source_type": c.source_type,
+                    "bm25_score": round(rc.bm25_score, 4),
+                    "vector_score": round(rc.vector_score, 4),
+                    "final_score": round(rc.final_score, 4),
+                })
+            return {
+                "tool": "HybridSearch",
+                "query": query,
+                "results": serializable,
+                "formatted_context": formatted,
+            }
+        except Exception as e:
+            logger.warning(f"Hybrid search failed: {e}")
+            return {
+                "tool": "HybridSearch",
+                "query": query,
+                "error": str(e),
+            }
+
     def _find_rg(self) -> Optional[str]:
-        """Return path to ripgrep binary if available, else None."""
         # 1. Windows bundled binary
         if os.path.isfile(_RG_PATH):
             return _RG_PATH
@@ -1047,6 +1109,27 @@ def get_skill_tools() -> List[Dict]:
                         }
                     },
                     "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "HybridSearch",
+                "description": "Semantic hybrid search (BM25 + vector) over the pre-indexed knowledge base. Returns the most relevant code snippets. Use this as a fast first step before using ReadFile or Grep.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Natural language query describing what you need (e.g., 'load a volume and display it')"
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "Number of top results to return (default 15)"
+                        }
+                    },
+                    "required": ["query"]
                 }
             }
         },

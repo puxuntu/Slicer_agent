@@ -68,6 +68,10 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         self.tearDown()
         
         self.setUp()
+        self.test_SkillIndexer()
+        self.tearDown()
+        
+        self.setUp()
         self.test_Integration()
         self.tearDown()
 
@@ -77,6 +81,7 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
             from SlicerAIAgentLib import (
                 LLMClient,
                 SkillTools,
+                SkillIndexer,
                 CodeValidator,
                 SafeExecutor,
                 ConversationStore,

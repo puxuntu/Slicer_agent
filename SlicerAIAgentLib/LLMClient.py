@@ -445,6 +445,13 @@ class LLMClient:
         base_prompt += "You only need to specify the relative path within the skill directory. "
         base_prompt += "Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths — the tool handles this automatically.\n"
 
+        # Inject hybrid retrieval results if available
+        if context and context.get('retrieval_results'):
+            base_prompt += "\n\n## RELEVANT KNOWLEDGE BASE SNIPPETS\n"
+            base_prompt += context['retrieval_results']
+            base_prompt += "\n\nUse the above snippets as a starting point. "
+            base_prompt += "If you need to confirm exact API signatures, use ReadFile or Grep.\n"
+
         # Add dynamic scene context
         if context and context.get('scene'):
             scene = context['scene']
@@ -1355,6 +1362,77 @@ class LLMClient:
         response['timing_report'] = timing_report
         response['intermediate_messages'] = intermediate_messages
         return response
+
+    def decomposeQuery(self, prompt: str) -> List[str]:
+        """
+        Decompose a complex user query into sub-task queries for multi-retrieval.
+
+        Short or simple queries are returned as-is without API call.
+        Complex multi-step queries are broken into 2-5 independent sub-queries
+        via a lightweight LLM call.
+
+        Returns:
+            List of query strings. Always returns at least [prompt].
+        """
+        # Heuristic: only truly short and simple queries skip decomposition
+        word_count = len(prompt.split())
+        comma_count = prompt.count(',')
+        and_count = prompt.lower().count(' and ')
+        if word_count < 12 and comma_count == 0 and and_count <= 1:
+            return [prompt]
+
+        system_msg = (
+            "You are a task decomposition assistant for 3D Slicer medical image analysis software.\n"
+            "Analyze the user's request and break it into independent sub-tasks.\n"
+            "Each sub-task should be a concise natural-language query suitable for code/API retrieval.\n\n"
+            "Rules:\n"
+            "- If the request is simple (1-2 clear steps), return it as a single task unchanged.\n"
+            "- For complex multi-step requests, break into 2-5 sub-tasks.\n"
+            "- Each sub-task must be self-contained and mention the specific Slicer operation.\n"
+            "- Output ONLY a JSON array of strings. No markdown, no explanation.\n\n"
+            'Output format example: ["load a DICOM volume", '
+            '"apply threshold segmentation to create a segment", '
+            '"export segmentation as STL model"]'
+        )
+
+        # Save/restore conversation history to avoid polluting user dialog
+        saved_history = list(self.conversation_history)
+        try:
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": f"User request: {prompt}"},
+            ]
+            payload = self._buildPayload(messages, stream=False)
+            url = self._getChatUrl()
+            request = self._buildRequest(url, payload)
+
+            with self._openRequest(request) as response:
+                data = json.loads(response.read().decode('utf-8'))
+
+            if self._isClaude():
+                data = self._normalizeClaudeResponse(data)
+
+            content = data['choices'][0]['message'].get('content', '').strip()
+
+            # Extract JSON array from response
+            match = re.search(r'\[.*\]', content, re.DOTALL)
+            if match:
+                try:
+                    sub_queries = json.loads(match.group())
+                    if isinstance(sub_queries, list) and len(sub_queries) > 0:
+                        validated = [str(q).strip() for q in sub_queries if str(q).strip()]
+                        if validated:
+                            return validated
+                except json.JSONDecodeError:
+                    pass
+
+            # Fallback: return original if parsing fails
+            return [prompt]
+        except Exception as e:
+            logger.warning(f"Query decomposition failed: {e}")
+            return [prompt]
+        finally:
+            self.conversation_history = saved_history
 
     def chatWithToolsIsolated(
         self,
