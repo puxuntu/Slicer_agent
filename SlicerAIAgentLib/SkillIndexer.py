@@ -216,12 +216,36 @@ class Chunker:
 
     # P0 + P1 directories that we actually index
     INDEXED_PREFIXES = (
+        # ── Cookbook examples (highest value for code gen) ──
         "slicer-source/Docs/developer_guide/script_repository",
+
+        # ── Core Python API ──
         "slicer-source/Base/Python/slicer/util.py",
         "slicer-source/Base/Python/slicer/",
+
+        # ── Scripted module reference implementations ──
         "slicer-source/Modules/Scripted/",
-        "slicer-source/Libs/MRML/Core/",
+
+        # ── Segment Editor Python effects ──
         "slicer-source/Modules/Loadable/Segmentations/EditorEffects/Python/",
+
+        # ── Loadable module Python tests (programmatic control APIs) ──
+        "slicer-source/Modules/Loadable/Colors/Testing/Python/",
+        "slicer-source/Modules/Loadable/CropVolume/Testing/Python/",
+        "slicer-source/Modules/Loadable/Markups/Testing/Python/",
+        "slicer-source/Modules/Loadable/Markups/Widgets/Testing/Python/",
+        "slicer-source/Modules/Loadable/Plots/Testing/Python/",
+        "slicer-source/Modules/Loadable/SceneViews/Testing/Python/",
+        "slicer-source/Modules/Loadable/Segmentations/Testing/Python/",
+        "slicer-source/Modules/Loadable/Sequences/Testing/Python/",
+        "slicer-source/Modules/Loadable/SubjectHierarchy/Testing/Python/",
+        "slicer-source/Modules/Loadable/SubjectHierarchy/Widgets/Python/",
+        "slicer-source/Modules/Loadable/Tables/Testing/Python/",
+        "slicer-source/Modules/Loadable/VolumeRendering/Testing/Python/",
+        "slicer-source/Modules/Loadable/Volumes/Testing/Python/",
+
+        # ── MRML node definitions (maps to Python MRML API) ──
+        "slicer-source/Libs/MRML/Core/",
     )
 
     # Extensions we know how to chunk
