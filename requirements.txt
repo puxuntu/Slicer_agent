@@ -10,7 +10,7 @@ numpy>=1.21.0
 # For JSON schema validation
 jsonschema>=4.0.0
 
-# Hybrid retrieval dependencies (auto-installed at runtime if missing)
-# rank-bm25>=0.2.2
+# Dense retrieval dependencies (auto-installed at runtime if missing)
 # faiss-cpu>=1.7.0
-# sentence-transformers>=2.2.0
+# onnxruntime>=1.16.0
+# transformers>=4.30.0

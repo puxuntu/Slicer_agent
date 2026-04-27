@@ -1,6 +1,7 @@
 """
 Standalone script to build the dense vector retrieval index.
 Run this to create/update the FAISS vector index under Resources/Code_RAG/v1/.
+Uses ONNX Runtime for embedding (no PyTorch/CUDA required).
 """
 import os
 import sys

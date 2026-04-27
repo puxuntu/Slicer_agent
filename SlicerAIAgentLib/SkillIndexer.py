@@ -6,7 +6,7 @@ Indexes and model caches are stored under the project's Code_RAG/ directory.
 
 Components:
 - Chunker: splits knowledge-base files into semantic chunks
-- VectorIndex: dense semantic retrieval via sentence-transformers + FAISS
+- VectorIndex: dense semantic retrieval via ONNX Runtime + FAISS
 - VectorRetriever: similarity search + source_type weighting
 - IndexBuilder: orchestrates incremental index building
 """
@@ -120,16 +120,16 @@ def _get_faiss() -> Any:
         raise ImportError("faiss-cpu is required but could not be installed.")
 
 
-def _get_sentence_transformers() -> Any:
-    """Lazy import sentence_transformers with auto-install."""
+def _get_onnxruntime() -> Any:
+    """Lazy import onnxruntime with auto-install."""
     try:
-        from sentence_transformers import SentenceTransformer
-        return SentenceTransformer
+        import onnxruntime as ort
+        return ort
     except ImportError:
-        if _ensure_packages(["sentence-transformers"]):
-            from sentence_transformers import SentenceTransformer
-            return SentenceTransformer
-        raise ImportError("sentence-transformers is required but could not be installed.")
+        if _ensure_packages(["onnxruntime"]):
+            import onnxruntime as ort
+            return ort
+        raise ImportError("onnxruntime is required but could not be installed.")
 
 
 def _get_numpy() -> Any:
@@ -492,55 +492,173 @@ class Chunker:
 # ---------------------------------------------------------------------------
 
 class VectorIndex:
-    """Dense semantic retrieval using sentence-transformers + FAISS."""
+    """Dense semantic retrieval via ONNX Runtime + FAISS."""
 
     MODEL_NAME = "jinaai/jina-embeddings-v2-base-code"
+    ONNX_SUBPATH = "onnx/model.onnx"
     DIMENSION = 768
+    MAX_SEQ_LENGTH = 1024
 
     def __init__(self, index_path: str):
         self.index_path = index_path
-        self.model = None
+        self.session = None      # onnxruntime InferenceSession
+        self.tokenizer = None    # transformers AutoTokenizer
         self.faiss_index = None
         self.chunk_ids: List[str] = []
 
-    def _load_model(self):
-        if self.model is None:
-            SentenceTransformer = _get_sentence_transformers()
-            cache_dir = _get_model_cache_dir()
-            os.makedirs(cache_dir, exist_ok=True)
-            logger.info(f"Loading embedding model {self.MODEL_NAME} (cache: {cache_dir})...")
-            self.model = SentenceTransformer(
+    def _ensure_model_files(self):
+        """Download ONNX model and tokenizer if not cached locally."""
+        cache_dir = _get_model_cache_dir()
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Ensure tokenizer is available
+        if self.tokenizer is None:
+            _ensure_packages(["transformers"])
+            from transformers import AutoTokenizer
+            logger.info(f"Loading tokenizer for {self.MODEL_NAME} ...")
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 self.MODEL_NAME,
-                cache_folder=cache_dir,
+                cache_dir=cache_dir,
                 trust_remote_code=True,
             )
-        return self.model
+
+        # Ensure ONNX model is available
+        onnx_path = os.path.join(cache_dir, "model.onnx")
+        if not os.path.exists(onnx_path):
+            self._download_onnx_model(onnx_path)
+
+    def _download_onnx_model(self, onnx_path: str):
+        """Download ONNX model from HuggingFace Hub with progress logging."""
+        import urllib.request
+        url = f"https://huggingface.co/{self.MODEL_NAME}/resolve/main/{self.ONNX_SUBPATH}"
+        logger.info(f"Downloading ONNX model from {url} ...")
+        logger.info(f"Target: {onnx_path} (this is a one-time ~640 MB download)")
+
+        def _report(block_num, block_size, total_size):
+            downloaded = block_num * block_size
+            if total_size > 0:
+                pct = min(100, downloaded * 100 / total_size)
+                if block_num % 50 == 0 or pct >= 100:
+                    logger.info(f"  Download progress: {pct:.1f}% "
+                               f"({downloaded // 1024 // 1024}MB / {total_size // 1024 // 1024}MB)")
+
+        try:
+            urllib.request.urlretrieve(url, onnx_path, reporthook=_report)
+            logger.info(f"ONNX model downloaded successfully: {onnx_path}")
+        except Exception as e:
+            logger.error(f"Failed to download ONNX model: {e}")
+            raise
+
+    def _load_model(self):
+        if self.session is None:
+            _get_onnxruntime()
+            self._ensure_model_files()
+
+            cache_dir = _get_model_cache_dir()
+            onnx_path = os.path.join(cache_dir, "model.onnx")
+
+            import onnxruntime as ort
+            logger.info(f"Loading ONNX model from {onnx_path} ...")
+
+            sess_options = ort.SessionOptions()
+            sess_options.intra_op_num_threads = 0  # use all CPU cores
+            sess_options.inter_op_num_threads = 0
+
+            self.session = ort.InferenceSession(
+                onnx_path,
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
+            logger.info("ONNX model loaded successfully.")
+        return self.session
+
+    @staticmethod
+    def _mean_pooling(last_hidden_state: np.ndarray, attention_mask: np.ndarray) -> np.ndarray:
+        """Mean pooling over token embeddings, masking padding tokens."""
+        mask = np.expand_dims(attention_mask.astype(np.float32), -1)  # [batch, seq_len, 1]
+        sum_embeddings = np.sum(last_hidden_state * mask, axis=1)      # [batch, hidden_dim]
+        sum_mask = np.clip(np.sum(mask, axis=1), a_min=1e-9, a_max=None)
+        return sum_embeddings / sum_mask
+
+    @staticmethod
+    def _l2_normalize(vectors: np.ndarray) -> np.ndarray:
+        """L2 normalize embeddings."""
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        return vectors / np.clip(norms, a_min=1e-12, a_max=None)
+
+    def _encode(self, texts: List[str], batch_size: int = 8) -> np.ndarray:
+        """Encode texts into embeddings using ONNX Runtime."""
+        import time
+        session = self._load_model()
+        tokenizer = self.tokenizer
+
+        all_embeddings = []
+        total = len(texts)
+        start = time.time()
+        n_batches = (total + batch_size - 1) // batch_size
+        log_every = max(1, n_batches // 10)
+
+        for batch_idx, i in enumerate(range(0, total, batch_size)):
+            batch = texts[i:i + batch_size]
+
+            inputs = tokenizer(
+                batch,
+                padding=True,
+                truncation=True,
+                max_length=self.MAX_SEQ_LENGTH,
+                return_tensors="np",
+            )
+
+            # Build ONNX inputs dynamically based on model's expected inputs
+            ort_inputs = {}
+            for inp in session.get_inputs():
+                name = inp.name
+                if name == "input_ids":
+                    ort_inputs[name] = inputs["input_ids"].astype(np.int64)
+                elif name == "attention_mask":
+                    ort_inputs[name] = inputs["attention_mask"].astype(np.int64)
+                elif name == "token_type_ids":
+                    if "token_type_ids" in inputs:
+                        ort_inputs[name] = inputs["token_type_ids"].astype(np.int64)
+                    else:
+                        ort_inputs[name] = np.zeros_like(inputs["input_ids"], dtype=np.int64)
+
+            outputs = session.run(None, ort_inputs)
+            last_hidden_state = outputs[0]
+
+            # Handle both pooled and hidden-state outputs
+            if last_hidden_state.ndim == 2:
+                embeddings = last_hidden_state
+            else:
+                embeddings = self._mean_pooling(last_hidden_state, inputs["attention_mask"])
+
+            embeddings = self._l2_normalize(embeddings)
+            all_embeddings.append(embeddings)
+
+            if n_batches > 1 and (batch_idx + 1) % log_every == 0:
+                elapsed = time.time() - start
+                done = min(i + batch_size, total)
+                rate = done / elapsed if elapsed > 0 else 0
+                logger.info(f"  Encoded {done}/{total} texts ({rate:.1f} texts/s)")
+
+        if n_batches > 1:
+            elapsed = time.time() - start
+            rate = total / elapsed if elapsed > 0 else 0
+            logger.info(f"  Encoded {total}/{total} texts ({rate:.1f} texts/s total)")
+
+        return np.concatenate(all_embeddings, axis=0)
 
     def build(self, chunks: List[CodeChunk], batch_size: int = 8):
         """Build FAISS index from chunks."""
         import time
         np = _get_numpy()
-        model = self._load_model()
-
-        # Cap at 1024 tokens to fit 4GB consumer GPUs while keeping most chunks intact
-        max_len = 1024
-        if hasattr(model, 'max_seq_length'):
-            model.max_seq_length = max_len
-        elif hasattr(model, 'tokenizer') and hasattr(model.tokenizer, 'model_max_length'):
-            model.tokenizer.model_max_length = max_len
-        logger.info(f"[EMBED] Max sequence length set to {max_len} tokens.")
 
         texts = [c.embedding_text for c in chunks]
-        device = getattr(model, 'device', 'cpu')
-        logger.info(f"[EMBED] Encoding {len(texts)} chunks with {self.MODEL_NAME} on {device} ...")
+        logger.info(f"[EMBED] Encoding {len(texts)} chunks with {self.MODEL_NAME} (ONNX CPU) ...")
+        logger.info(f"[EMBED] Max sequence length: {self.MAX_SEQ_LENGTH} tokens.")
 
         start = time.time()
-        embeddings = model.encode(
-            texts,
-            batch_size=batch_size,
-            show_progress_bar=True,
-            normalize_embeddings=True,
-        )
+        embeddings = self._encode(texts, batch_size=batch_size)
         elapsed = time.time() - start
         speed = len(texts) / elapsed if elapsed > 0 else 0
         logger.info(f"[EMBED] Done: {len(texts)} chunks in {elapsed:.1f}s ({speed:.1f} chunks/s)")
@@ -556,10 +674,7 @@ class VectorIndex:
         if self.faiss_index is None:
             return []
         np = _get_numpy()
-        model = self._load_model()
-        query_embedding = model.encode(
-            [query], normalize_embeddings=True
-        )
+        query_embedding = self._encode([query], batch_size=1)
         scores, indices = self.faiss_index.search(
             np.array(query_embedding, dtype=np.float32), top_k
         )

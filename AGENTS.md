@@ -19,7 +19,7 @@ The extension is built as a standard Slicer **scripted module** and follows Slic
 | LLM backend | OpenAI-compatible APIs (Kimi / Moonshot, Claude / Anthropic) |
 | HTTP client | `urllib.request` (standard library); `httpx` declared in `requirements.txt` |
 | Optional parsing | `tree-sitter` + `tree-sitter-python` + `tree-sitter-cpp` (auto-installed at runtime) |
-| Hybrid retrieval | `rank-bm25`, `faiss-cpu`, `sentence-transformers` (auto-installed at runtime) |
+| Dense retrieval | `faiss-cpu`, `onnxruntime`, `transformers` (auto-installed at runtime) |
 | Other deps | `numpy`, `jsonschema` (from `requirements.txt`) |
 
 ## Project Structure
@@ -58,7 +58,7 @@ scripts/build_rag.py          # Standalone script to build/update the dense vect
 - **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `HybridSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing. `HybridSearch` delegates to `SkillIndexer.VectorRetriever` if a local index is present.
 - **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
   - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.
-  - `VectorIndex` — dense semantic retrieval via `sentence-transformers` (`jinaai/jina-embeddings-v2-base-code`, 768-dim, 8192-token context) + FAISS (`IndexFlatIP`).
+  - `VectorIndex` — dense semantic retrieval via ONNX Runtime (`jinaai/jina-embeddings-v2-base-code` ONNX export, 768-dim) + FAISS (`IndexFlatIP`).
   - `VectorRetriever` — pure dense vector search with source-type weighting (`doc_example` ×1.3, `python_api` ×1.2, etc.). Deduplicates to max 3 chunks per file. Supports `merge_results_with_quota` for multi-query decomposition.
   - `IndexBuilder` — incremental index builder. Scans skill tree, compares file mtime fingerprints, re-chunks only changed files, then rebuilds the FAISS vector index. Stores everything under `<repo>/Resources/Code_RAG/v1/`; model cache lives under `<repo>/Resources/Code_RAG/models/`.
 - **`SlicerAIAgentLib/SafeExecutor.py`** — Runs generated code in `sys.modules['__main__'].__dict__` (same namespace as the Slicer Python Console). Captures stdout/stderr, intercepts VTK errors via `vtkFileOutputWindow`, supports cooperative timeout, and rolls back the MRML scene on failure (`SaveStateForUndo` + node-ID-based cleanup). Execution is scheduled via `qt.QTimer.singleShot` to stay on the main thread.
@@ -208,6 +208,6 @@ Tool results are compressed before being persisted to conversation history to pr
 - **Do not refactor the monolithic module file into multiple files** without also updating `CMakeLists.txt` and the Slicer macro calls. Slicer scripted modules expect the main `.py` file to declare the classes together.
 - **Any change to the system prompt** should be made in `Resources/Prompts/system_prompt.md`, not hardcoded in `LLMClient.py`. The UI and logic rely on external loading.
 - **The code is auto-executed** after generation. There is no manual "Execute" button in the current UI flow (the buttons were removed). Self-correction is automatic.
-- **Hybrid index dependencies** (`rank-bm25`, `faiss-cpu`, `sentence-transformers`) are commented out in `requirements.txt` and are auto-installed at runtime via `SkillIndexer._ensure_packages` (mirroring the tree-sitter installation pattern). This avoids breaking Slicer builds if the packages are not immediately available.
+- **Retrieval dependencies** (`faiss-cpu`, `onnxruntime`, `transformers`) are commented out in `requirements.txt` and are auto-installed at runtime via `SkillIndexer._ensure_packages` (mirroring the tree-sitter installation pattern). This avoids breaking Slicer builds if the packages are not immediately available.
 - **Qt thread safety:** MRML scene access and all UI updates must happen on the main thread. Background threads are used only for HTTP I/O. Use `qt.QTimer.singleShot(0, ...)` or the internal `_streamQueue` pattern to marshal results back to the main thread.
 - **Do not push this repo to GitHub automatically unless the user asks you to do so.**
