@@ -4,7 +4,7 @@ SlicerAIAgentLib - Core library for the SlicerAIAgent extension.
 This package contains the core components for AI-powered assistance in 3D Slicer:
 - LLMClient: HTTP client for LLM API communication (OpenAI-compatible)
 - SkillTools: Tool calling support for searching the skill
-- SkillIndexer: Hybrid retrieval index (BM25 + FAISS + RRF) for the knowledge base
+- SkillIndexer: Dense vector retrieval index (FAISS) for the knowledge base
 - CodeValidator: Validates Python code for safety before execution
 - SafeExecutor: Sandboxed execution environment for generated code
 - ConversationStore: Manages conversation history
@@ -25,9 +25,8 @@ from .LLMClient import LLMClient
 from .SkillTools import SkillToolExecutor, get_skill_tools
 from .SkillIndexer import (
     Chunker,
-    BM25Index,
     VectorIndex,
-    HybridRetriever,
+    VectorRetriever,
     IndexBuilder,
     CodeChunk,
     RetrievedChunk,

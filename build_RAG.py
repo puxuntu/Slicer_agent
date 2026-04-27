@@ -2,8 +2,11 @@
 Standalone script to build the dense vector retrieval index.
 Run this to create/update the FAISS vector index under Resources/Code_RAG/v1/.
 """
-import os
 import sys
+# Prevent Slicer from treating this file as a scripted loadable module
+if __name__ != "__main__" and "slicer" in sys.modules:
+    raise ImportError("build_RAG.py is a standalone CLI script, not a Slicer module.")
+import os
 import logging
 import time
 
