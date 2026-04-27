@@ -1750,7 +1750,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
     def _start_index_background_check(self):
         """
         Check whether a vector index exists on disk.
-        Does NOT auto-build or auto-update — the user must run build_RAG.py manually.
+        Does NOT auto-build or auto-update — the user must run scripts/build_rag.py manually.
         """
         try:
             from SlicerAIAgentLib.SkillIndexer import IndexBuilder
@@ -1766,7 +1766,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                 logger.info(f"Vector index found: {self._index_dir}")
             else:
                 self._index_status = "Missing"
-                logger.info(f"Vector index not found at {self._index_dir}. Run build_RAG.py to create it.")
+                logger.info(f"Vector index not found at {self._index_dir}. Run scripts/build_rag.py to create it.")
         except Exception as e:
             logger.warning(f"Could not check index status: {e}")
             self._index_status = "Error"

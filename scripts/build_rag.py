@@ -2,34 +2,29 @@
 Standalone script to build the dense vector retrieval index.
 Run this to create/update the FAISS vector index under Resources/Code_RAG/v1/.
 """
-import sys
-# Prevent Slicer from treating this file as a scripted loadable module
-if __name__ != "__main__" and "slicer" in sys.modules:
-    raise ImportError("build_RAG.py is a standalone CLI script, not a Slicer module.")
 import os
+import sys
 import logging
 import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-# Add lib to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Project root is one level up from this script
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PROJECT_ROOT)
 
 # Direct import to avoid loading Slicer-dependent modules via __init__.py
 import importlib.util
 _spec = importlib.util.spec_from_file_location(
     "SkillIndexer",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "SlicerAIAgentLib", "SkillIndexer.py")
+    os.path.join(_PROJECT_ROOT, "SlicerAIAgentLib", "SkillIndexer.py")
 )
 SkillIndexer = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(SkillIndexer)
 IndexBuilder = SkillIndexer.IndexBuilder
 
-SKILL_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "Resources", "Skills", "slicer-skill-full"
-)
+SKILL_PATH = os.path.join(_PROJECT_ROOT, "Resources", "Skills", "slicer-skill-full")
 
 if __name__ == "__main__":
     if not os.path.isdir(SKILL_PATH):

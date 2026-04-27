@@ -36,7 +36,7 @@ SlicerAIAgentLib/             # Core library package
 ├── ConversationStore.py      # Persistent conversation history via Qt QSettings
 └── SlicerCodeTemplates.py    # Reusable Slicer Python code snippets
 Resources/
-├── Code_RAG/                 # Hybrid index artifacts (gitignored, created by build_RAG.py)
+├── Code_RAG/                 # Vector index artifacts (gitignored, created by scripts/build_rag.py)
 ├── Icons/                    # Extension icon
 ├── UI/
 │   └── SlicerAIAgent.ui      # Qt Designer UI file (loaded at runtime)
@@ -48,7 +48,7 @@ Testing/
 └── SlicerAIAgentTest.py      # Unit / integration test suite
 CMakeLists.txt                # Slicer extension build configuration
 requirements.txt              # Python dependencies for Slicer to install
-build_RAG.py                  # Standalone script to build/update the dense vector retrieval index
+scripts/build_rag.py          # Standalone script to build/update the dense vector retrieval index
 ```
 
 ### Key Files for Agents
@@ -99,7 +99,7 @@ slicer.util.pip_install("jsonschema>=4.0.0")
 Run the standalone script to create or incrementally update the dense vector index:
 
 ```bash
-python build_RAG.py
+python scripts/build_rag.py
 ```
 
 This scans `Resources/Skills/slicer-skill-full/`, chunks changed files, and writes index artifacts to `Resources/Code_RAG/v1/`. The index directory and model cache are gitignored.
