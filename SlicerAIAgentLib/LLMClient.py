@@ -1434,31 +1434,50 @@ class LLMClient:
         finally:
             self.conversation_history = saved_history
 
-    def hydeRewrite(self, query: str) -> str:
+    def decomposeQueryWithHyDE(self, prompt: str) -> List[Dict[str, str]]:
         """
-        HyDE (Hypothetical Document Embedding): rewrite a natural language query
-        into a hypothetical Python code snippet. The hypothetical code is embedded
-        and searched against the vector index, bridging the semantic gap between
-        natural language and code.
+        Decompose a complex user query into sub-tasks AND generate HyDE hypothetical
+        code snippets for each sub-task in a **single LLM call**.
+
+        Combines query decomposition + HyDE rewrite into one step, cutting LLM API
+        calls from N+1 down to 1.
 
         Args:
-            query: Natural language query (e.g. "threshold a volume from -200 to 1000")
+            prompt: User's natural language request.
 
         Returns:
-            Hypothetical Python code snippet, or original query if LLM fails.
+            List of dicts: [{"query": str, "hyde": str}, ...]
+            Falls back to [{"query": prompt, "hyde": prompt}] on failure.
         """
+        # Heuristic: skip decomposition for truly short/simple queries
+        word_count = len(prompt.split())
+        comma_count = prompt.count(',')
+        and_count = prompt.lower().count(' and ')
+        if word_count < 12 and comma_count == 0 and and_count <= 1:
+            return [{"query": prompt, "hyde": prompt}]
+
         system_msg = (
-            "You are a 3D Slicer Python API expert. "
-            "Given a user's natural language request, write a short hypothetical Python code snippet "
-            "(2-5 lines) that would accomplish the task. Use real Slicer API names such as "
-            "slicer.util.loadVolume, slicer.modules.segmentEditorWidget, vtkMRML, etc. "
-            "Output ONLY the code snippet, no explanation, no markdown fences."
+            "You are a task decomposition assistant for 3D Slicer medical image analysis software.\n"
+            "Analyze the user's request and break it into independent sub-tasks.\n"
+            "For EACH sub-task, provide TWO fields:\n"
+            "  1. 'query': a concise natural-language query suitable for code/API retrieval.\n"
+            "  2. 'hyde': a short hypothetical Python code snippet (2-4 lines) using real Slicer APIs\n"
+            "     that would accomplish the sub-task. Use real API names such as slicer.util.loadVolume,\n"
+            "     slicer.modules.segmentEditorWidget, vtkMRML, etc.\n\n"
+            "Rules:\n"
+            "- If the request is simple (1-2 clear steps), return it as a single task.\n"
+            "- For complex multi-step requests, break into 2-5 sub-tasks.\n"
+            "- Output ONLY a JSON array of objects. No markdown, no explanation.\n\n"
+            "Output format: [{\"query\":\"...\",\"hyde\":\"...\"}, ...]\n"
+            "Example: [{\"query\":\"load a DICOM volume\",\"hyde\":\"volumeNode = slicer.util.loadVolume('/path/to/volume.nrrd')\"}, "
+            "{\"query\":\"apply threshold segmentation\",\"hyde\":\"segmentEditorWidget = slicer.modules.segmentEditorWidget\\nsegmentEditorWidget.setActiveEffectByName('Threshold')\"}]"
         )
+
         saved_history = list(self.conversation_history)
         try:
             messages = [
                 {"role": "system", "content": system_msg},
-                {"role": "user", "content": f"Task: {query}"},
+                {"role": "user", "content": f"User request: {prompt}"},
             ]
             payload = self._buildPayload(messages, stream=False)
             url = self._getChatUrl()
@@ -1471,13 +1490,30 @@ class LLMClient:
                 data = self._normalizeClaudeResponse(data)
 
             content = data['choices'][0]['message'].get('content', '').strip()
-            # Clean up markdown fences if the LLM added them
-            content = re.sub(r'^```(?:python)?\s*', '', content)
-            content = re.sub(r'\s*```$', '', content)
-            return content if content else query
+
+            # Extract JSON array from response
+            match = re.search(r'\[.*\]', content, re.DOTALL)
+            if match:
+                try:
+                    parsed = json.loads(match.group())
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        validated = []
+                        for item in parsed:
+                            if isinstance(item, dict) and 'query' in item and 'hyde' in item:
+                                validated.append({
+                                    "query": str(item['query']).strip(),
+                                    "hyde": str(item['hyde']).strip(),
+                                })
+                        if validated:
+                            return validated
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+            # Fallback: return original as a single task
+            return [{"query": prompt, "hyde": prompt}]
         except Exception as e:
-            logger.warning(f"HyDE rewrite failed: {e}, falling back to raw query")
-            return query
+            logger.warning(f"Combined decompose+HyDE failed: {e}, falling back to raw query")
+            return [{"query": prompt, "hyde": prompt}]
         finally:
             self.conversation_history = saved_history
 

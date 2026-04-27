@@ -1482,8 +1482,9 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _buildRetrievalContext(self, prompt: str, timing: Optional[Dict] = None) -> str:
         """
-        Perform dense vector pre-retrieval with query decomposition and HyDE.
-        Returns formatted context string or empty string.
+        Perform dense vector pre-retrieval with combined query decomposition + HyDE.
+        Uses a single LLM call to break the request into sub-tasks AND generate
+        hypothetical code snippets for each. Returns formatted context string.
         """
         try:
             retriever = self._getHybridRetriever()
@@ -1491,20 +1492,15 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                 return ""
 
             import time
-            # Step 1: Query decomposition
+            # Step 1: Combined decomposition + HyDE (single LLM call)
             t0 = time.time()
-            sub_queries = self.llmClient.decomposeQuery(prompt)
+            sub_tasks = self.llmClient.decomposeQueryWithHyDE(prompt)
             t1 = time.time()
 
-            # Step 2: HyDE rewrite each sub-query into hypothetical code
-            t_hyde_start = time.time()
-            hyde_queries = []
-            for sq in sub_queries:
-                hyde = self.llmClient.hydeRewrite(sq)
-                hyde_queries.append(hyde)
-            t_hyde_end = time.time()
+            sub_queries = [t['query'] for t in sub_tasks]
+            hyde_queries = [t['hyde'] for t in sub_tasks]
 
-            # Step 3: Multi-retrieval using HyDE queries (top-15 per sub-query)
+            # Step 2: Multi-retrieval using HyDE queries (top-15 per sub-query)
             all_results = []
             per_query = []
             for sq, hyde in zip(sub_queries, hyde_queries):
@@ -1519,7 +1515,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     'time': round(q_end - q_start, 3)
                 })
 
-            # Step 4: Merge with quota and format
+            # Step 3: Merge with quota and format
             from SlicerAIAgentLib.SkillIndexer import VectorRetriever
             total_slots = max(15, len(sub_queries) * 5)
             merged = VectorRetriever.merge_results_with_quota(
@@ -1528,8 +1524,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             formatted = retriever.format_for_prompt(merged)
 
             if timing is not None:
-                timing['decomposition_time'] = round(t1 - t0, 3)
-                timing['hyde_time'] = round(t_hyde_end - t_hyde_start, 3)
+                timing['decompose_hyde_time'] = round(t1 - t0, 3)
                 timing['sub_queries'] = sub_queries
                 timing['hyde_queries'] = hyde_queries
                 timing['retrieval_count'] = len(sub_queries)
