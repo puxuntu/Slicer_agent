@@ -297,7 +297,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.indexStatusLabel = None
 
     def _updateIndexStatus(self):
-        """Update UI label to show current hybrid index status."""
+        """Update UI label to show current vector index status."""
         if not hasattr(self, 'indexStatusLabel') or self.indexStatusLabel is None:
             return
         if not self.logic:
@@ -1036,12 +1036,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append(f"Scene context build: {t['context_build_time']:.3f}s")
                 lines.append("")
 
-            # Retrieval (multi-query decomposition)
+            # Retrieval (multi-query decomposition + HyDE)
             if 'retrieval_timing' in t:
                 rt = t['retrieval_timing']
-                lines.append("Retrieval (multi-query decomposition):")
-                if 'decomposition_time' in rt:
-                    lines.append(f"  Query decomposition: {rt['decomposition_time']:.3f}s")
+                lines.append("Retrieval (multi-query decomposition + HyDE):")
+                if 'decompose_hyde_time' in rt:
+                    lines.append(f"  Query decomposition + HyDE: {rt['decompose_hyde_time']:.3f}s")
                 if 'sub_queries' in rt:
                     for i, sq in enumerate(rt['sub_queries'], 1):
                         lines.append(f"  Sub-query {i}: {sq}")
@@ -1055,7 +1055,10 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     total_retrieval_time = sum(pq.get('time', 0) for pq in rt['retrieval_per_query'])
                     lines.append(f"  Total retrieval time: {total_retrieval_time:.3f}s")
                     for pq in rt['retrieval_per_query']:
+                        hyde_preview = pq.get('hyde', '')[:60].replace('\n', ' ')
                         lines.append(f"    - {pq.get('query', '')}: {pq.get('count', 0)} chunks in {pq.get('time', 0):.3f}s")
+                        if hyde_preview:
+                            lines.append(f"      HyDE: {hyde_preview}...")
                 lines.append("")
 
             # LLM generation
@@ -1473,7 +1476,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         return bool(self.apiKey)
 
     def _getHybridRetriever(self):
-        """Get the cached hybrid retriever if available."""
+        """Get the cached vector retriever if available."""
         if self.toolExecutor and self.toolExecutor.has_hybrid_index():
             return self.toolExecutor._hybrid_retriever
         if self._indexBuilder and self._indexBuilder.index_exists():
@@ -1746,7 +1749,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _start_index_background_check(self):
         """
-        Check whether a hybrid index exists on disk.
+        Check whether a vector index exists on disk.
         Does NOT auto-build or auto-update — the user must run build_RAG.py manually.
         """
         try:
@@ -1760,16 +1763,16 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             self._indexBuilder = IndexBuilder(self.skill_path, index_dir=self._index_dir)
             if self._indexBuilder.index_exists():
                 self._index_status = "Ready"
-                logger.info(f"Hybrid index found: {self._index_dir}")
+                logger.info(f"Vector index found: {self._index_dir}")
             else:
                 self._index_status = "Missing"
-                logger.info(f"Hybrid index not found at {self._index_dir}. Run build_RAG.py to create it.")
+                logger.info(f"Vector index not found at {self._index_dir}. Run build_RAG.py to create it.")
         except Exception as e:
             logger.warning(f"Could not check index status: {e}")
             self._index_status = "Error"
 
     def get_index_status(self) -> str:
-        """Return current hybrid index status for UI display."""
+        """Return current vector index status for UI display."""
         return getattr(self, '_index_status', 'Unknown')
 
 #------------------------------------------------------------------
