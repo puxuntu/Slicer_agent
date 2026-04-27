@@ -251,8 +251,8 @@ class SkillToolExecutor:
 
     def _init_hybrid_retriever(self) -> Any:
         """
-        Attempt to load an existing hybrid index.
-        Returns HybridRetriever if available, else None.
+        Attempt to load an existing vector index.
+        Returns VectorRetriever if available, else None.
         """
         try:
             from .SkillIndexer import IndexBuilder
@@ -1116,7 +1116,7 @@ def get_skill_tools() -> List[Dict]:
             "type": "function",
             "function": {
                 "name": "HybridSearch",
-                "description": "Semantic hybrid search (BM25 + vector) over the pre-indexed knowledge base. Returns the most relevant code snippets. Use this as a fast first step before using ReadFile or Grep.",
+                "description": "Dense vector search over the pre-indexed knowledge base. Returns the most relevant code snippets. Use this as a fast first step before using ReadFile or Grep.",
                 "parameters": {
                     "type": "object",
                     "properties": {

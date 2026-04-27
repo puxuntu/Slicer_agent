@@ -1482,7 +1482,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _buildRetrievalContext(self, prompt: str, timing: Optional[Dict] = None) -> str:
         """
-        Perform hybrid pre-retrieval with query decomposition for complex requests.
+        Perform dense vector pre-retrieval with query decomposition and HyDE.
         Returns formatted context string or empty string.
         """
         try:
@@ -1496,31 +1496,42 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             sub_queries = self.llmClient.decomposeQuery(prompt)
             t1 = time.time()
 
-            # Step 2: Multi-retrieval (top-15 per sub-query)
+            # Step 2: HyDE rewrite each sub-query into hypothetical code
+            t_hyde_start = time.time()
+            hyde_queries = []
+            for sq in sub_queries:
+                hyde = self.llmClient.hydeRewrite(sq)
+                hyde_queries.append(hyde)
+            t_hyde_end = time.time()
+
+            # Step 3: Multi-retrieval using HyDE queries (top-15 per sub-query)
             all_results = []
             per_query = []
-            for sq in sub_queries:
+            for sq, hyde in zip(sub_queries, hyde_queries):
                 q_start = time.time()
-                results = retriever.search(sq, top_k=15)
+                results = retriever.search(hyde, top_k=15)
                 q_end = time.time()
                 all_results.append(results)
                 per_query.append({
                     'query': sq,
+                    'hyde': hyde,
                     'count': len(results),
                     'time': round(q_end - q_start, 3)
                 })
 
-            # Step 3: Merge with quota and format
-            from SlicerAIAgentLib.SkillIndexer import HybridRetriever
+            # Step 4: Merge with quota and format
+            from SlicerAIAgentLib.SkillIndexer import VectorRetriever
             total_slots = max(15, len(sub_queries) * 5)
-            merged = HybridRetriever.merge_results_with_quota(
+            merged = VectorRetriever.merge_results_with_quota(
                 all_results, quota_per_list=3, total_slots=total_slots
             )
             formatted = retriever.format_for_prompt(merged)
 
             if timing is not None:
                 timing['decomposition_time'] = round(t1 - t0, 3)
+                timing['hyde_time'] = round(t_hyde_end - t_hyde_start, 3)
                 timing['sub_queries'] = sub_queries
+                timing['hyde_queries'] = hyde_queries
                 timing['retrieval_count'] = len(sub_queries)
                 timing['retrieval_per_query'] = per_query
                 timing['merged_count'] = len(merged)
@@ -1528,7 +1539,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
             return formatted
         except Exception as e:
-            logger.warning(f"Hybrid pre-retrieval failed: {e}")
+            logger.warning(f"Dense pre-retrieval failed: {e}")
             return ""
 
     def generateResponse(self, prompt):

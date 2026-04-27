@@ -1,15 +1,13 @@
 """
-SkillIndexer - Hybrid retrieval index for Slicer skill knowledge base.
+SkillIndexer - Dense vector retrieval index for Slicer skill knowledge base.
 
-Implements BM25 + dense vector (FAISS) retrieval with RRF fusion and
-source-type weighting. Indexes and model caches are stored under the
-project's Index/ directory (peer to SlicerAIAgentLib/).
+Implements pure dense vector (FAISS) retrieval with source-type weighting.
+Indexes and model caches are stored under the project's Code_RAG/ directory.
 
 Components:
 - Chunker: splits knowledge-base files into semantic chunks
-- BM25Index: sparse lexical retrieval
 - VectorIndex: dense semantic retrieval via sentence-transformers + FAISS
-- HybridRetriever: RRF fusion + source_type weighting
+- VectorRetriever: similarity search + source_type weighting
 - IndexBuilder: orchestrates incremental index building
 """
 
@@ -17,9 +15,8 @@ import hashlib
 import json
 import logging
 import os
-import pickle
+import ast
 import re
-import string
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -135,18 +132,6 @@ def _get_sentence_transformers() -> Any:
         raise ImportError("sentence-transformers is required but could not be installed.")
 
 
-def _get_bm25() -> Any:
-    """Lazy import rank_bm25 with auto-install."""
-    try:
-        from rank_bm25 import BM25Okapi
-        return BM25Okapi
-    except ImportError:
-        if _ensure_packages(["rank-bm25"]):
-            from rank_bm25 import BM25Okapi
-            return BM25Okapi
-        raise ImportError("rank-bm25 is required but could not be installed.")
-
-
 def _get_numpy() -> Any:
     try:
         import numpy as np
@@ -159,52 +144,28 @@ def _get_numpy() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Text preprocessing
+# API description extraction (for embedding text enrichment)
 # ---------------------------------------------------------------------------
 
-_STOPWORDS = {
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "to", "of", "and", "in", "on", "at", "by", "for", "with", "from",
-    "as", "it", "its", "this", "that", "these", "those", "i", "you",
-    "he", "she", "we", "they", "me", "him", "her", "us", "them",
-    "my", "your", "his", "our", "their", "have", "has", "had", "do",
-    "does", "did", "will", "would", "could", "should", "may", "might",
-    "can", "shall", "how", "what", "when", "where", "why", "who",
-    "which", "than", "then", "now", "here", "there", "so", "or", "not",
-    "no", "nor", "but", "if", "else", "also", "very", "just", "only",
-    "too", "more", "most", "some", "any", "all", "each", "every",
-    "both", "either", "neither", "one", "two", "get", "use", "using",
-}
 
-
-def _split_camel_case(token: str) -> List[str]:
-    """Split CamelCase / snake_case tokens."""
-    # snake_case
-    if '_' in token:
-        return [t for t in token.split('_') if t]
-    # CamelCase
-    parts = re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', token)).split()
-    return [p.lower() for p in parts if p]
-
-
-def _tokenize_for_bm25(text: str) -> List[str]:
-    """Tokenize text for BM25: lower, remove punctuation, camel-split, drop stopwords."""
-    text = text.lower()
-    # Replace code punctuation with spaces
-    text = text.translate(str.maketrans(
-        string.punctuation + '()[]{}<>',
-        ' ' * len(string.punctuation + '()[]{}<>')
-    ))
-    tokens = []
-    for raw in text.split():
-        if raw.isdigit():
-            tokens.append(raw)
-            continue
-        expanded = _split_camel_case(raw)
-        for t in expanded:
-            if t not in _STOPWORDS and len(t) > 1:
-                tokens.append(t)
-    return tokens
+def _extract_api_description(content: str) -> str:
+    """Extract function signature + docstring from a Python code chunk."""
+    import ast
+    try:
+        tree = ast.parse(content)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                sig_line = content.split('\n')[0].strip()
+                doc = ast.get_docstring(node)
+                parts = []
+                if sig_line:
+                    parts.append(f"API: {sig_line}")
+                if doc:
+                    parts.append(f"Description: {doc}")
+                return "\n".join(parts) if parts else ""
+    except Exception:
+        pass
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -510,78 +471,20 @@ class Chunker:
 
     def _enhance_code_embedding_text(self, name: str, content: str,
                                      chunk_type: str, source_type: str) -> str:
-        """Prefix code chunks with type hints for better embedding quality."""
+        """Prefix code chunks with type hints and API descriptions for better embedding quality."""
         if chunk_type == 'function':
             prefix = f"function {name}: "
         elif chunk_type == 'class':
             prefix = f"class {name}: "
         else:
             prefix = ""
-        # Also include source_type context
+        # Include source_type context
         ctx = f"[{source_type}] "
+        # NEW: extract signature + docstring for Python chunks
+        api_desc = _extract_api_description(content)
+        if api_desc:
+            prefix = api_desc + "\n" + prefix
         return ctx + prefix + content
-
-
-# ---------------------------------------------------------------------------
-# BM25Index
-# ---------------------------------------------------------------------------
-
-class BM25Index:
-    """Sparse lexical retrieval using rank-bm25."""
-
-    def __init__(self, index_path: str):
-        self.index_path = index_path
-        self.bm25 = None          # BM25Okapi instance
-        self.tokenized_corpus: List[List[str]] = []
-        self.chunk_ids: List[str] = []
-
-    def build(self, chunks: List[CodeChunk]):
-        """Build BM25 index from chunks."""
-        BM25Okapi = _get_bm25()
-        self.tokenized_corpus = []
-        self.chunk_ids = []
-        for chunk in chunks:
-            self.chunk_ids.append(chunk.chunk_id)
-            self.tokenized_corpus.append(
-                _tokenize_for_bm25(chunk.embedding_text)
-            )
-        self.bm25 = BM25Okapi(self.tokenized_corpus)
-        self.save()
-
-    def search(self, query: str, top_k: int = 50) -> List[Tuple[str, float]]:
-        """Return (chunk_id, bm25_score) sorted descending."""
-        if self.bm25 is None:
-            return []
-        tokens = _tokenize_for_bm25(query)
-        if not tokens:
-            return []
-        scores = self.bm25.get_scores(tokens)
-        indexed = list(enumerate(scores))
-        indexed.sort(key=lambda x: x[1], reverse=True)
-        return [(self.chunk_ids[idx], float(score))
-                for idx, score in indexed[:top_k] if score > 0]
-
-    def save(self):
-        with open(self.index_path, 'wb') as f:
-            pickle.dump({
-                'tokenized_corpus': self.tokenized_corpus,
-                'chunk_ids': self.chunk_ids,
-            }, f)
-
-    def load(self) -> bool:
-        if not os.path.exists(self.index_path):
-            return False
-        try:
-            with open(self.index_path, 'rb') as f:
-                data = pickle.load(f)
-            self.tokenized_corpus = data['tokenized_corpus']
-            self.chunk_ids = data['chunk_ids']
-            BM25Okapi = _get_bm25()
-            self.bm25 = BM25Okapi(self.tokenized_corpus)
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to load BM25 index: {e}")
-            return False
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +494,7 @@ class BM25Index:
 class VectorIndex:
     """Dense semantic retrieval using sentence-transformers + FAISS."""
 
-    MODEL_NAME = "BAAI/bge-base-en-v1.5"
+    MODEL_NAME = "jinaai/jina-embeddings-v2-base-code"
     DIMENSION = 768
 
     def __init__(self, index_path: str):
@@ -684,7 +587,7 @@ class VectorIndex:
 
 
 # ---------------------------------------------------------------------------
-# HybridRetriever
+# VectorRetriever
 # ---------------------------------------------------------------------------
 
 _SOURCE_TYPE_WEIGHTS = {
@@ -696,69 +599,50 @@ _SOURCE_TYPE_WEIGHTS = {
     'source': 1.0,
 }
 
-_RRF_K = 60
+class VectorRetriever:
+    """Pure dense vector retrieval with source_type weighting."""
 
-
-class HybridRetriever:
-    """BM25 + Vector retrieval with RRF fusion and source_type weighting."""
-
-    def __init__(self, bm25_index: BM25Index, vector_index: VectorIndex,
+    def __init__(self, vector_index: VectorIndex,
                  chunks_metadata: Dict[str, CodeChunk]):
-        self.bm25 = bm25_index
         self.vector = vector_index
         self.chunks = chunks_metadata
 
     def is_ready(self) -> bool:
-        return (self.bm25.bm25 is not None and
-                self.vector.faiss_index is not None)
+        return self.vector.faiss_index is not None
 
     def search(self, query: str, top_k: int = 15) -> List[RetrievedChunk]:
-        """Run hybrid search and return ranked chunks."""
+        """Run pure vector search and return ranked chunks."""
         if not self.is_ready():
             return []
 
-        # Step 1: parallel retrieval
-        bm25_results = self.bm25.search(query, top_k=50)
-        vec_results = self.vector.search(query, top_k=50)
+        # Over-fetch for deduplication
+        vec_results = self.vector.search(query, top_k=top_k * 3)
 
-        # Step 2: RRF fusion
-        rrf_scores: Dict[str, float] = {}
-
-        def _add_ranked(results: List[Tuple[str, float]], weight: float = 1.0):
-            for rank, (cid, _) in enumerate(results, start=1):
-                score = weight * (1.0 / (_RRF_K + rank))
-                rrf_scores[cid] = rrf_scores.get(cid, 0.0) + score
-
-        _add_ranked(bm25_results, 1.0)
-        _add_ranked(vec_results, 1.0)
-
-        # Step 3: source_type weighting
+        # Apply source_type weighting
         scored = []
-        for cid, rrf in rrf_scores.items():
+        for cid, sim in vec_results:
             chunk = self.chunks.get(cid)
             if not chunk:
                 continue
             weight = _SOURCE_TYPE_WEIGHTS.get(chunk.source_type, 1.0)
-            final = rrf * weight
-            scored.append((cid, final, rrf, chunk))
+            final = sim * weight
+            scored.append((cid, final, sim, chunk))
 
         scored.sort(key=lambda x: x[1], reverse=True)
 
-        # Step 4: deduplicate by file (keep top 3 chunks per file)
+        # Deduplicate by file (max 3 chunks per file)
         file_counts: Dict[str, int] = {}
         results: List[RetrievedChunk] = []
-        for cid, final, rrf, chunk in scored:
+        for cid, final, sim, chunk in scored:
             fp = chunk.file_path
             if file_counts.get(fp, 0) >= 3:
                 continue
             file_counts[fp] = file_counts.get(fp, 0) + 1
-            bm25_dict = dict(bm25_results)
-            vec_dict = dict(vec_results)
             results.append(RetrievedChunk(
                 chunk=chunk,
-                bm25_score=bm25_dict.get(cid, 0.0),
-                vector_score=vec_dict.get(cid, 0.0),
-                rrf_score=rrf,
+                bm25_score=0.0,
+                vector_score=sim,
+                rrf_score=final,
                 final_score=final,
             ))
             if len(results) >= top_k:
@@ -869,7 +753,6 @@ class IndexBuilder:
 
     def index_exists(self) -> bool:
         return (
-            os.path.exists(os.path.join(self.index_dir, "bm25_index.pkl")) and
             os.path.exists(os.path.join(self.index_dir, "vector_index.faiss")) and
             os.path.exists(self._manifest_path)
         )
@@ -1008,13 +891,6 @@ class IndexBuilder:
                 f.write(json.dumps(asdict(chunk), ensure_ascii=False) + "\n")
         logger.info(f"[META] Metadata saved in {time.time()-t2:.1f}s")
 
-        # Build BM25
-        t3 = time.time()
-        bm25_path = os.path.join(self.index_dir, "bm25_index.pkl")
-        bm25 = BM25Index(bm25_path)
-        bm25.build(final_chunks)
-        logger.info(f"[BM25] Index saved in {time.time()-t3:.1f}s")
-
         # Build Vector
         t4 = time.time()
         vector_path = os.path.join(self.index_dir, "vector_index.faiss")
@@ -1038,17 +914,12 @@ class IndexBuilder:
         logger.info("Index build/update completed successfully.")
         return True
 
-    def load_retriever(self) -> Optional[HybridRetriever]:
-        """Load indexes from disk and return a ready HybridRetriever."""
+    def load_retriever(self) -> Optional[VectorRetriever]:
+        """Load vector index from disk and return a ready VectorRetriever."""
         if not self.index_exists():
             return None
 
-        bm25_path = os.path.join(self.index_dir, "bm25_index.pkl")
         vector_path = os.path.join(self.index_dir, "vector_index.faiss")
-
-        bm25 = BM25Index(bm25_path)
-        if not bm25.load():
-            return None
 
         vector = VectorIndex(vector_path)
         if not vector.load():
@@ -1073,4 +944,4 @@ class IndexBuilder:
         if not chunks:
             return None
 
-        return HybridRetriever(bm25, vector, chunks)
+        return VectorRetriever(vector, chunks)

@@ -1434,6 +1434,53 @@ class LLMClient:
         finally:
             self.conversation_history = saved_history
 
+    def hydeRewrite(self, query: str) -> str:
+        """
+        HyDE (Hypothetical Document Embedding): rewrite a natural language query
+        into a hypothetical Python code snippet. The hypothetical code is embedded
+        and searched against the vector index, bridging the semantic gap between
+        natural language and code.
+
+        Args:
+            query: Natural language query (e.g. "threshold a volume from -200 to 1000")
+
+        Returns:
+            Hypothetical Python code snippet, or original query if LLM fails.
+        """
+        system_msg = (
+            "You are a 3D Slicer Python API expert. "
+            "Given a user's natural language request, write a short hypothetical Python code snippet "
+            "(2-5 lines) that would accomplish the task. Use real Slicer API names such as "
+            "slicer.util.loadVolume, slicer.modules.segmentEditorWidget, vtkMRML, etc. "
+            "Output ONLY the code snippet, no explanation, no markdown fences."
+        )
+        saved_history = list(self.conversation_history)
+        try:
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": f"Task: {query}"},
+            ]
+            payload = self._buildPayload(messages, stream=False)
+            url = self._getChatUrl()
+            request = self._buildRequest(url, payload)
+
+            with self._openRequest(request) as response:
+                data = json.loads(response.read().decode('utf-8'))
+
+            if self._isClaude():
+                data = self._normalizeClaudeResponse(data)
+
+            content = data['choices'][0]['message'].get('content', '').strip()
+            # Clean up markdown fences if the LLM added them
+            content = re.sub(r'^```(?:python)?\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            return content if content else query
+        except Exception as e:
+            logger.warning(f"HyDE rewrite failed: {e}, falling back to raw query")
+            return query
+        finally:
+            self.conversation_history = saved_history
+
     def chatWithToolsIsolated(
         self,
         messages: List[Dict[str, Any]],
