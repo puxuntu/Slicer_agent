@@ -41,16 +41,16 @@ if __name__ == "__main__":
     else:
         logger.info("No existing index found, starting fresh build...")
 
+    logger.info("[STAGE 1/4] Scanning and chunking files...")
     success = builder.build_or_update()
     total_elapsed = time.time() - total_start
     logger.info(f"[DONE] Total elapsed time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
 
     if success:
-        logger.info("Index build/update completed successfully.")
+        logger.info("[STAGE 4/4] Loading retriever and running sanity check...")
         retriever = builder.load_retriever()
         if retriever and retriever.is_ready():
             logger.info("Retriever loaded and ready.")
-            # Quick sanity search
             try:
                 results = retriever.search("load a volume and display it", top_k=5)
                 logger.info(f"Sanity search returned {len(results)} results.")
@@ -58,6 +58,7 @@ if __name__ == "__main__":
                     logger.info(f"  [{i}] {r.chunk.file_path} ({r.chunk.start_line}-{r.chunk.end_line}) score={r.final_score:.3f}")
             except Exception as e:
                 logger.warning(f"Sanity search failed: {e}")
+        logger.info("Index build/update completed successfully.")
     else:
         logger.error("Index build/update failed.")
         sys.exit(1)

@@ -560,6 +560,24 @@ class VectorIndex:
             import onnxruntime as ort
             logger.info(f"Loading ONNX model from {onnx_path} ...")
 
+            # Auto-detect GPU providers; fallback to CPU
+            available = ort.get_available_providers()
+            preferred = []
+            if 'CUDAExecutionProvider' in available:
+                preferred.append('CUDAExecutionProvider')
+            if 'DmlExecutionProvider' in available:
+                preferred.append('DmlExecutionProvider')
+            if 'ROCMExecutionProvider' in available:
+                preferred.append('ROCMExecutionProvider')
+            if 'CoreMLExecutionProvider' in available:
+                preferred.append('CoreMLExecutionProvider')
+            preferred.append('CPUExecutionProvider')
+
+            if preferred[0] != 'CPUExecutionProvider':
+                logger.info(f"GPU provider available: {preferred[0]}")
+            else:
+                logger.info("No GPU provider found; using CPU.")
+
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = 0  # use all CPU cores
             sess_options.inter_op_num_threads = 0
@@ -567,28 +585,31 @@ class VectorIndex:
             self.session = ort.InferenceSession(
                 onnx_path,
                 sess_options=sess_options,
-                providers=["CPUExecutionProvider"],
+                providers=preferred,
             )
-            logger.info("ONNX model loaded successfully.")
+            logger.info(f"ONNX model loaded successfully on provider: {self.session.get_providers()[0]}")
         return self.session
 
     @staticmethod
-    def _mean_pooling(last_hidden_state: np.ndarray, attention_mask: np.ndarray) -> np.ndarray:
+    def _mean_pooling(last_hidden_state: Any, attention_mask: Any) -> Any:
         """Mean pooling over token embeddings, masking padding tokens."""
+        np = _get_numpy()
         mask = np.expand_dims(attention_mask.astype(np.float32), -1)  # [batch, seq_len, 1]
         sum_embeddings = np.sum(last_hidden_state * mask, axis=1)      # [batch, hidden_dim]
         sum_mask = np.clip(np.sum(mask, axis=1), a_min=1e-9, a_max=None)
         return sum_embeddings / sum_mask
 
     @staticmethod
-    def _l2_normalize(vectors: np.ndarray) -> np.ndarray:
+    def _l2_normalize(vectors: Any) -> Any:
         """L2 normalize embeddings."""
+        np = _get_numpy()
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         return vectors / np.clip(norms, a_min=1e-12, a_max=None)
 
-    def _encode(self, texts: List[str], batch_size: int = 8) -> np.ndarray:
+    def _encode(self, texts: List[str], batch_size: int = 8) -> Any:
         """Encode texts into embeddings using ONNX Runtime."""
         import time
+        np = _get_numpy()
         session = self._load_model()
         tokenizer = self.tokenizer
 
@@ -596,7 +617,15 @@ class VectorIndex:
         total = len(texts)
         start = time.time()
         n_batches = (total + batch_size - 1) // batch_size
-        log_every = max(1, n_batches // 10)
+        last_logged_done = 0
+
+        def _format_eta(seconds: float) -> str:
+            if seconds < 60:
+                return f"{seconds:.0f}s"
+            elif seconds < 3600:
+                return f"{seconds/60:.0f}m {seconds%60:.0f}s"
+            else:
+                return f"{seconds/3600:.0f}h {(seconds%3600)/60:.0f}m"
 
         for batch_idx, i in enumerate(range(0, total, batch_size)):
             batch = texts[i:i + batch_size]
@@ -635,27 +664,35 @@ class VectorIndex:
             embeddings = self._l2_normalize(embeddings)
             all_embeddings.append(embeddings)
 
-            if n_batches > 1 and (batch_idx + 1) % log_every == 0:
+            done = min(i + batch_size, total)
+            # Log every time at least 5 more chunks have been processed since last log
+            if done - last_logged_done >= 5 or done == total:
                 elapsed = time.time() - start
-                done = min(i + batch_size, total)
+                pct = done * 100.0 / total
                 rate = done / elapsed if elapsed > 0 else 0
-                logger.info(f"  Encoded {done}/{total} texts ({rate:.1f} texts/s)")
+                remaining = (total - done) / rate if rate > 0 else 0
+                logger.info(
+                    f"[PROGRESS] {done:>5}/{total} ({pct:5.1f}%) | "
+                    f"{rate:.1f} chunks/s | ETA: {_format_eta(remaining)}"
+                )
+                last_logged_done = done
 
-        if n_batches > 1:
-            elapsed = time.time() - start
-            rate = total / elapsed if elapsed > 0 else 0
-            logger.info(f"  Encoded {total}/{total} texts ({rate:.1f} texts/s total)")
+        elapsed = time.time() - start
+        rate = total / elapsed if elapsed > 0 else 0
+        logger.info(f"[PROGRESS] {total:>5}/{total} (100.0%) | {rate:.1f} chunks/s total | Done in {_format_eta(elapsed)}")
 
         return np.concatenate(all_embeddings, axis=0)
 
-    def build(self, chunks: List[CodeChunk], batch_size: int = 8):
+    def build(self, chunks: List[CodeChunk], batch_size: int = 16):
         """Build FAISS index from chunks."""
         import time
         np = _get_numpy()
 
         texts = [c.embedding_text for c in chunks]
-        logger.info(f"[EMBED] Encoding {len(texts)} chunks with {self.MODEL_NAME} (ONNX CPU) ...")
-        logger.info(f"[EMBED] Max sequence length: {self.MAX_SEQ_LENGTH} tokens.")
+        session = self._load_model()
+        provider = session.get_providers()[0] if session else "CPUExecutionProvider"
+        logger.info(f"[EMBED] Encoding {len(texts)} chunks with {self.MODEL_NAME} (provider: {provider}) ...")
+        logger.info(f"[EMBED] Max sequence length: {self.MAX_SEQ_LENGTH} tokens. Batch size: {batch_size}")
 
         start = time.time()
         embeddings = self._encode(texts, batch_size=batch_size)
@@ -1009,6 +1046,7 @@ class IndexBuilder:
             return False
 
         # Build metadata jsonl
+        logger.info("[STAGE 2/4] Saving chunk metadata...")
         t2 = time.time()
         with open(self._metadata_path, 'w', encoding='utf-8') as f:
             for chunk in final_chunks:
@@ -1016,6 +1054,7 @@ class IndexBuilder:
         logger.info(f"[META] Metadata saved in {time.time()-t2:.1f}s")
 
         # Build Vector
+        logger.info("[STAGE 3/4] Encoding chunks and building FAISS index (this may take a few minutes)...")
         t4 = time.time()
         vector_path = os.path.join(self.index_dir, "vector_index.faiss")
         vector = VectorIndex(vector_path)
