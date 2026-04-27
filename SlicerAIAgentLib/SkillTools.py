@@ -333,7 +333,7 @@ class SkillToolExecutor:
         return result
     
     def _hybrid_search(self, query: str, top_k: int = 15) -> Dict:
-        """Execute hybrid search against the pre-built index."""
+        """Execute dense vector search against the pre-built index."""
         if not self._hybrid_retriever:
             return {
                 "tool": "HybridSearch",

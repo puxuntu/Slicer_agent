@@ -19,6 +19,7 @@ The extension is built as a standard Slicer **scripted module** and follows Slic
 | LLM backend | OpenAI-compatible APIs (Kimi / Moonshot, Claude / Anthropic) |
 | HTTP client | `urllib.request` (standard library); `httpx` declared in `requirements.txt` |
 | Optional parsing | `tree-sitter` + `tree-sitter-python` + `tree-sitter-cpp` (auto-installed at runtime) |
+| Hybrid retrieval | `rank-bm25`, `faiss-cpu`, `sentence-transformers` (auto-installed at runtime) |
 | Other deps | `numpy`, `jsonschema` (from `requirements.txt`) |
 
 ## Project Structure
@@ -29,12 +30,13 @@ SlicerAIAgentLib/             # Core library package
 ├── __init__.py               # Package exports
 ├── LLMClient.py              # LLM API client: streaming, tool calling, history, pricing
 ├── SkillTools.py             # Tool executor: FindFile, SearchSymbol, Grep, ReadFile, HybridSearch
-├── SkillIndexer.py           # Hybrid retrieval index: Chunker, BM25Index, VectorIndex, HybridRetriever, IndexBuilder
+├── SkillIndexer.py           # Dense vector retrieval index: Chunker, VectorIndex, VectorRetriever, IndexBuilder
 ├── CodeValidator.py          # AST-based security validation before code execution
 ├── SafeExecutor.py           # Code execution in __main__.__dict__ with undo/rollback
 ├── ConversationStore.py      # Persistent conversation history via Qt QSettings
 └── SlicerCodeTemplates.py    # Reusable Slicer Python code snippets
 Resources/
+├── Code_RAG/                 # Hybrid index artifacts (gitignored, created by build_RAG.py)
 ├── Icons/                    # Extension icon
 ├── UI/
 │   └── SlicerAIAgent.ui      # Qt Designer UI file (loaded at runtime)
@@ -46,20 +48,20 @@ Testing/
 └── SlicerAIAgentTest.py      # Unit / integration test suite
 CMakeLists.txt                # Slicer extension build configuration
 requirements.txt              # Python dependencies for Slicer to install
+build_RAG.py                  # Standalone script to build/update the dense vector retrieval index
 ```
 
 ### Key Files for Agents
 
-- **`SlicerAIAgent.py`** — The monolithic module file. All UI logic, streaming display, auto-execution, self-correction, and settings persistence live here. The `SlicerAIAgentLogic` class orchestrates the LLM client, tool executor, validator, and executor.
-- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports both OpenAI-compatible and native Anthropic Messages API formats. Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, and conversation history FIFO trimming (500K character limit). `_buildSystemPrompt` injects hybrid retrieval results when available.
-- **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `HybridSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast search. `ReadFile` implements smart slicing: AST boundary extraction, markdown heading queries, grep-context fallback, and test-method slicing. `HybridSearch` delegates to `SkillIndexer.HybridRetriever` if a local index is present.
-- **`SlicerAIAgentLib/SkillIndexer.py`** — **(NEW)** Hybrid retrieval backend. Contains:
-  - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings.
-  - `BM25Index` — sparse lexical retrieval via `rank-bm25`.
-  - `VectorIndex` — dense semantic retrieval via `sentence-transformers` (BAAI/bge-base-en-v1.5, 768-dim) + FAISS (`IndexFlatIP`).
-  - `HybridRetriever` — fuses BM25 and vector results with RRF (Reciprocal Rank Fusion, k=60) and source-type weighting (`doc_example` ×1.3, `python_api` ×1.2, etc.). Deduplicates to max 3 chunks per file.
-  - `IndexBuilder` — incremental index builder. Scans skill tree, compares file mtime fingerprints, re-chunks only changed files, then rebuilds BM25 + FAISS. Stores everything under `<repo>/Resources/Code_RAG/v1/`; model cache lives under `<repo>/Resources/Code_RAG/models/`.
-- **`SlicerAIAgentLib/SafeExecutor.py`** — Runs generated code in `sys.modules['__main__'].__dict__` (same namespace as the Slicer Python Console). Captures stdout/stderr, intercepts VTK errors via `vtkFileOutputWindow`, supports cooperative timeout, and rolls back the MRML scene on failure (`SaveStateForUndo` + node-ID-based cleanup).
+- **`SlicerAIAgent.py`** — The monolithic module file containing all four Slicer scripted module classes: `SlicerAIAgent` (metadata), `SlicerAIAgentWidget` (UI setup, streaming display, auto-execution, self-correction, settings persistence), `SlicerAIAgentLogic` (orchestrates LLM client, tool executor, validator, executor, and dense vector retrieval), and `SlicerAIAgentTest` (smoke tests). The Widget implements a queue-based streaming UI (`_streamQueue` + `QTimer` polling at 50 ms) and auto-executes generated code with up to 5 self-correction attempts.
+- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports both OpenAI-compatible and native Anthropic Messages API formats. Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, query decomposition (`decomposeQuery`), and HyDE query rewriting (`hydeRewrite`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
+- **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `HybridSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing. `HybridSearch` delegates to `SkillIndexer.VectorRetriever` if a local index is present.
+- **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
+  - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.
+  - `VectorIndex` — dense semantic retrieval via `sentence-transformers` (`jinaai/jina-embeddings-v2-base-code`, 768-dim, 8192-token context) + FAISS (`IndexFlatIP`).
+  - `VectorRetriever` — pure dense vector search with source-type weighting (`doc_example` ×1.3, `python_api` ×1.2, etc.). Deduplicates to max 3 chunks per file. Supports `merge_results_with_quota` for multi-query decomposition.
+  - `IndexBuilder` — incremental index builder. Scans skill tree, compares file mtime fingerprints, re-chunks only changed files, then rebuilds the FAISS vector index. Stores everything under `<repo>/Resources/Code_RAG/v1/`; model cache lives under `<repo>/Resources/Code_RAG/models/`.
+- **`SlicerAIAgentLib/SafeExecutor.py`** — Runs generated code in `sys.modules['__main__'].__dict__` (same namespace as the Slicer Python Console). Captures stdout/stderr, intercepts VTK errors via `vtkFileOutputWindow`, supports cooperative timeout, and rolls back the MRML scene on failure (`SaveStateForUndo` + node-ID-based cleanup). Execution is scheduled via `qt.QTimer.singleShot` to stay on the main thread.
 - **`Resources/Prompts/system_prompt.md`** — The external system prompt loaded at runtime. Contains the LLM's search strategy, source tree map, critical rules, and code execution environment description.
 
 ## Build and Test Commands
@@ -91,6 +93,16 @@ slicer.util.pip_install("jsonschema>=4.0.0")
 ```
 
 `tree-sitter` and its language parsers are auto-installed at runtime by `SkillTools.py` if missing.
+
+### Build Hybrid Retrieval Index
+
+Run the standalone script to create or incrementally update the dense vector index:
+
+```bash
+python build_RAG.py
+```
+
+This scans `Resources/Skills/slicer-skill-full/`, chunks changed files, and writes index artifacts to `Resources/Code_RAG/v1/`. The index directory and model cache are gitignored.
 
 ### Run Tests
 
@@ -124,7 +136,11 @@ The main test file is `Testing/SlicerAIAgentTest.py`. It tests module imports, L
 
 ### Hybrid Pre-Retrieval (Phase 1)
 
-Before each LLM request, `SlicerAIAgentLogic` automatically calls `HybridSearch` against the local index (if available). The top-15 ranked snippets are formatted and injected into the system prompt under `## RELEVANT KNOWLEDGE BASE SNIPPETS`. This reduces the need for multiple tool rounds and improves first-response quality.
+Before each LLM request, `SlicerAIAgentLogic` automatically calls `_buildRetrievalContext`, which:
+1. Decomposes complex user prompts into sub-queries via `llmClient.decomposeQuery`.
+2. Runs `HybridRetriever.search` for each sub-query (top-15 per query).
+3. Merges results with `merge_results_with_quota` (quota per sub-query = 3, total slots ≈ max(15, len(sub_queries) × 5)).
+4. Formats the result and injects it into the system prompt under `## RELEVANT KNOWLEDGE BASE SNIPPETS`.
 
 If the index is missing or not ready, the system silently falls back to the traditional pure tool-calling workflow.
 
@@ -184,6 +200,7 @@ Tool results are compressed before being persisted to conversation history to pr
 - The extension is packaged via Slicer's CMake/CPack machinery (`include(${Slicer_EXTENSION_CPACK})`).
 - The skill knowledge base (`Resources/Skills/slicer-skill-full/`) is **not** version-controlled. It is a large external dependency that must be set up separately (see `.gitignore`).
 - Runtime debug output files (`*_prompt_debug.txt`, `*_code.txt`, `*_performance_log.txt`, `thinking_history.txt`) are gitignored.
+- Hybrid index artifacts (`Resources/Code_RAG/`) are gitignored.
 
 ## Important Notes for Agents
 
@@ -193,4 +210,4 @@ Tool results are compressed before being persisted to conversation history to pr
 - **The code is auto-executed** after generation. There is no manual "Execute" button in the current UI flow (the buttons were removed). Self-correction is automatic.
 - **Hybrid index dependencies** (`rank-bm25`, `faiss-cpu`, `sentence-transformers`) are commented out in `requirements.txt` and are auto-installed at runtime via `SkillIndexer._ensure_packages` (mirroring the tree-sitter installation pattern). This avoids breaking Slicer builds if the packages are not immediately available.
 - **Qt thread safety:** MRML scene access and all UI updates must happen on the main thread. Background threads are used only for HTTP I/O. Use `qt.QTimer.singleShot(0, ...)` or the internal `_streamQueue` pattern to marshal results back to the main thread.
-- **Do not push this repo to github automatically unlesss the user ask you to do so**
+- **Do not push this repo to GitHub automatically unless the user asks you to do so.**
