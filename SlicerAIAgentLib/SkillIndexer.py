@@ -512,14 +512,23 @@ class VectorIndex:
             self.model = SentenceTransformer(
                 self.MODEL_NAME,
                 cache_folder=cache_dir,
+                trust_remote_code=True,
             )
         return self.model
 
-    def build(self, chunks: List[CodeChunk], batch_size: int = 32):
+    def build(self, chunks: List[CodeChunk], batch_size: int = 8):
         """Build FAISS index from chunks."""
         import time
         np = _get_numpy()
         model = self._load_model()
+
+        # Cap at 1024 tokens to fit 4GB consumer GPUs while keeping most chunks intact
+        max_len = 1024
+        if hasattr(model, 'max_seq_length'):
+            model.max_seq_length = max_len
+        elif hasattr(model, 'tokenizer') and hasattr(model.tokenizer, 'model_max_length'):
+            model.tokenizer.model_max_length = max_len
+        logger.info(f"[EMBED] Max sequence length set to {max_len} tokens.")
 
         texts = [c.embedding_text for c in chunks]
         device = getattr(model, 'device', 'cpu')
@@ -544,7 +553,7 @@ class VectorIndex:
 
     def search(self, query: str, top_k: int = 50) -> List[Tuple[str, float]]:
         """Return (chunk_id, cosine_similarity) sorted descending."""
-        if self.faiss_index is None or self.model is None:
+        if self.faiss_index is None:
             return []
         np = _get_numpy()
         model = self._load_model()
