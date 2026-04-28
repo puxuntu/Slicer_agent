@@ -27,17 +27,20 @@ logger = logging.getLogger(__name__)
 
 def _get_project_root() -> str:
     """Return the repository root directory (parent of SlicerAIAgentLib/)."""
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return root
 
 
 def _get_index_dir() -> str:
     """Return the project-local index directory: <repo>/Resources/Code_RAG/v1/."""
-    return os.path.join(_get_project_root(), "Resources", "Code_RAG", "v1")
+    d = os.path.join(_get_project_root(), "Resources", "Code_RAG", "v1")
+    return d
 
 
 def _get_model_cache_dir() -> str:
     """Return the project-local model cache directory: <repo>/Resources/Code_RAG/models/."""
-    return os.path.join(_get_project_root(), "Resources", "Code_RAG", "models")
+    d = os.path.join(_get_project_root(), "Resources", "Code_RAG", "models")
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -60,11 +63,9 @@ class CodeChunk:
 
 @dataclass
 class RetrievedChunk:
-    """A chunk returned by the hybrid retriever."""
+    """A chunk returned by the dense vector retriever."""
     chunk: CodeChunk
-    bm25_score: float = 0.0
     vector_score: float = 0.0
-    rrf_score: float = 0.0
     final_score: float = 0.0
 
 
@@ -502,34 +503,69 @@ class VectorIndex:
     def __init__(self, index_path: str):
         self.index_path = index_path
         self.session = None      # onnxruntime InferenceSession
-        self.tokenizer = None    # transformers AutoTokenizer
+        self.tokenizer = None    # tokenizers Tokenizer
         self.faiss_index = None
         self.chunk_ids: List[str] = []
 
+    @staticmethod
+    def _find_tokenizer_json(cache_dir: str) -> Optional[str]:
+        """Find tokenizer.json in the HF Hub cache under cache_dir."""
+        # Prefer the exact model repo cache
+        model_cache = os.path.join(cache_dir, "models--jinaai--jina-embeddings-v2-base-code")
+        if os.path.isdir(model_cache):
+            for root, _, files in os.walk(model_cache):
+                if "tokenizer.json" in files:
+                    return os.path.join(root, "tokenizer.json")
+        # Fallback: search entire cache_dir
+        for root, _, files in os.walk(cache_dir):
+            if "tokenizer.json" in files:
+                return os.path.join(root, "tokenizer.json")
+        return None
+
     def _ensure_model_files(self):
-        """Download ONNX model and tokenizer if not cached locally."""
+        """Download ONNX model and load lightweight tokenizer if not cached locally."""
+        import time
+        t0 = time.time()
         cache_dir = _get_model_cache_dir()
         os.makedirs(cache_dir, exist_ok=True)
 
         # Ensure tokenizer is available
         if self.tokenizer is None:
-            _ensure_packages(["transformers"])
-            from transformers import AutoTokenizer
-            logger.info(f"Loading tokenizer for {self.MODEL_NAME} ...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.MODEL_NAME,
-                cache_dir=cache_dir,
-                trust_remote_code=True,
-            )
+            t1 = time.time()
+            try:
+                from tokenizers import Tokenizer
+            except ImportError:
+                _ensure_packages(["tokenizers"])
+                from tokenizers import Tokenizer
 
+            tokenizer_json = self._find_tokenizer_json(cache_dir)
+            if tokenizer_json is None:
+                raise RuntimeError(
+                    f"tokenizer.json not found under {cache_dir}. "
+                    "Please ensure the model tokenizer files are downloaded."
+                )
+            t_tok0 = time.time()
+            self.tokenizer = Tokenizer.from_file(tokenizer_json)
+            self.tokenizer.enable_truncation(max_length=self.MAX_SEQ_LENGTH)
+            pad_id = self.tokenizer.token_to_id("<pad>")
+            if pad_id is None:
+                pad_id = 0
+            self.tokenizer.enable_padding(
+                length=self.MAX_SEQ_LENGTH,
+                pad_id=pad_id,
+                pad_token="<pad>",
+            )
         # Ensure ONNX model is available
         onnx_path = os.path.join(cache_dir, "model.onnx")
-        if not os.path.exists(onnx_path):
+        onnx_exists = os.path.exists(onnx_path)
+        onnx_size = os.path.getsize(onnx_path) if onnx_exists else 0
+        if not onnx_exists:
             self._download_onnx_model(onnx_path)
 
     def _download_onnx_model(self, onnx_path: str):
         """Download ONNX model from HuggingFace Hub with progress logging."""
         import urllib.request
+        import time
         url = f"https://huggingface.co/{self.MODEL_NAME}/resolve/main/{self.ONNX_SUBPATH}"
         logger.info(f"Downloading ONNX model from {url} ...")
         logger.info(f"Target: {onnx_path} (this is a one-time ~640 MB download)")
@@ -542,15 +578,21 @@ class VectorIndex:
                     logger.info(f"  Download progress: {pct:.1f}% "
                                f"({downloaded // 1024 // 1024}MB / {total_size // 1024 // 1024}MB)")
 
+        t0 = time.time()
         try:
             urllib.request.urlretrieve(url, onnx_path, reporthook=_report)
+            elapsed = time.time() - t0
+            final_size = os.path.getsize(onnx_path) if os.path.exists(onnx_path) else 0
             logger.info(f"ONNX model downloaded successfully: {onnx_path}")
         except Exception as e:
+            elapsed = time.time() - t0
             logger.error(f"Failed to download ONNX model: {e}")
             raise
 
     def _load_model(self):
+        import time
         if self.session is None:
+            t0 = time.time()
             _get_onnxruntime()
             self._ensure_model_files()
 
@@ -582,12 +624,16 @@ class VectorIndex:
             sess_options.intra_op_num_threads = 0  # use all CPU cores
             sess_options.inter_op_num_threads = 0
 
+            t_sess0 = time.time()
             self.session = ort.InferenceSession(
                 onnx_path,
                 sess_options=sess_options,
                 providers=preferred,
             )
-            logger.info(f"ONNX model loaded successfully on provider: {self.session.get_providers()[0]}")
+            t_sess = time.time() - t_sess0
+            total = time.time() - t0
+            provider = self.session.get_providers()[0]
+            logger.info(f"ONNX model loaded successfully on provider: {provider}")
         return self.session
 
     @staticmethod
@@ -609,8 +655,11 @@ class VectorIndex:
     def _encode(self, texts: List[str], batch_size: int = 8) -> Any:
         """Encode texts into embeddings using ONNX Runtime."""
         import time
+        t0 = time.time()
         np = _get_numpy()
+        t_load0 = time.time()
         session = self._load_model()
+        t_load = time.time() - t_load0
         tokenizer = self.tokenizer
 
         all_embeddings = []
@@ -629,30 +678,42 @@ class VectorIndex:
 
         for batch_idx, i in enumerate(range(0, total, batch_size)):
             batch = texts[i:i + batch_size]
+            t_batch0 = time.time()
 
-            inputs = tokenizer(
-                batch,
-                padding=True,
-                truncation=True,
-                max_length=self.MAX_SEQ_LENGTH,
-                return_tensors="np",
-            )
+            # Use lightweight tokenizers library (Rust-based, no transformers import)
+            encodings = tokenizer.encode_batch(batch)
+            input_ids_list = [enc.ids for enc in encodings]
+            attention_mask_list = [enc.attention_mask for enc in encodings]
+            type_ids_list = [enc.type_ids for enc in encodings]
+
+            inputs = {
+                "input_ids": np.array(input_ids_list, dtype=np.int64),
+                "attention_mask": np.array(attention_mask_list, dtype=np.int64),
+            }
+            # Only include token_type_ids if the tokenizer produced them
+            has_type_ids = any(len(tids) > 0 and any(tids) for tids in type_ids_list)
+            if has_type_ids:
+                inputs["token_type_ids"] = np.array(type_ids_list, dtype=np.int64)
+
+            t_tok = time.time() - t_batch0
 
             # Build ONNX inputs dynamically based on model's expected inputs
             ort_inputs = {}
             for inp in session.get_inputs():
                 name = inp.name
                 if name == "input_ids":
-                    ort_inputs[name] = inputs["input_ids"].astype(np.int64)
+                    ort_inputs[name] = inputs["input_ids"]
                 elif name == "attention_mask":
-                    ort_inputs[name] = inputs["attention_mask"].astype(np.int64)
+                    ort_inputs[name] = inputs["attention_mask"]
                 elif name == "token_type_ids":
                     if "token_type_ids" in inputs:
-                        ort_inputs[name] = inputs["token_type_ids"].astype(np.int64)
+                        ort_inputs[name] = inputs["token_type_ids"]
                     else:
                         ort_inputs[name] = np.zeros_like(inputs["input_ids"], dtype=np.int64)
 
+            t_inf0 = time.time()
             outputs = session.run(None, ort_inputs)
+            t_inf = time.time() - t_inf0
             last_hidden_state = outputs[0]
 
             # Handle both pooled and hidden-state outputs
@@ -663,6 +724,7 @@ class VectorIndex:
 
             embeddings = self._l2_normalize(embeddings)
             all_embeddings.append(embeddings)
+            t_batch = time.time() - t_batch0
 
             done = min(i + batch_size, total)
             # Log every time at least 5 more chunks have been processed since last log
@@ -680,6 +742,7 @@ class VectorIndex:
         elapsed = time.time() - start
         rate = total / elapsed if elapsed > 0 else 0
         logger.info(f"[PROGRESS] {total:>5}/{total} (100.0%) | {rate:.1f} chunks/s total | Done in {_format_eta(elapsed)}")
+        total_t = time.time() - t0
 
         return np.concatenate(all_embeddings, axis=0)
 
@@ -708,18 +771,25 @@ class VectorIndex:
 
     def search(self, query: str, top_k: int = 50) -> List[Tuple[str, float]]:
         """Return (chunk_id, cosine_similarity) sorted descending."""
+        import time
+        t0 = time.time()
         if self.faiss_index is None:
             return []
         np = _get_numpy()
+        t_enc0 = time.time()
         query_embedding = self._encode([query], batch_size=1)
+        t_enc = time.time() - t_enc0
+        t_faiss0 = time.time()
         scores, indices = self.faiss_index.search(
             np.array(query_embedding, dtype=np.float32), top_k
         )
+        t_faiss = time.time() - t_faiss0
         results = []
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0 or idx >= len(self.chunk_ids):
                 continue
             results.append((self.chunk_ids[int(idx)], float(score)))
+        total = time.time() - t0
         return results
 
     def save(self):
@@ -801,9 +871,7 @@ class VectorRetriever:
             file_counts[fp] = file_counts.get(fp, 0) + 1
             results.append(RetrievedChunk(
                 chunk=chunk,
-                bm25_score=0.0,
                 vector_score=sim,
-                rrf_score=final,
                 final_score=final,
             ))
             if len(results) >= top_k:

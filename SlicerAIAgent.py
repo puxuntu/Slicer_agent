@@ -122,7 +122,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
         self.thinkingTimerLabel = self.ui.findChild(qt.QLabel, "thinkingTimerLabel")
-        # Hybrid index status label (may not exist in older .ui files)
+        # Vector index status label (may not exist in older .ui files)
         self.indexStatusLabel = self.ui.findChild(qt.QLabel, "indexStatusLabel")
         if self.indexStatusLabel is None:
             # Dynamically inject into the UI if not present in .ui file
@@ -1428,10 +1428,14 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             self.codeValidator = CodeValidator()
             self.executor = SafeExecutor()
 
-            # Hybrid index background check
+            # Vector index background check
             self._indexBuilder = None
             self._index_status = "Unknown"
             self._start_index_background_check()
+
+            # Background pre-load: import transformers and create ONNX session
+            # so the first prompt doesn't block on the 4-minute import
+            self._warmup_thread = self._start_vector_warmup()
 
             logger.info("SlicerAIAgent logic components initialized")
         except Exception as e:
@@ -1475,10 +1479,10 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
     def hasApiKey(self):
         return bool(self.apiKey)
 
-    def _getHybridRetriever(self):
+    def _getVectorRetriever(self):
         """Get the cached vector retriever if available."""
-        if self.toolExecutor and self.toolExecutor.has_hybrid_index():
-            return self.toolExecutor._hybrid_retriever
+        if self.toolExecutor and self.toolExecutor.has_vector_index():
+            return self.toolExecutor._vector_retriever
         if self._indexBuilder and self._indexBuilder.index_exists():
             return self._indexBuilder.load_retriever()
         return None
@@ -1489,8 +1493,12 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         Uses a single LLM call to break the request into sub-tasks AND generate
         hypothetical code snippets for each. Returns formatted context string.
         """
+        import time
+        t_total0 = time.time()
         try:
-            retriever = self._getHybridRetriever()
+            t_get0 = time.time()
+            retriever = self._getVectorRetriever()
+            t_get = time.time() - t_get0
             if not retriever or not retriever.is_ready():
                 return ""
 
@@ -1521,10 +1529,13 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             # Step 3: Merge with quota and format
             from SlicerAIAgentLib.SkillIndexer import VectorRetriever
             total_slots = max(15, len(sub_queries) * 5)
+            t_merge0 = time.time()
             merged = VectorRetriever.merge_results_with_quota(
                 all_results, quota_per_list=3, total_slots=total_slots
             )
+            t_merge = time.time() - t_merge0
             formatted = retriever.format_for_prompt(merged)
+            total_t = time.time() - t_total0
 
             if timing is not None:
                 timing['decompose_hyde_time'] = round(t1 - t0, 3)
@@ -1537,6 +1548,8 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
             return formatted
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.warning(f"Dense pre-retrieval failed: {e}")
             return ""
 
@@ -1589,7 +1602,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         if context is None:
             context = {"scene": self._buildSceneContext()}
 
-        # Inject hybrid retrieval results if not already present
+        # Inject dense vector retrieval results if not already present
         retrieval_timing = {}
         if "retrieval_results" not in context:
             retrieval = self._buildRetrievalContext(prompt, retrieval_timing)
@@ -1659,7 +1672,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile, HybridSearch)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile, VectorSearch)
             tool_args: Tool arguments dict
             
         Returns:
@@ -1770,6 +1783,39 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         except Exception as e:
             logger.warning(f"Could not check index status: {e}")
             self._index_status = "Error"
+
+    def _start_vector_warmup(self):
+        """
+        Start a background thread that eagerly loads the tokenizer and ONNX session.
+        This prevents the ~4-minute first-prompt delay caused by transformers import.
+        """
+        import threading
+        def _warmup():
+            try:
+                if not self.toolExecutor:
+                    return
+                if not self.toolExecutor.has_vector_index():
+                    return
+                retriever = self.toolExecutor._vector_retriever
+                if retriever is None:
+                    return
+                vector = retriever.vector
+                if vector is None:
+                    return
+                # Trigger tokenizer loading + ONNX session creation
+                import time
+                t0 = time.time()
+                vector._ensure_model_files()
+                t1 = time.time()
+                vector._load_model()
+                t2 = time.time()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                logger.warning(f"Background vector warmup failed: {e}")
+        thread = threading.Thread(target=_warmup, daemon=True)
+        thread.start()
+        return thread
 
     def get_index_status(self) -> str:
         """Return current vector index status for UI display."""

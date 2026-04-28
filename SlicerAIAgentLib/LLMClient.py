@@ -445,7 +445,7 @@ class LLMClient:
         base_prompt += "You only need to specify the relative path within the skill directory. "
         base_prompt += "Do NOT prepend 'Resources/Skills/slicer-skill-full/' to your paths — the tool handles this automatically.\n"
 
-        # Inject hybrid retrieval results if available
+        # Inject dense vector retrieval results if available
         if context and context.get('retrieval_results'):
             base_prompt += "\n\n## RELEVANT KNOWLEDGE BASE SNIPPETS\n"
             base_prompt += context['retrieval_results']
