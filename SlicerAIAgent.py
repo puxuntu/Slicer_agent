@@ -1573,33 +1573,17 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             sub_queries = self.llmClient.decomposeQuery(prompt)
             t1 = time.time()
 
-            # Step 2: Multi-retrieval using sub-queries (top-15 per sub-query)
-            # Run searches in parallel since each is independent
-            import concurrent.futures
-            all_results = [[] for _ in sub_queries]
-            per_query = [{} for _ in sub_queries]
-
-            def _search_one(idx, sq):
-                q_start = time.time()
-                results = retriever.search(sq, top_k=15)
-                q_end = time.time()
-                return idx, {
-                    'results': results,
-                    'query': sq,
-                    'count': len(results),
-                    'time': round(q_end - q_start, 3)
-                }
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [executor.submit(_search_one, i, sq) for i, sq in enumerate(sub_queries)]
-                for future in concurrent.futures.as_completed(futures):
-                    idx, info = future.result()
-                    all_results[idx] = info['results']
-                    per_query[idx] = {
-                        'query': info['query'],
-                        'count': info['count'],
-                        'time': info['time']
-                    }
+            # Step 2: Batch retrieval using sub-queries (top-15 per sub-query)
+            # Batched ONNX inference is ~N× faster than N sequential calls
+            # because encoding all queries in one batch avoids repeated model
+            # loading and keeps all cores busy with one inference pass.
+            t_batch0 = time.time()
+            all_results = retriever.search_batch(sub_queries, top_k=15)
+            t_batch = time.time() - t_batch0
+            per_query = [
+                {'query': sq, 'count': len(res), 'time': None}
+                for sq, res in zip(sub_queries, all_results)
+            ]
 
             # Step 3: Merge with quota and format
             from SlicerAIAgentLib.SkillIndexer import VectorRetriever

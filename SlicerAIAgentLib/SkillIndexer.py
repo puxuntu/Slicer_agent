@@ -792,6 +792,36 @@ class VectorIndex:
         total = time.time() - t0
         return results
 
+    def search_batch(self, queries: List[str], top_k: int = 50) -> List[List[Tuple[str, float]]]:
+        """Batch search: encode all queries in one ONNX call, then FAISS lookup.
+
+        Returns a list of result lists, one per query, where each inner list
+        contains (chunk_id, cosine_similarity) tuples sorted descending.
+        """
+        import time
+        t0 = time.time()
+        if self.faiss_index is None or not queries:
+            return [[] for _ in queries]
+        np = _get_numpy()
+        t_enc0 = time.time()
+        query_embeddings = self._encode(queries, batch_size=len(queries))
+        t_enc = time.time() - t_enc0
+        t_faiss0 = time.time()
+        scores, indices = self.faiss_index.search(
+            np.array(query_embeddings, dtype=np.float32), top_k
+        )
+        t_faiss = time.time() - t_faiss0
+        all_results: List[List[Tuple[str, float]]] = []
+        for q_scores, q_indices in zip(scores, indices):
+            q_results = []
+            for score, idx in zip(q_scores, q_indices):
+                if idx < 0 or idx >= len(self.chunk_ids):
+                    continue
+                q_results.append((self.chunk_ids[int(idx)], float(score)))
+            all_results.append(q_results)
+        total = time.time() - t0
+        return all_results
+
     def save(self):
         if self.faiss_index is None:
             return
@@ -878,6 +908,48 @@ class VectorRetriever:
                 break
 
         return results
+
+    def search_batch(self, queries: List[str], top_k: int = 15) -> List[List[RetrievedChunk]]:
+        """Run batched pure vector search and return ranked chunks per query."""
+        if not self.is_ready() or not queries:
+            return [[] for _ in queries]
+
+        # Over-fetch for deduplication
+        vec_results_per_query = self.vector.search_batch(queries, top_k=top_k * 3)
+
+        all_results: List[List[RetrievedChunk]] = []
+        for vec_results in vec_results_per_query:
+            # Apply source_type weighting
+            scored = []
+            for cid, sim in vec_results:
+                chunk = self.chunks.get(cid)
+                if not chunk:
+                    continue
+                weight = _SOURCE_TYPE_WEIGHTS.get(chunk.source_type, 1.0)
+                final = sim * weight
+                scored.append((cid, final, sim, chunk))
+
+            scored.sort(key=lambda x: x[1], reverse=True)
+
+            # Deduplicate by file (max 3 chunks per file)
+            file_counts: Dict[str, int] = {}
+            results: List[RetrievedChunk] = []
+            for cid, final, sim, chunk in scored:
+                fp = chunk.file_path
+                if file_counts.get(fp, 0) >= 3:
+                    continue
+                file_counts[fp] = file_counts.get(fp, 0) + 1
+                results.append(RetrievedChunk(
+                    chunk=chunk,
+                    vector_score=sim,
+                    final_score=final,
+                ))
+                if len(results) >= top_k:
+                    break
+
+            all_results.append(results)
+
+        return all_results
 
     @staticmethod
     def merge_results(result_lists: List[List[RetrievedChunk]], top_k: int = 15) -> List[RetrievedChunk]:
