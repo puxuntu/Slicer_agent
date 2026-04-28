@@ -1102,7 +1102,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 lines.append("Phase 2 — Dense Pre-Retrieval (Decompose + Vector Search)")
                 lines.append("-" * 40)
                 if 'decompose_time' in rt:
-                    lines.append(f"Query decomposition: {rt['decompose_time']:.3f}s")
+                    thinking_flag = "ON" if rt.get('decompose_thinking') else "OFF"
+                    lines.append(f"Query decomposition: {rt['decompose_time']:.3f}s (thinking={thinking_flag})")
                 if 'sub_queries' in rt:
                     for i, sq in enumerate(rt['sub_queries'], 1):
                         lines.append(f"  Sub-query {i}: {sq}")
@@ -1142,10 +1143,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                         tools = ', '.join(r.get('tools', [])) or 'done'
                         tok = r.get('tokens', 0)
                         tok_str = f" tokens={tok}" if tok else ""
+                        thinking_flag = "ON" if r.get('thinking') else "OFF"
                         lines.append(
                             f"  Round {r['round']} | "
                             f"api={r['api_time']:.3f}s tool={r.get('tool_time', 0):.3f}s "
-                            f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]{tok_str}"
+                            f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | "
+                            f"thinking={thinking_flag} | tools=[{tools}]{tok_str}"
                         )
                     lines.append("")
 
@@ -1571,18 +1574,32 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             t1 = time.time()
 
             # Step 2: Multi-retrieval using sub-queries (top-15 per sub-query)
-            all_results = []
-            per_query = []
-            for sq in sub_queries:
+            # Run searches in parallel since each is independent
+            import concurrent.futures
+            all_results = [[] for _ in sub_queries]
+            per_query = [{} for _ in sub_queries]
+
+            def _search_one(idx, sq):
                 q_start = time.time()
                 results = retriever.search(sq, top_k=15)
                 q_end = time.time()
-                all_results.append(results)
-                per_query.append({
+                return idx, {
+                    'results': results,
                     'query': sq,
                     'count': len(results),
                     'time': round(q_end - q_start, 3)
-                })
+                }
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(_search_one, i, sq) for i, sq in enumerate(sub_queries)]
+                for future in concurrent.futures.as_completed(futures):
+                    idx, info = future.result()
+                    all_results[idx] = info['results']
+                    per_query[idx] = {
+                        'query': info['query'],
+                        'count': info['count'],
+                        'time': info['time']
+                    }
 
             # Step 3: Merge with quota and format
             from SlicerAIAgentLib.SkillIndexer import VectorRetriever
@@ -1597,6 +1614,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
             if timing is not None:
                 timing['decompose_time'] = round(t1 - t0, 3)
+                timing['decompose_thinking'] = False
                 timing['sub_queries'] = sub_queries
                 timing['retrieval_count'] = len(sub_queries)
                 timing['retrieval_per_query'] = per_query

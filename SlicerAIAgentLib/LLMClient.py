@@ -355,8 +355,15 @@ class LLMClient:
             total_chars -= len(str(removed.get('content', '')))
         return trimmed
 
-    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
-        """Build the API payload for chat completion requests."""
+    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None, thinking: Optional[bool] = None) -> Dict[str, Any]:
+        """Build the API payload for chat completion requests.
+
+        Args:
+            thinking: Explicitly enable/disable thinking mode. If None,
+                      uses the model's default capability check.
+        """
+        enable_thinking = self._supportsThinking() if thinking is None else thinking
+
         if self._isClaude():
             system, claude_messages = self._convertMessagesForClaude(messages)
             payload: Dict[str, Any] = {
@@ -370,7 +377,7 @@ class LLMClient:
                 payload["stream"] = True
             if tools:
                 payload["tools"] = self._convertToolsForClaude(tools)
-            if self._supportsThinking():
+            if enable_thinking:
                 # Anthropic thinking API requires budget_tokens and max_tokens > budget_tokens
                 budget = 4096
                 payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
@@ -384,6 +391,9 @@ class LLMClient:
         if stream:
             payload["stream"] = True
         if self._supportsThinking():
+            # Models like kimi-k2* require explicit disable because default is ON
+            payload["thinking"] = {"type": "enabled" if enable_thinking else "disabled"}
+        elif enable_thinking:
             payload["thinking"] = {"type": "enabled"}
         if tools:
             payload["tools"] = tools
@@ -582,7 +592,7 @@ class LLMClient:
             f"{tool_results_text}"
         )
         messages = [{"role": "user", "content": summary_prompt}]
-        payload = self._buildPayload(messages, stream=False)
+        payload = self._buildPayload(messages, stream=False, thinking=False)
         url = self._getChatUrl()
         try:
             request = self._buildRequest(url, payload)
@@ -723,7 +733,7 @@ class LLMClient:
             raise RuntimeError("API key not configured")
 
         messages = self._buildMessages(prompt, context)
-        payload = self._buildPayload(messages, stream=False)
+        payload = self._buildPayload(messages, stream=False, thinking=True)
         url = self._getChatUrl()
 
         last_error = None
@@ -838,7 +848,7 @@ class LLMClient:
             return result
 
         messages = self._buildMessages(prompt, context)
-        payload = self._buildPayload(messages, stream=True)
+        payload = self._buildPayload(messages, stream=True, thinking=True)
         url = self._getChatUrl()
 
         last_error = None
@@ -951,7 +961,7 @@ class LLMClient:
             raise RuntimeError("API key not configured")
         
         url = self._getChatUrl()
-        payload = self._buildPayload(messages, stream=False)
+        payload = self._buildPayload(messages, stream=False, thinking=True)
         
         last_error = None
         for attempt in range(self.MAX_RETRIES):
@@ -1073,6 +1083,7 @@ class LLMClient:
                         'round_time': round(time.time() - round_start, 3),
                         'tools': [],
                         'tokens': round_tokens,
+                        'thinking': True,
                     })
 
                     if code:
@@ -1189,6 +1200,7 @@ class LLMClient:
                     'round_time': round(time.time() - round_start, 3),
                     'tools': tool_names,
                     'tokens': round_tokens,
+                    'thinking': True,
                 })
 
                 assistant_msg = {
@@ -1262,7 +1274,7 @@ class LLMClient:
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
         context: Optional[Dict] = None,
-        max_tool_rounds: int = 50,
+        max_tool_rounds: int = 10,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -1402,7 +1414,7 @@ class LLMClient:
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": f"User request: {prompt}"},
             ]
-            payload = self._buildPayload(messages, stream=False)
+            payload = self._buildPayload(messages, stream=False, thinking=False)
             url = self._getChatUrl()
             request = self._buildRequest(url, payload)
 
@@ -1439,7 +1451,7 @@ class LLMClient:
         messages: List[Dict[str, Any]],
         tools: List[Dict],
         tool_executor: Callable[[str, Dict], Dict],
-        max_tool_rounds: int = 50,
+        max_tool_rounds: int = 10,
         on_progress: Optional[Callable[[Dict], None]] = None,
     ) -> Dict[str, Any]:
         """
@@ -1635,7 +1647,7 @@ class LLMClient:
         other_error = None
         try:
             messages = [{'role': 'user', 'content': 'Hi'}]
-            payload = self._buildPayload(messages)
+            payload = self._buildPayload(messages, thinking=False)
             url = self._getChatUrl()
             request = self._buildRequest(url, payload)
             with self._openRequest(request):
