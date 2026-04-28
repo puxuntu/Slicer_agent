@@ -1256,7 +1256,54 @@ class LLMClient:
                 logger.error(f"Error in chatWithTools round {round_num + 1}: {e}")
                 raise
 
-        logger.warning(f"Max tool rounds ({max_tool_rounds}) reached")
+        logger.warning(f"Max tool rounds ({max_tool_rounds}) reached — forcing final code generation")
+
+        # Force one final call without tools to generate the code
+        messages.append({
+            'role': 'user',
+            'content': (
+                "You have reached the maximum number of search rounds. "
+                "Stop searching and generate the final Python code block now. "
+                "Output the complete code inside ```python ... ```."
+            ),
+        })
+        intermediate_messages.append(messages[-1])
+
+        final_start = time.time()
+        payload = self._buildPayload(messages, stream=False, tools=None)
+        request = self._buildRequest(url, payload)
+        with self._openRequest(request) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        api_time = time.time() - final_start
+        if self._isClaude():
+            data = self._normalizeClaudeResponse(data)
+
+        assistant_message = data['choices'][0]['message']
+        content = self._coerceText(assistant_message.get('content', ''))
+        reasoning_content = self._coerceText(assistant_message.get('reasoning_content', ''))
+        if reasoning_content:
+            all_reasoning_parts.append(f"[Final Generation]\n{reasoning_content}")
+
+        usage = data.get('usage', {})
+        round_tokens = usage.get('total_tokens', 0)
+        timing_report['total_tokens'] += round_tokens
+        timing_report['total_prompt_tokens'] += usage.get('prompt_tokens', 0)
+        timing_report['total_completion_tokens'] += usage.get('completion_tokens', 0)
+        timing_report['api_calls'] += 1
+        timing_report['total_api_time'] += api_time
+        timing_report['rounds'].append({
+            'round': max_tool_rounds + 1,
+            'phase': 'generate',
+            'api_time': round(api_time, 3),
+            'tool_time': 0.0,
+            'other_time': 0.0,
+            'round_time': round(time.time() - final_start, 3),
+            'tools': [],
+            'tokens': round_tokens,
+            'thinking': True,
+        })
+
+        code = self._extractCode(content)
         accumulated_reasoning = '\n\n'.join(all_reasoning_parts) if all_reasoning_parts else reasoning_content
         return {
             'content': content,
@@ -1265,7 +1312,7 @@ class LLMClient:
             'timing_report': timing_report,
             'tool_calls_history': tool_calls_history,
             'intermediate_messages': intermediate_messages,
-            'has_code': False,
+            'has_code': bool(code),
         }
 
     def chatWithTools(

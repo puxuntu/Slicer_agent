@@ -1573,17 +1573,20 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             sub_queries = self.llmClient.decomposeQuery(prompt)
             t1 = time.time()
 
-            # Step 2: Batch retrieval using sub-queries (top-15 per sub-query)
-            # Batched ONNX inference is ~N× faster than N sequential calls
-            # because encoding all queries in one batch avoids repeated model
-            # loading and keeps all cores busy with one inference pass.
-            t_batch0 = time.time()
-            all_results = retriever.search_batch(sub_queries, top_k=15)
-            t_batch = time.time() - t_batch0
-            per_query = [
-                {'query': sq, 'count': len(res), 'time': None}
-                for sq, res in zip(sub_queries, all_results)
-            ]
+            # Step 2: Multi-retrieval using sub-queries (top-15 per sub-query)
+            # Run searches sequentially so each query is fully independent.
+            all_results = []
+            per_query = []
+            for sq in sub_queries:
+                q_start = time.time()
+                results = retriever.search(sq, top_k=15)
+                q_end = time.time()
+                all_results.append(results)
+                per_query.append({
+                    'query': sq,
+                    'count': len(results),
+                    'time': round(q_end - q_start, 3)
+                })
 
             # Step 3: Merge with quota and format
             from SlicerAIAgentLib.SkillIndexer import VectorRetriever
