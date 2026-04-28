@@ -1018,116 +1018,175 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             t = self._timing
             lines = ["="*50, "Performance Timing Report", "="*50, ""]
 
-            # Overview
-            if 'turn_start' in t and 'generation_complete' in t:
-                total = t['generation_complete'] - t['turn_start']
-                lines.append(f"Turn wall-clock time (up to generation): {total:.3f}s")
-            if 'turn_start' in t and 'execution_end' in t:
-                total = t['execution_end'] - t['turn_start']
-                lines.append(f"Turn wall-clock time (including execution): {total:.3f}s")
+            # ---- Compute phase times so the overview adds up ----
+            phase1_scene = t.get('context_build_time', 0.0)
+
+            phase2_decompose = 0.0
+            phase2_faiss = 0.0
+            phase2_retrieval = 0.0
+            rt = t.get('retrieval_timing', {})
+            if rt:
+                phase2_decompose = rt.get('decompose_time', 0.0)
+                phase2_faiss = sum(pq.get('time', 0.0) for pq in rt.get('retrieval_per_query', []))
+                phase2_retrieval = phase2_decompose + phase2_faiss
+
+            phase3_api = 0.0
+            phase3_tool = 0.0
+            phase3_other = 0.0
+            phase3_tools = 0.0
+            lt = t.get('llm_timing', {})
+            if lt:
+                phase3_api = lt.get('total_api_time', 0.0)
+                phase3_tool = lt.get('total_tool_time', 0.0)
+                phase3_other = lt.get('total_other_time', 0.0)
+                phase3_tools = phase3_api + phase3_tool + phase3_other
+
+            phase4_validation = 0.0
+            if 'validation_start' in t and 'validation_end' in t:
+                phase4_validation = t['validation_end'] - t['validation_start']
+            phase4_exec = 0.0
+            if 'execution_start' in t and 'execution_end' in t:
+                phase4_exec = t['execution_end'] - t['execution_start']
+            phase4_total = phase4_validation + phase4_exec
+
+            # Totals
+            total_to_generation = 0.0
+            total_with_execution = 0.0
+            if 'turn_start' in t:
+                if 'generation_complete' in t:
+                    total_to_generation = t['generation_complete'] - t['turn_start']
+                if 'execution_end' in t:
+                    total_with_execution = t['execution_end'] - t['turn_start']
+
+            # Unmeasured overhead = remainder not captured by the explicit phases above
+            measured_sum = phase1_scene + phase2_retrieval + phase3_tools + phase4_total
+            unmeasured = max(0.0, total_with_execution - measured_sum)
+
+            # ---- Timeline Overview (numbers must add up) ----
+            lines.append("=== Timeline Overview ===")
+            lines.append(f"Total turn wall-clock (including execution): {total_with_execution:.3f}s")
+            if total_to_generation > 0:
+                lines.append(f"Total up to code generation: {total_to_generation:.3f}s")
+            lines.append("")
+            lines.append("Phase breakdown:")
+            lines.append(f"  1. Scene context build: {phase1_scene:.3f}s")
+            lines.append(f"  2. Pre-retrieval (query decomposition + vector search): {phase2_retrieval:.3f}s")
+            lines.append(f"  3. Autonomous tool-calling & code generation: {phase3_tools:.3f}s")
+            lines.append(f"  4. Code validation & execution: {phase4_total:.3f}s")
+            if unmeasured > 0.001:
+                lines.append(f"  5. Unmeasured overhead (prompt formatting, UI handoff, etc.): {unmeasured:.3f}s")
+            lines.append("")
+            lines.append("Verification: " + " + ".join([
+                f"{phase1_scene:.3f}", f"{phase2_retrieval:.3f}", f"{phase3_tools:.3f}",
+                f"{phase4_total:.3f}", f"{unmeasured:.3f}"
+            ]) + f" = {measured_sum + unmeasured:.3f}s")
+            lines.append("")
+
             if 'tokens' in t:
                 lines.append(f"Main generation tokens: {t['tokens']}")
             if 'cost' in t:
                 lines.append(f"Main generation cost: ${t['cost']:.4f}")
             lines.append("")
 
-            # Context building
+            # ---- Phase 1: Scene Context (detail) ----
             if 'context_build_time' in t:
+                lines.append("-" * 40)
+                lines.append("Phase 1 — Scene Context Build")
+                lines.append("-" * 40)
                 lines.append(f"Scene context build: {t['context_build_time']:.3f}s")
                 lines.append("")
 
-            # Retrieval (multi-query decomposition + HyDE)
-            if 'retrieval_timing' in t:
-                rt = t['retrieval_timing']
-                lines.append("Retrieval (multi-query decomposition + HyDE):")
-                if 'decompose_hyde_time' in rt:
-                    lines.append(f"  Query decomposition + HyDE: {rt['decompose_hyde_time']:.3f}s")
+            # ---- Phase 2: Pre-Retrieval (detail) ----
+            if rt:
+                lines.append("-" * 40)
+                lines.append("Phase 2 — Dense Pre-Retrieval (Decompose + Vector Search)")
+                lines.append("-" * 40)
+                if 'decompose_time' in rt:
+                    lines.append(f"Query decomposition: {rt['decompose_time']:.3f}s")
                 if 'sub_queries' in rt:
                     for i, sq in enumerate(rt['sub_queries'], 1):
                         lines.append(f"  Sub-query {i}: {sq}")
                 if 'retrieval_count' in rt:
-                    lines.append(f"  Retrieval calls: {rt['retrieval_count']}")
+                    lines.append(f"Retrieval calls: {rt['retrieval_count']}")
                 if 'merged_count' in rt:
-                    lines.append(f"  Merged unique chunks: {rt['merged_count']}")
+                    lines.append(f"Merged unique chunks: {rt['merged_count']}")
                 if 'total_slots' in rt:
-                    lines.append(f"  Total slots target: {rt['total_slots']}")
+                    lines.append(f"Total slots target: {rt['total_slots']}")
                 if 'retrieval_per_query' in rt:
-                    total_retrieval_time = sum(pq.get('time', 0) for pq in rt['retrieval_per_query'])
-                    lines.append(f"  Total retrieval time: {total_retrieval_time:.3f}s")
+                    lines.append(f"Vector search total: {phase2_faiss:.3f}s")
                     for pq in rt['retrieval_per_query']:
-                        hyde_preview = pq.get('hyde', '')[:60].replace('\n', ' ')
-                        lines.append(f"    - {pq.get('query', '')}: {pq.get('count', 0)} chunks in {pq.get('time', 0):.3f}s")
-                        if hyde_preview:
-                            lines.append(f"      HyDE: {hyde_preview}...")
+                        lines.append(f"  - {pq.get('query', '')}: {pq.get('count', 0)} chunks in {pq.get('time', 0):.3f}s")
                 lines.append("")
 
-            # LLM generation
-            if 'turn_start' in t and 'generation_complete' in t:
-                gen = t['generation_complete'] - t['turn_start']
-                lines.append(f"LLM response generation: {gen:.3f}s")
-            if 'llm_timing' in t:
-                lt = t['llm_timing']
+            # ---- Phase 3: Tool-Calling Loop (detail) ----
+            if lt:
+                lines.append("-" * 40)
+                lines.append("Phase 3 — Autonomous Tool-Calling Loop")
+                lines.append("-" * 40)
                 rounds = lt.get('rounds', [])
-                # Count tool types across all rounds
                 grep_count = sum(1 for r in rounds if 'Grep' in r.get('tools', []))
                 readfile_count = sum(1 for r in rounds if 'ReadFile' in r.get('tools', []))
-                lines.append(f"  API calls: {lt.get('api_calls', 0)}")
-                lines.append(f"  Total API time: {lt.get('total_api_time', 0):.3f}s")
-                lines.append(f"  Total tool time: {lt.get('total_tool_time', 0):.3f}s")
-                lines.append(f"  Total other time: {lt.get('total_other_time', 0):.3f}s")
-                lines.append(f"  Tool rounds: {lt.get('tool_rounds', 0)}")
-                lines.append(f"  Grep calls: {grep_count}")
-                lines.append(f"  ReadFile calls: {readfile_count}")
-                # Per-round breakdown
+                lines.append(f"API calls: {lt.get('api_calls', 0)}")
+                lines.append(f"Tool rounds: {lt.get('tool_rounds', 0)}")
+                lines.append(f"Grep calls: {grep_count}")
+                lines.append(f"ReadFile calls: {readfile_count}")
+                lines.append("")
+                lines.append(f"Time inside this phase:")
+                lines.append(f"  LLM API wait time: {phase3_api:.3f}s")
+                lines.append(f"  Tool execution time: {phase3_tool:.3f}s")
+                lines.append(f"  Overhead (JSON parse, prompt rebuild, etc.): {phase3_other:.3f}s")
+                lines.append("")
                 if rounds:
-                    lines.append("")
-                    lines.append("  Per-round breakdown:")
+                    lines.append("Per-round breakdown:")
                     for r in rounds:
                         tools = ', '.join(r.get('tools', [])) or 'done'
                         tok = r.get('tokens', 0)
                         tok_str = f" tokens={tok}" if tok else ""
                         lines.append(
-                            f"    Round {r['round']} | "
+                            f"  Round {r['round']} | "
                             f"api={r['api_time']:.3f}s tool={r.get('tool_time', 0):.3f}s "
                             f"other={r.get('other_time', 0):.3f}s total={r['round_time']:.3f}s | tools=[{tools}]{tok_str}"
                         )
-            lines.append("")
+                    lines.append("")
 
-            # Auto-execute pipeline (fine-grained)
-            if 'autoexecute_start' in t:
-                lines.append("Auto-execute pipeline:")
+            # ---- Phase 4: Execution (detail) ----
+            has_exec = 'execution_start' in t or 'autoexecute_start' in t
+            if has_exec:
+                lines.append("-" * 40)
+                lines.append("Phase 4 — Code Validation & Execution")
+                lines.append("-" * 40)
                 if 'validation_start' in t and 'validation_end' in t:
                     v_t = t['validation_end'] - t['validation_start']
-                    lines.append(f"  Syntax validation: {v_t:.3f}s")
+                    lines.append(f"Syntax validation: {v_t:.3f}s")
                 if 'execution_async_call' in t and 'autoexecute_start' in t:
                     async_t = t['execution_async_call'] - t['autoexecute_start']
-                    lines.append(f"  Pre-execution overhead: {async_t:.3f}s")
+                    lines.append(f"Pre-execution overhead: {async_t:.3f}s")
                 if 'executor_scheduled' in t and 'execution_async_call' in t:
                     sched_t = t['executor_scheduled'] - t['execution_async_call']
-                    lines.append(f"  Executor scheduling delay: {sched_t:.3f}s")
+                    lines.append(f"Executor scheduling delay: {sched_t:.3f}s")
                 if 'executor_actual_start' in t and 'executor_scheduled' in t:
                     actual_delay = t['executor_actual_start'] - t['executor_scheduled']
-                    lines.append(f"  Qt event-loop delay (singleShot→run): {actual_delay:.3f}s")
+                    lines.append(f"Qt event-loop delay (singleShot→run): {actual_delay:.3f}s")
                 if 'execution_start' in t and 'executor_actual_start' in t:
                     exec_startup = t['execution_start'] - t['executor_actual_start']
-                    lines.append(f"  Executor startup overhead: {exec_startup:.3f}s")
+                    lines.append(f"Executor startup overhead: {exec_startup:.3f}s")
                 if 'execution_callback_start' in t and 'execution_end' in t:
                     cb_t = t['execution_callback_start'] - t['execution_end']
-                    lines.append(f"  Callback dispatch delay: {cb_t:.3f}s")
+                    lines.append(f"Callback dispatch delay: {cb_t:.3f}s")
+                if 'execution_start' in t:
+                    if 'execution_end' in t:
+                        exec_t = t['execution_end'] - t['execution_start']
+                        lines.append(f"Code execution (exec() only): {exec_t:.3f}s (result: {t.get('execution_result', 'unknown')})")
+                    else:
+                        lines.append("Code execution: started but not finished yet")
                 lines.append("")
-            
-            # Execution
-            if 'execution_start' in t:
-                if 'execution_end' in t:
-                    exec_t = t['execution_end'] - t['execution_start']
-                    lines.append(f"Code execution (exec() only): {exec_t:.3f}s (result: {t.get('execution_result', 'unknown')})")
-                else:
-                    lines.append(f"Code execution: started but not finished yet")
-            lines.append("")
 
-            # Self-corrections
+            # ---- Self-corrections ----
+            lines.append("-" * 40)
+            lines.append("Self-Correction")
+            lines.append("-" * 40)
             if 'corrections' in t:
-                lines.append(f"Self-correction attempts: {len(t['corrections'])}")
+                lines.append(f"Attempts: {len(t['corrections'])}")
                 for corr in t['corrections']:
                     lines.append(f"  Attempt {corr['attempt']}: start={corr['start']:.3f}s")
                     if 'tokens' in corr:
@@ -1144,10 +1203,13 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                         if rounds:
                             lines.append(f"    Rounds: {len(rounds)}")
             else:
-                lines.append("Self-correction attempts: 0")
+                lines.append("Attempts: 0")
             lines.append("")
 
-            # Token & Cost summary
+            # ---- Token & Cost summary ----
+            lines.append("-" * 40)
+            lines.append("Token & Cost Summary")
+            lines.append("-" * 40)
             total_tokens = t.get('tokens', 0)
             total_cost = t.get('cost', 0.0)
             if 'corrections' in t:
@@ -1489,9 +1551,9 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
 
     def _buildRetrievalContext(self, prompt: str, timing: Optional[Dict] = None) -> str:
         """
-        Perform dense vector pre-retrieval with combined query decomposition + HyDE.
-        Uses a single LLM call to break the request into sub-tasks AND generate
-        hypothetical code snippets for each. Returns formatted context string.
+        Perform dense vector pre-retrieval with query decomposition.
+        Breaks the request into sub-task queries, runs a separate semantic
+        search for each, then merges and formats the results.
         """
         import time
         t_total0 = time.time()
@@ -1503,25 +1565,21 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                 return ""
 
             import time
-            # Step 1: Combined decomposition + HyDE (single LLM call)
+            # Step 1: Decompose into sub-task queries
             t0 = time.time()
-            sub_tasks = self.llmClient.decomposeQueryWithHyDE(prompt)
+            sub_queries = self.llmClient.decomposeQuery(prompt)
             t1 = time.time()
 
-            sub_queries = [t['query'] for t in sub_tasks]
-            hyde_queries = [t['hyde'] for t in sub_tasks]
-
-            # Step 2: Multi-retrieval using HyDE queries (top-15 per sub-query)
+            # Step 2: Multi-retrieval using sub-queries (top-15 per sub-query)
             all_results = []
             per_query = []
-            for sq, hyde in zip(sub_queries, hyde_queries):
+            for sq in sub_queries:
                 q_start = time.time()
-                results = retriever.search(hyde, top_k=15)
+                results = retriever.search(sq, top_k=15)
                 q_end = time.time()
                 all_results.append(results)
                 per_query.append({
                     'query': sq,
-                    'hyde': hyde,
                     'count': len(results),
                     'time': round(q_end - q_start, 3)
                 })
@@ -1538,9 +1596,8 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             total_t = time.time() - t_total0
 
             if timing is not None:
-                timing['decompose_hyde_time'] = round(t1 - t0, 3)
+                timing['decompose_time'] = round(t1 - t0, 3)
                 timing['sub_queries'] = sub_queries
-                timing['hyde_queries'] = hyde_queries
                 timing['retrieval_count'] = len(sub_queries)
                 timing['retrieval_per_query'] = per_query
                 timing['merged_count'] = len(merged)

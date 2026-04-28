@@ -56,7 +56,7 @@ requirements.txt              # Python dependencies for Slicer to install
 ### Key Files for Agents
 
 - **`SlicerAIAgent.py`** — The monolithic module file containing all four Slicer scripted module classes: `SlicerAIAgent` (metadata), `SlicerAIAgentWidget` (UI setup, streaming display, auto-execution, self-correction, settings persistence), `SlicerAIAgentLogic` (orchestrates LLM client, tool executor, validator, executor, and dense vector retrieval), and `SlicerAIAgentTest` (smoke tests). The Widget implements a queue-based streaming UI (`_streamQueue` + `QTimer` polling at 50 ms) and auto-executes generated code with up to 5 self-correction attempts.
-- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports both OpenAI-compatible and native Anthropic Messages API formats. Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, query decomposition (`decomposeQuery`), and combined decomposition + HyDE (`decomposeQueryWithHyDE`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
+- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports both OpenAI-compatible and native Anthropic Messages API formats. Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, and query decomposition (`decomposeQuery`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
 - **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing. `VectorSearch` delegates to `SkillIndexer.VectorRetriever` if a local index is present.
 - **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
   - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.
@@ -153,7 +153,7 @@ The main test file is `Testing/SlicerAIAgentTest.py`. It tests module imports, L
 ### Dense Vector Pre-Retrieval (Phase 1)
 
 Before each LLM request, `SlicerAIAgentLogic` automatically calls `_buildRetrievalContext`, which:
-1. Decomposes complex user prompts into sub-queries via `llmClient.decomposeQueryWithHyDE`.
+1. Decomposes complex user prompts into sub-queries via `llmClient.decomposeQuery`.
 2. Runs `VectorRetriever.search` for each sub-query (top-15 per query).
 3. Merges results with `merge_results_with_quota` (quota per sub-query = 3, total slots ≈ max(15, len(sub_queries) × 5)).
 4. Formats the result and injects it into the system prompt under `## RELEVANT KNOWLEDGE BASE SNIPPETS`.
