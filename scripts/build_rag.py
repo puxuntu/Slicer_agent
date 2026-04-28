@@ -8,11 +8,17 @@ import sys
 import logging
 import time
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-logger = logging.getLogger(__name__)
-
 # Project root is one level up from this script
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 sys.path.insert(0, _PROJECT_ROOT)
 
 # Direct import to avoid loading Slicer-dependent modules via __init__.py
