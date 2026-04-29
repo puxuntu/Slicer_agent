@@ -61,7 +61,7 @@ requirements.txt              # Python dependencies for Slicer to install
 - **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
   - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.
   - `VectorIndex` — dense semantic retrieval via ONNX Runtime (`jinaai/jina-embeddings-v2-base-code` ONNX export, 768-dim) + FAISS (`IndexFlatIP`).
-  - `VectorRetriever` — pure dense vector search with source-type weighting (`doc_example` ×1.3, `python_api` ×1.2, etc.). Deduplicates to max 3 chunks per file. Supports `merge_results_with_quota` for multi-query decomposition.
+  - `VectorRetriever` — pure dense vector search with source-type weighting (`doc_example` ×1.3, `python_api` ×1.2, etc.). Returns top-k chunks directly per query.
   - `IndexBuilder` — incremental index builder. Scans skill tree, compares file mtime fingerprints, re-chunks only changed files, then rebuilds the FAISS vector index. Stores everything under `<repo>/Resources/Code_RAG/v1/`; model cache lives under `<repo>/Resources/Code_RAG/models/`.
 - **`SlicerAIAgentLib/SafeExecutor.py`** — Runs generated code in `sys.modules['__main__'].__dict__` (same namespace as the Slicer Python Console). Captures stdout/stderr, intercepts VTK errors via `vtkFileOutputWindow`, supports cooperative timeout, and rolls back the MRML scene on failure (`SaveStateForUndo` + node-ID-based cleanup). Execution is scheduled via `qt.QTimer.singleShot` to stay on the main thread.
 - **`Resources/Prompts/system_prompt.md`** — The external system prompt loaded at runtime. Contains the LLM's search strategy, source tree map, critical rules, and code execution environment description.
@@ -154,8 +154,8 @@ The main test file is `Testing/SlicerAIAgentTest.py`. It tests module imports, L
 
 Before each LLM request, `SlicerAIAgentLogic` automatically calls `_buildRetrievalContext`, which:
 1. Decomposes complex user prompts into sub-queries via `llmClient.decomposeQuery`.
-2. Runs `VectorRetriever.search` for each sub-query (top-15 per query).
-3. Merges results with `merge_results_with_quota` (quota per sub-query = 3, total slots ≈ max(15, len(sub_queries) × 5)).
+2. Runs `VectorRetriever.search` for each sub-query (top-10 per query).
+3. Concatenates per-sub-query results directly (top-10 per sub-query).
 4. Formats the result and injects it into the system prompt under `## RELEVANT KNOWLEDGE BASE SNIPPETS`.
 
 If the index is missing or not ready, the system silently falls back to the traditional pure tool-calling workflow.

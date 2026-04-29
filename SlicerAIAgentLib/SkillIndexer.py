@@ -846,29 +846,16 @@ class VectorRetriever:
         if not self.is_ready():
             return []
 
-        # Over-fetch for deduplication
-        vec_results = self.vector.search(query, top_k=top_k * 3)
+        vec_results = self.vector.search(query, top_k=top_k)
 
         # Apply source_type weighting
-        scored = []
+        results: List[RetrievedChunk] = []
         for cid, sim in vec_results:
             chunk = self.chunks.get(cid)
             if not chunk:
                 continue
             weight = _SOURCE_TYPE_WEIGHTS.get(chunk.source_type, 1.0)
             final = sim * weight
-            scored.append((cid, final, sim, chunk))
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-
-        # Deduplicate by file (max 3 chunks per file)
-        file_counts: Dict[str, int] = {}
-        results: List[RetrievedChunk] = []
-        for cid, final, sim, chunk in scored:
-            fp = chunk.file_path
-            if file_counts.get(fp, 0) >= 3:
-                continue
-            file_counts[fp] = file_counts.get(fp, 0) + 1
             results.append(RetrievedChunk(
                 chunk=chunk,
                 vector_score=sim,
@@ -879,68 +866,6 @@ class VectorRetriever:
 
         return results
 
-    @staticmethod
-    def merge_results(result_lists: List[List[RetrievedChunk]], top_k: int = 15) -> List[RetrievedChunk]:
-        """
-        Merge multiple retrieval result lists, deduplicate by chunk_id,
-        keep the highest final_score, and return top_k.
-        """
-        best: Dict[str, RetrievedChunk] = {}
-        for results in result_lists:
-            for rc in results:
-                cid = rc.chunk.chunk_id
-                if cid not in best or rc.final_score > best[cid].final_score:
-                    best[cid] = rc
-        merged = sorted(best.values(), key=lambda rc: rc.final_score, reverse=True)
-        return merged[:top_k]
-
-    @staticmethod
-    def merge_results_with_quota(
-        result_lists: List[List[RetrievedChunk]],
-        quota_per_list: int = 2,
-        total_slots: int = 15,
-    ) -> List[RetrievedChunk]:
-        """
-        Merge retrieval results with per-sub-query quota guarantee.
-
-        Phase 1: each sub-query gets `quota_per_list` top chunks (guaranteed).
-        Phase 2: remaining slots filled from global pool by final_score.
-        """
-        seen: set = set()
-        merged: List[RetrievedChunk] = []
-
-        # Phase 1: guarantee quota for each sub-query
-        for results in result_lists:
-            count = 0
-            for rc in sorted(results, key=lambda x: x.final_score, reverse=True):
-                cid = rc.chunk.chunk_id
-                if cid not in seen:
-                    seen.add(cid)
-                    merged.append(rc)
-                    count += 1
-                    if count >= quota_per_list:
-                        break
-
-        # Phase 2: fill remaining slots from global pool
-        if len(merged) < total_slots:
-            all_remaining: List[RetrievedChunk] = []
-            for results in result_lists:
-                for rc in results:
-                    if rc.chunk.chunk_id not in seen:
-                        all_remaining.append(rc)
-            all_remaining.sort(key=lambda x: x.final_score, reverse=True)
-            for rc in all_remaining:
-                if len(merged) >= total_slots:
-                    break
-                cid = rc.chunk.chunk_id
-                if cid not in seen:
-                    seen.add(cid)
-                    merged.append(rc)
-
-        # Final sort by score descending
-        merged.sort(key=lambda x: x.final_score, reverse=True)
-        return merged
-
     def format_for_prompt(self, results: List[RetrievedChunk]) -> str:
         """Format retrieval results for injection into system prompt."""
         if not results:
@@ -950,7 +875,7 @@ class VectorRetriever:
             c = rc.chunk
             lines.append(
                 f"[{i}] {c.file_path} (lines {c.start_line}-{c.end_line}) "
-                f"[{c.source_type}] score:{rc.final_score:.3f}\n"
+                f"[{c.source_type}] similarity:{rc.vector_score:.3f} boosted:{rc.final_score:.3f}\n"
                 f"```{c.language if c.language != 'other' else ''}\n"
                 f"{c.content}\n"
                 f"```\n"

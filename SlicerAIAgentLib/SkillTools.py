@@ -307,7 +307,7 @@ class SkillToolExecutor:
         elif tool_name == "VectorSearch":
             result = self._vector_search(
                 arguments.get("query", ""),
-                arguments.get("top_k", 15)
+                arguments.get("top_k", 10)
             )
         else:
             return {"error": f"Unknown tool: {tool_name}"}
@@ -338,7 +338,7 @@ class SkillToolExecutor:
                 result["file"] = self._relativize(result["file"])
         return result
     
-    def _vector_search(self, query: str, top_k: int = 15) -> Dict:
+    def _vector_search(self, query: str, top_k: int = 10) -> Dict:
         """Execute dense vector search against the pre-built index."""
         if not self._vector_retriever:
             return {
@@ -1131,7 +1131,7 @@ def get_skill_tools() -> List[Dict]:
                         },
                         "top_k": {
                             "type": "integer",
-                            "description": "Number of top results to return (default 15)"
+                            "description": "Number of top results to return (default 10)"
                         }
                     },
                     "required": ["query"]

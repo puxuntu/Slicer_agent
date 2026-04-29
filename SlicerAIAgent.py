@@ -461,6 +461,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             elif event_type == 'error':
                 self._onStreamError(payload)
                 i += 1
+            elif event_type == 'correction_complete':
+                self._handleCorrectionResult(**payload)
+                i += 1
+            elif event_type == 'correction_error':
+                self._handleCorrectionError(**payload)
+                i += 1
             else:
                 i += 1
 
@@ -888,12 +894,18 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     on_progress=_on_correction_progress,
                 )
                 
-                # Dispatch result handling to main thread for safe Qt UI updates
-                qt.QTimer.singleShot(0, lambda: self._handleCorrectionResult(
-                    response, attempt, max_attempts, error_detail, _lastUserPrompt
-                ))
+                # Dispatch result handling via _streamQueue so it runs on the main thread
+                self._streamQueue.put(('correction_complete', {
+                    'response': response,
+                    'attempt': attempt,
+                    'max_attempts': max_attempts,
+                    'error_detail': error_detail,
+                    'original_prompt': _lastUserPrompt,
+                }))
             except Exception as e:
-                qt.QTimer.singleShot(0, lambda: self._handleCorrectionError(str(e)))
+                self._streamQueue.put(('correction_error', {
+                    'error_msg': str(e),
+                }))
         
         thread = threading.Thread(target=_run_correction, daemon=True)
         thread.start()
@@ -1109,10 +1121,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                         lines.append(f"  Sub-query {i}: {sq}")
                 if 'retrieval_count' in rt:
                     lines.append(f"Retrieval calls: {rt['retrieval_count']}")
-                if 'merged_count' in rt:
-                    lines.append(f"Merged unique chunks: {rt['merged_count']}")
-                if 'total_slots' in rt:
-                    lines.append(f"Total slots target: {rt['total_slots']}")
+                if 'concatenated_count' in rt:
+                    lines.append(f"Total chunks in context: {rt['concatenated_count']}")
                 if 'retrieval_per_query' in rt:
                     lines.append(f"Vector search total: {phase2_faiss:.3f}s")
                     for pq in rt['retrieval_per_query']:
@@ -1582,13 +1592,13 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             sub_queries = self.llmClient.decomposeQuery(prompt)
             t1 = time.time()
 
-            # Step 2: Multi-retrieval using sub-queries (top-15 per sub-query)
+            # Step 2: Multi-retrieval using sub-queries (top-10 per sub-query)
             # Run searches sequentially so each query is fully independent.
             all_results = []
             per_query = []
             for sq in sub_queries:
                 q_start = time.time()
-                results = retriever.search(sq, top_k=15)
+                results = retriever.search(sq, top_k=10)
                 q_end = time.time()
                 all_results.append(results)
                 per_query.append({
@@ -1597,15 +1607,24 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     'time': round(q_end - q_start, 3)
                 })
 
-            # Step 3: Merge with quota and format
-            from SlicerAIAgentLib.SkillIndexer import VectorRetriever
-            total_slots = max(15, len(sub_queries) * 5)
+            # Step 3: Concatenate all per-query results and format
             t_merge0 = time.time()
-            merged = VectorRetriever.merge_results_with_quota(
-                all_results, quota_per_list=3, total_slots=total_slots
-            )
+            concatenated: List[Any] = []
+            for res in all_results:
+                concatenated.extend(res)
             t_merge = time.time() - t_merge0
-            formatted = retriever.format_for_prompt(merged)
+            formatted = retriever.format_for_prompt(concatenated)
+            # Prepend the sub-queries so the LLM knows what topics were already searched
+            if sub_queries:
+                search_note = (
+                    "## Pre-retrieval search coverage\n"
+                    "The following topics were already searched automatically. "
+                    "You do NOT need to call VectorSearch for these same topics again. "
+                    "Only use tools for gaps not covered below.\n"
+                    + '\n'.join(f"- {sq}" for sq in sub_queries)
+                    + "\n\n"
+                )
+                formatted = search_note + formatted
             total_t = time.time() - t_total0
 
             if timing is not None:
@@ -1614,8 +1633,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                 timing['sub_queries'] = sub_queries
                 timing['retrieval_count'] = len(sub_queries)
                 timing['retrieval_per_query'] = per_query
-                timing['merged_count'] = len(merged)
-                timing['total_slots'] = total_slots
+                timing['concatenated_count'] = len(concatenated)
 
             return formatted
         except Exception as e:
