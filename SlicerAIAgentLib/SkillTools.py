@@ -280,7 +280,7 @@ class SkillToolExecutor:
         Execute a tool call.
         
         Args:
-            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile, VectorSearch)
+            tool_name: Name of the tool (FindFile, SearchSymbol, Grep, ReadFile)
             arguments: Tool arguments
             
         Returns:
@@ -303,11 +303,6 @@ class SkillToolExecutor:
             result = self._readfile(
                 arguments.get("path", ""),
                 arguments.get("query")
-            )
-        elif tool_name == "VectorSearch":
-            result = self._vector_search(
-                arguments.get("query", ""),
-                arguments.get("top_k", 10)
             )
         else:
             return {"error": f"Unknown tool: {tool_name}"}
@@ -338,45 +333,6 @@ class SkillToolExecutor:
                 result["file"] = self._relativize(result["file"])
         return result
     
-    def _vector_search(self, query: str, top_k: int = 10) -> Dict:
-        """Execute dense vector search against the pre-built index."""
-        if not self._vector_retriever:
-            return {
-                "tool": "VectorSearch",
-                "query": query,
-                "error": "Vector index not available. Please build index first."
-            }
-        try:
-            results = self._vector_retriever.search(query, top_k)
-            formatted = self._vector_retriever.format_for_prompt(results)
-            # Serialize results for JSON compatibility
-            serializable = []
-            for rc in results:
-                c = rc.chunk
-                serializable.append({
-                    "chunk_id": c.chunk_id,
-                    "file_path": c.file_path,
-                    "start_line": c.start_line,
-                    "end_line": c.end_line,
-                    "chunk_type": c.chunk_type,
-                    "source_type": c.source_type,
-                    "vector_score": round(rc.vector_score, 4),
-                    "final_score": round(rc.final_score, 4),
-                })
-            return {
-                "tool": "VectorSearch",
-                "query": query,
-                "results": serializable,
-                "formatted_context": formatted,
-            }
-        except Exception as e:
-            logger.warning(f"Vector search failed: {e}")
-            return {
-                "tool": "VectorSearch",
-                "query": query,
-                "error": str(e),
-            }
-
     def _find_rg(self) -> Optional[str]:
         # 1. Windows bundled binary
         if self.platform == 'windows' and os.path.isfile(_RG_PATH):
@@ -1114,27 +1070,6 @@ def get_skill_tools() -> List[Dict]:
                         }
                     },
                     "required": ["path"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "VectorSearch",
-                "description": "Dense vector search over the pre-indexed knowledge base. Returns the most relevant code snippets. Use this as a fast first step before using ReadFile or Grep.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Natural language query describing what you need (e.g., 'load a volume and display it')"
-                        },
-                        "top_k": {
-                            "type": "integer",
-                            "description": "Number of top results to return (default 10)"
-                        }
-                    },
-                    "required": ["query"]
                 }
             }
         },
