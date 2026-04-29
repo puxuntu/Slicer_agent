@@ -30,7 +30,7 @@ SlicerAIAgent.py              # Main module: Module, Widget, Logic, and Test cla
 SlicerAIAgentLib/             # Core library package
 ├── __init__.py               # Package exports
 ├── LLMClient.py              # LLM API client: streaming, tool calling, history, pricing
-├── SkillTools.py             # Tool executor: FindFile, SearchSymbol, Grep, ReadFile
+├── SkillTools.py             # Tool executor: FindFile, SearchSymbol, Grep, ReadFile, VectorSearch
 ├── SkillIndexer.py           # Dense vector retrieval index: Chunker, VectorIndex, VectorRetriever, IndexBuilder
 ├── CodeValidator.py          # AST-based security validation before code execution
 ├── SafeExecutor.py           # Code execution in __main__.__dict__ with undo/rollback
@@ -57,7 +57,7 @@ requirements.txt              # Python dependencies for Slicer to install
 
 - **`SlicerAIAgent.py`** — The monolithic module file containing all four Slicer scripted module classes: `SlicerAIAgent` (metadata), `SlicerAIAgentWidget` (UI setup, streaming display, auto-execution, self-correction, settings persistence), `SlicerAIAgentLogic` (orchestrates LLM client, tool executor, validator, executor, and dense vector retrieval), and `SlicerAIAgentTest` (smoke tests). The Widget implements a queue-based streaming UI (`_streamQueue` + `QTimer` polling at 50 ms) and auto-executes generated code with up to 5 self-correction attempts.
 - **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports OpenAI-compatible APIs (Kimi/Moonshot, DeepSeek) and native Anthropic Messages API (Claude). Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, query decomposition (`decomposeQuery`), and HyDE query rewriting (`hydeRewrite`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
-- **`SlicerAIAgentLib/SkillTools.py`** — Executes the four tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing.
+- **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing. `VectorSearch` delegates to `SkillIndexer.VectorRetriever` if a local index is present.
 - **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
   - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.
   - `VectorIndex` — dense semantic retrieval via ONNX Runtime (`jinaai/jina-embeddings-v2-base-code` ONNX export, 768-dim) + FAISS (`IndexFlatIP`).
@@ -162,7 +162,7 @@ If the index is missing or not ready, the system silently falls back to the trad
 
 ### Autonomous Tool-Calling Workflow
 
-The LLM is given four tools from the start (`FindFile`, `SearchSymbol`, `Grep`, `ReadFile`) and decides autonomously how to use them:
+The LLM is given five tools from the start (`FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`) and decides autonomously how to use them:
 
 1. **Search** — `Grep` or `SearchSymbol` to locate relevant APIs across the skill knowledge base.
 2. **Read** — `ReadFile` to confirm exact function signatures and usage patterns.
