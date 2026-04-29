@@ -688,6 +688,13 @@ class LLMClient:
                     elif tool_name == 'Grep':
                         # Grep results are usually short; keep as-is for history
                         compressed.append(msg)
+                    elif tool_name == 'VectorSearch':
+                        # Drop the large formatted_context to prevent history bloat;
+                        # keep the structured results list and query.
+                        data.pop('formatted_context', None)
+                        new_msg = dict(msg)
+                        new_msg['content'] = json.dumps(data, ensure_ascii=False)
+                        compressed.append(new_msg)
                     else:
                         compressed.append(msg)
                 except Exception:
@@ -1244,6 +1251,9 @@ class LLMClient:
                             path = args.get('path', 'N/A')
                             sym_type = args.get('type', 'all')
                             progress_lines.append(f'  SearchSymbol({sym_type}): "{pattern}" → {path}')
+                        elif tool_name == 'VectorSearch':
+                            query = args.get('query', 'N/A')
+                            progress_lines.append(f'  VectorSearch: "{query}"')
                         else:
                             progress_lines.append(f'  {tool_name}: {args}')
                     progress_msg = '\n'.join(progress_lines) + '\n'

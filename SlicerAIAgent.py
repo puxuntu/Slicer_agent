@@ -854,7 +854,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     'content': (
                         f"CRITICAL: The previous Python code execution failed with this error:\n"
                         f"{error_detail}\n\n"
-                        "You have Grep and ReadFile tools available. "
+                        "You have Grep, ReadFile, and VectorSearch tools available. "
                         "If the error is caused by an incorrect API signature, missing parameter, or wrong module path, "
                         "use the tools to verify the correct usage before fixing. "
                         "Do NOT search unnecessarily — if you are confident in the fix, apply it directly.\n\n"
@@ -884,7 +884,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     messages=isolated_messages,
                     tools=_logic.skillTools,
                     tool_executor=_logic._executeTool,
-                    max_tool_rounds=50,
+                    max_tool_rounds=5,
                     on_progress=_on_correction_progress,
                 )
                 
@@ -1127,10 +1127,12 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 rounds = lt.get('rounds', [])
                 grep_count = sum(1 for r in rounds if 'Grep' in r.get('tools', []))
                 readfile_count = sum(1 for r in rounds if 'ReadFile' in r.get('tools', []))
+                vectorsearch_count = sum(1 for r in rounds if 'VectorSearch' in r.get('tools', []))
                 lines.append(f"API calls: {lt.get('api_calls', 0)}")
                 lines.append(f"Tool rounds: {lt.get('tool_rounds', 0)}")
                 lines.append(f"Grep calls: {grep_count}")
                 lines.append(f"ReadFile calls: {readfile_count}")
+                lines.append(f"VectorSearch calls: {vectorsearch_count}")
                 lines.append("")
                 lines.append(f"Time inside this phase:")
                 lines.append(f"  LLM API wait time: {phase3_api:.3f}s")
