@@ -1620,7 +1620,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             # Identify .md files with >= 3 chunks
             full_md_files = [
                 fp for fp, cnt in file_counts.items()
-                if cnt >= 3 and fp.lower().endswith('.md')
+                if cnt >= 5 and fp.lower().endswith('.md')
             ]
             if full_md_files and self.toolExecutor:
                 from SlicerAIAgentLib.SkillIndexer import CodeChunk, RetrievedChunk
