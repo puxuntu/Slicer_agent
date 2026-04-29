@@ -1612,6 +1612,56 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             concatenated: List[Any] = []
             for res in all_results:
                 concatenated.extend(res)
+
+            # ---- Full-file inclusion for heavily-referenced .md files ----
+            # Count chunks per file path
+            from collections import Counter
+            file_counts = Counter(rc.chunk.file_path for rc in concatenated)
+            # Identify .md files with >= 3 chunks
+            full_md_files = [
+                fp for fp, cnt in file_counts.items()
+                if cnt >= 3 and fp.lower().endswith('.md')
+            ]
+            if full_md_files and self.toolExecutor:
+                from SlicerAIAgentLib.SkillIndexer import CodeChunk, RetrievedChunk
+                skill_root = self.toolExecutor.skill_path
+                for fp in full_md_files:
+                    abs_path = os.path.join(skill_root, fp)
+                    if not os.path.exists(abs_path):
+                        continue
+                    try:
+                        with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            full_content = f.read()
+                        total_lines = full_content.count('\n') + 1
+                        # Determine dominant source_type from existing chunks
+                        source_types = [rc.chunk.source_type for rc in concatenated if rc.chunk.file_path == fp]
+                        dominant_source = Counter(source_types).most_common(1)[0][0] if source_types else 'doc_example'
+                        # Remove all individual chunks from this file
+                        concatenated = [rc for rc in concatenated if rc.chunk.file_path != fp]
+                        # Create synthetic whole-file chunk
+                        synthetic_chunk = CodeChunk(
+                            chunk_id=f"{fp}#full",
+                            file_path=fp,
+                            start_line=1,
+                            end_line=total_lines,
+                            content=full_content,
+                            embedding_text="",
+                            chunk_type="whole_file",
+                            source_type=dominant_source,
+                            language="markdown",
+                        )
+                        synthetic_rc = RetrievedChunk(
+                            chunk=synthetic_chunk,
+                            vector_score=1.0,
+                            final_score=1.5,
+                        )
+                        concatenated.append(synthetic_rc)
+                        retriever.full_file_paths.add(fp)
+                    except Exception as e:
+                        logger.warning(f"Failed to include full file {fp}: {e}")
+                # Re-sort by final_score descending so full files appear near top
+                concatenated.sort(key=lambda rc: rc.final_score, reverse=True)
+
             t_merge = time.time() - t_merge0
             formatted = retriever.format_for_prompt(concatenated)
             # Prepend the sub-queries so the LLM knows what topics were already searched

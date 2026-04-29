@@ -348,6 +348,10 @@ class SkillToolExecutor:
             }
         try:
             results = self._vector_retriever.search(query, top_k)
+            # Filter out chunks from files already included as full files in Phase 2
+            excluded = self._vector_retriever.full_file_paths
+            if excluded:
+                results = [rc for rc in results if rc.chunk.file_path not in excluded]
             formatted = self._vector_retriever.format_for_prompt(results)
             # Serialize results for JSON compatibility
             serializable = []

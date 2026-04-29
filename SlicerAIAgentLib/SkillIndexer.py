@@ -20,7 +20,7 @@ import re
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -837,6 +837,7 @@ class VectorRetriever:
                  chunks_metadata: Dict[str, CodeChunk]):
         self.vector = vector_index
         self.chunks = chunks_metadata
+        self.full_file_paths: Set[str] = set()
 
     def is_ready(self) -> bool:
         return self.vector.faiss_index is not None
@@ -873,13 +874,22 @@ class VectorRetriever:
         lines = ["## Relevant code snippets from knowledge base:\n"]
         for i, rc in enumerate(results, 1):
             c = rc.chunk
-            lines.append(
-                f"[{i}] {c.file_path} (lines {c.start_line}-{c.end_line}) "
-                f"[{c.source_type}] similarity:{rc.vector_score:.3f} boosted:{rc.final_score:.3f}\n"
-                f"```{c.language if c.language != 'other' else ''}\n"
-                f"{c.content}\n"
-                f"```\n"
-            )
+            if c.chunk_type == "whole_file":
+                lines.append(
+                    f"[{i}] {c.file_path} (lines {c.start_line}-{c.end_line}) "
+                    f"[{c.source_type}] [Full file included — no need to ReadFile or VectorSearch this file]\n"
+                    f"```{c.language if c.language != 'other' else ''}\n"
+                    f"{c.content}\n"
+                    f"```\n"
+                )
+            else:
+                lines.append(
+                    f"[{i}] {c.file_path} (lines {c.start_line}-{c.end_line}) "
+                    f"[{c.source_type}] similarity:{rc.vector_score:.3f} boosted:{rc.final_score:.3f}\n"
+                    f"```{c.language if c.language != 'other' else ''}\n"
+                    f"{c.content}\n"
+                    f"```\n"
+                )
         return '\n'.join(lines)
 
 
