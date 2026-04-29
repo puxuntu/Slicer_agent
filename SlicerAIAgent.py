@@ -94,11 +94,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._streamPollTimer.timeout.connect(self._drainStreamQueue)
         self._streamPollTimer.start()
 
-        # Index status polling (every 2 seconds)
-        self._indexStatusTimer = qt.QTimer()
-        self._indexStatusTimer.setInterval(2000)
-        self._indexStatusTimer.timeout.connect(self._updateIndexStatus)
-        self._indexStatusTimer.start()
+        # Index status: one-time console log only (no UI label)
+        self._indexStatusTimer = None
         self._updateIndexStatus()
 
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
@@ -122,10 +119,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.statusLabel = self.ui.findChild(qt.QLabel, "statusLabel")
         self.tokenLabel = self.ui.findChild(qt.QLabel, "tokenLabel")
         self.thinkingTimerLabel = self.ui.findChild(qt.QLabel, "thinkingTimerLabel")
-        # Vector index status label (may not exist in older .ui files)
+        # Vector index status label — hidden, only console logging is used
         self.indexStatusLabel = self.ui.findChild(qt.QLabel, "indexStatusLabel")
-        if self.indexStatusLabel is None:
-            # Dynamically inject into the UI if not present in .ui file
+        if self.indexStatusLabel:
+            self.indexStatusLabel.setVisible(False)
+        else:
             self._injectIndexStatusLabel()
 
     def setupUIProgrammatically(self):
@@ -225,10 +223,6 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.tokenLabel = qt.QLabel("Tokens: 0 | Cost: $0.000")
         mainLayout.addWidget(self.tokenLabel)
 
-        self.indexStatusLabel = qt.QLabel("Index: Checking...")
-        self.indexStatusLabel.setStyleSheet("font-size: 11px;")
-        mainLayout.addWidget(self.indexStatusLabel)
-
         self.setupConnections()
 
     def setupConnections(self):
@@ -280,41 +274,18 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         logger.info("SlicerAIAgent widget cleaned up")
 
     def _injectIndexStatusLabel(self):
-        """Dynamically add index status label to the UI if not in .ui file."""
-        try:
-            parent = self.statusLabel.parent() if self.statusLabel else self.ui
-            if parent is None:
-                parent = self.ui
-            layout = parent.layout()
-            if layout is None:
-                layout = qt.QVBoxLayout(parent)
-                parent.setLayout(layout)
-            self.indexStatusLabel = qt.QLabel("Index: Checking...")
-            self.indexStatusLabel.setStyleSheet("font-size: 11px;")
-            layout.addWidget(self.indexStatusLabel)
-        except Exception as e:
-            logger.warning(f"Failed to inject index status label: {e}")
-            self.indexStatusLabel = None
+        """No-op: index status is logged to console only, not shown in UI."""
+        self.indexStatusLabel = None
 
     def _updateIndexStatus(self):
-        """Update UI label to show current vector index status."""
-        if not hasattr(self, 'indexStatusLabel') or self.indexStatusLabel is None:
-            return
+        """Log vector index status to console only; no UI indicator."""
         if not self.logic:
-            self.indexStatusLabel.text = "Index: Not initialized"
-            self.indexStatusLabel.setStyleSheet("font-size: 11px; color: #999;")
+            logger.info("Vector index status: Not initialized")
             return
 
         status = self.logic.get_index_status()
-        status_map = {
-            "Ready":    ("Index: Ready",     "font-size: 11px; color: #2e7d32;"),
-            "Missing":  ("Index: Not Built", "font-size: 11px; color: #c62828;"),
-            "Error":    ("Index: Error",     "font-size: 11px; color: #c62828;"),
-            "Unknown":  ("Index: Unknown",   "font-size: 11px; color: #999;"),
-        }
-        text, style = status_map.get(status, (f"Index: {status}", "font-size: 11px; color: #666;"))
-        self.indexStatusLabel.text = text
-        self.indexStatusLabel.setStyleSheet(style)
+        if status != "Ready":
+            logger.info(f"Vector index status: {status} — pre-retrieval will be skipped. Run 'python scripts/build_rag.py' to build the index.")
 
     def enter(self):
         if (hasattr(self, 'chatHistory') and self.chatHistory is not None and
