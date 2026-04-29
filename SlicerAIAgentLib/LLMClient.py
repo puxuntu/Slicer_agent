@@ -833,6 +833,7 @@ class LLMClient:
         prompt: str,
         context: Optional[Dict] = None,
         on_delta: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Send a streaming chat request to the LLM API and assemble the full result.
@@ -849,6 +850,9 @@ class LLMClient:
         """
         if not self.api_key:
             raise RuntimeError("API key not configured")
+
+        if on_status:
+            on_status("Generating...")
 
         if self._isClaude():
             # Anthropic native streaming uses a different SSE format; fallback to non-streaming
@@ -1027,6 +1031,7 @@ class LLMClient:
         tool_executor: Callable[[str, Dict], Dict],
         max_tool_rounds: int,
         on_progress: Optional[Callable[[Dict], None]] = None,
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Core tool-calling loop. Operates on messages in-place.
@@ -1054,6 +1059,9 @@ class LLMClient:
             round_start = time.time()
 
             logger.debug(f"Payload messages count: {len(messages)}")
+
+            if on_status:
+                on_status("Thinking...")
 
             try:
                 api_start = time.time()
@@ -1102,6 +1110,8 @@ class LLMClient:
                     })
 
                     if code:
+                        if on_status:
+                            on_status("Generating...")
                         accumulated_reasoning = '\n\n'.join(all_reasoning_parts) if all_reasoning_parts else reasoning_content
                         return {
                             'content': content,
@@ -1199,12 +1209,25 @@ class LLMClient:
 
                 has_search = any(n in ('Grep', 'FindFile', 'SearchSymbol') for n in tool_names)
                 has_readfile = any(n == 'ReadFile' for n in tool_names)
+                has_vector = any(n == 'VectorSearch' for n in tool_names)
                 if has_search and has_readfile:
                     phase_label = "Search+Read"
                 elif has_readfile:
                     phase_label = "Read"
-                else:
+                elif has_search or has_vector:
                     phase_label = "Search"
+                else:
+                    phase_label = "Tools"
+
+                if on_status:
+                    if has_readfile and (has_search or has_vector):
+                        on_status("Searching & reading...")
+                    elif has_readfile:
+                        on_status("Reading...")
+                    elif has_search or has_vector:
+                        on_status("Searching...")
+                    else:
+                        on_status("Running tools...")
 
                 timing_report['rounds'].append({
                     'round': round_num + 1,
@@ -1276,6 +1299,9 @@ class LLMClient:
 
         logger.warning(f"Max tool rounds ({max_tool_rounds}) reached — forcing final code generation")
 
+        if on_status:
+            on_status("Generating...")
+
         # Force one final call without tools to generate the code
         messages.append({
             'role': 'user',
@@ -1341,6 +1367,7 @@ class LLMClient:
         context: Optional[Dict] = None,
         max_tool_rounds: int = 10,
         on_progress: Optional[Callable[[Dict], None]] = None,
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Send a chat request with tool calling support.
@@ -1373,6 +1400,7 @@ class LLMClient:
             tool_executor=tool_executor,
             max_tool_rounds=max_tool_rounds,
             on_progress=on_progress,
+            on_status=on_status,
         )
 
         content = result['content']
@@ -1518,6 +1546,7 @@ class LLMClient:
         tool_executor: Callable[[str, Dict], Dict],
         max_tool_rounds: int = 10,
         on_progress: Optional[Callable[[Dict], None]] = None,
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Run tool-calling loop with fully isolated context.

@@ -438,6 +438,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             elif event_type == 'correction_error':
                 self._handleCorrectionError(**payload)
                 i += 1
+            elif event_type == 'status':
+                self.statusLabel.text = payload
+                i += 1
             else:
                 i += 1
 
@@ -549,7 +552,6 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._currentTurnTokens = 0
         self._currentTurnCost = 0.0
 
-        self.statusLabel.text = "Generating..."
         self.sendButton.setEnabled(False)
         slicer.app.processEvents()
 
@@ -583,11 +585,14 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 def _onDelta(delta):
                     self._streamQueue.put(('delta', dict(delta)))
 
+                def _onStatus(status_text):
+                    self._streamQueue.put(('status', status_text))
+
                 import time as _time
                 gen_start = _time.time()
                 if self._timing:
                     self._timing['generation_start'] = gen_start
-                response = self.logic.generateResponseStream(prompt, context, _onDelta)
+                response = self.logic.generateResponseStream(prompt, context, _onDelta, on_status=_onStatus)
                 if self._timing:
                     self._timing['generation_end'] = _time.time()
                 self._streamQueue.put(('complete', dict(response)))
@@ -774,6 +779,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         error_detail = error_msg if error_msg else "Unknown error"
         self.appendToChat("You", f"[Auto-correction attempt {attempt+1}]")
+        self.statusLabel.text = "Correcting..."
         self._startThinkingTimer()
         if self.logic and self.logic.llmClient:
             self.logic.llmClient.debug_suffix = "_correction"
@@ -856,6 +862,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 # Use tool-calling isolated chat so LLM can re-search if needed
                 def _on_correction_progress(progress):
                     self._streamQueue.put(('delta', dict(progress)))
+
+                def _on_correction_status(status_text):
+                    self._streamQueue.put(('status', status_text))
                 
                 response = _logic.llmClient.chatWithToolsIsolated(
                     messages=isolated_messages,
@@ -863,6 +872,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     tool_executor=_logic._executeTool,
                     max_tool_rounds=5,
                     on_progress=_on_correction_progress,
+                    on_status=_on_correction_status,
                 )
                 
                 # Dispatch result handling via _streamQueue so it runs on the main thread
@@ -1688,7 +1698,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         self.conversationStore.addExchange(prompt, response)
         return response
 
-    def generateResponseStream(self, prompt, context=None, on_delta=None, use_tools=True):
+    def generateResponseStream(self, prompt, context=None, on_delta=None, use_tools=True, on_status=None):
         """
         Generate AI response using streaming with optional tool calling.
 
@@ -1700,6 +1710,7 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
             context: Pre-built skill context (or None to build here)
             on_delta: Callback for incremental updates
             use_tools: Whether to use tool calling for skill search
+            on_status: Callback for status updates (str) — 'Retrieving...', 'Thinking...', etc.
 
         Returns:
             dict with keys: message, reasoning_content, code, tokens, cost
@@ -1715,6 +1726,8 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         # Inject dense vector retrieval results if not already present
         retrieval_timing = {}
         if "retrieval_results" not in context:
+            if on_status:
+                on_status("Retrieving...")
             retrieval = self._buildRetrievalContext(prompt, retrieval_timing)
             if retrieval:
                 context["retrieval_results"] = retrieval
@@ -1722,6 +1735,8 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
         if use_tools and self.toolExecutor and self.skillTools:
             # Use tool calling for skill search
             try:
+                if on_status:
+                    on_status("Thinking...")
                 # Progress callback to show tool execution in real-time
                 def _on_progress(progress):
                     if on_delta:
@@ -1733,16 +1748,17 @@ class SlicerAIAgentLogic(ScriptedLoadableModuleLogic):
                     tool_executor=self._executeTool,
                     context=context,
                     on_progress=_on_progress,
+                    on_status=on_status,
                 )
                 
                 # Tool calling returns complete response (no streaming during tool rounds).
                 # Final code generation is non-streaming; the UI displays the complete result.
             except Exception as e:
                 logger.warning(f"Tool calling failed, falling back to regular chat: {e}")
-                response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
+                response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta, on_status=on_status)
         else:
             # Fallback to regular streaming
-            response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta)
+            response = self.llmClient.chatStream(prompt, context=context, on_delta=on_delta, on_status=on_status)
         
         response['retrieval_timing'] = retrieval_timing
         self.conversationStore.addExchange(prompt, response)

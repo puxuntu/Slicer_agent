@@ -9,6 +9,7 @@ Provides cross-platform search functionality:
 import os
 import re
 import json
+import time
 import subprocess
 import platform
 import logging
@@ -31,8 +32,10 @@ class SkillToolExecutor:
         self.skill_path = skill_path
         self.platform = platform.system().lower()  # 'windows', 'linux', 'darwin'
         self._tree_sitter_available = self._ensure_tree_sitter()
+        self._tree_sitter_parsers = {}  # ext -> parser cache
         self._read_history = {}  # path -> {"query": str, "strategy": str}
         self._vector_retriever = self._init_vector_retriever()
+        self._rg_path_cache = self._find_rg()  # cache once at init
     
     def _ensure_tree_sitter(self) -> bool:
         """
@@ -86,15 +89,19 @@ class SkillToolExecutor:
             return False
     
     def _get_tree_sitter_parser(self, ext: str):
-        """Get a tree-sitter parser for the given file extension."""
+        """Get a tree-sitter parser for the given file extension (cached)."""
+        if ext in self._tree_sitter_parsers:
+            return self._tree_sitter_parsers[ext]
         try:
             from tree_sitter_languages import get_parser
             if ext == '.py':
-                return get_parser('python')
+                parser = get_parser('python')
             elif ext in ('.cxx', '.cpp', '.h', '.hxx', '.c'):
-                return get_parser('cpp')
+                parser = get_parser('cpp')
             else:
                 return None
+            self._tree_sitter_parsers[ext] = parser
+            return parser
         except Exception:
             return None
     
@@ -396,7 +403,7 @@ class SkillToolExecutor:
 
     def _grep_rg_aggregate(self, pattern: str, path: str) -> Dict:
         """Aggregate ripgrep: returns per-file summary instead of line-by-line matches."""
-        rg_exe = self._find_rg()
+        rg_exe = self._rg_path_cache
         if not rg_exe:
             return {"error": "ripgrep not found"}
 
@@ -528,7 +535,7 @@ class SkillToolExecutor:
         if not os.path.exists(path):
             return {"error": f"Path not found: {path}"}
 
-        if not self._find_rg():
+        if not self._rg_path_cache:
             return {
                 "error": (
                     "ripgrep (rg) is not installed. "
@@ -899,6 +906,33 @@ class SkillToolExecutor:
             ],
         }
 
+    def _rg_find_symbol_candidates(self, pattern: str, path: str) -> List[str]:
+        """Use ripgrep to quickly find files that may contain the symbol name.
+        
+        This avoids slow AST parsing on files that don't contain the pattern at all.
+        Returns up to 50 candidate file paths, sorted by modification time (newest first).
+        """
+        rg_exe = self._rg_path_cache
+        if not rg_exe:
+            return []
+        
+        # Use ripgrep to find files containing the pattern (case-insensitive)
+        cmd = [rg_exe, "-l", "-i", "--max-count", "1", pattern, path]
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=15)
+            if result.returncode not in (0, 1):  # 1 = no matches
+                return []
+            files = result.stdout.decode('utf-8', errors='ignore').strip().split('\n')
+            files = [f.strip() for f in files if f.strip()]
+            # Filter to supported extensions
+            valid_exts = {'.py', '.cxx', '.cpp', '.h', '.hxx', '.c', '.md'}
+            files = [f for f in files if os.path.splitext(f)[1].lower() in valid_exts]
+            # Prioritize newer files (more likely to be relevant in MRML/Core context)
+            files.sort(key=lambda f: os.path.getmtime(f) if os.path.isfile(f) else 0, reverse=True)
+            return files[:50]
+        except Exception:
+            return []
+
     def _search_symbol(self, pattern: str, path: str, symbol_type: str = "all") -> Dict:
         """
         Search for symbol definitions (functions, classes, headings).
@@ -998,18 +1032,27 @@ class SkillToolExecutor:
                                 "source_type": self._infer_source_type(filepath),
                             })
         
+        scan_start = time.time()
         if os.path.isfile(path):
             _scan_file(path)
         else:
-            for root, _, filenames in os.walk(path):
-                for filename in filenames:
-                    ext = os.path.splitext(filename)[1].lower()
-                    if ext in ('.py', '.cxx', '.cpp', '.h', '.hxx', '.c', '.md'):
-                        _scan_file(os.path.join(root, filename))
-                        if len(results) >= 20:
-                            break
-                if len(results) >= 20:
-                    break
+            # Fast path: use ripgrep to find candidate files before doing AST scanning
+            candidate_files = self._rg_find_symbol_candidates(pattern, path) if self._rg_path_cache else None
+            if candidate_files:
+                for filepath in candidate_files:
+                    _scan_file(filepath)
+                    if len(results) >= 20:
+                        break
+            else:
+                for root, _, filenames in os.walk(path):
+                    for filename in filenames:
+                        ext = os.path.splitext(filename)[1].lower()
+                        if ext in ('.py', '.cxx', '.cpp', '.h', '.hxx', '.c', '.md'):
+                            _scan_file(os.path.join(root, filename))
+                            if len(results) >= 20:
+                                break
+                    if len(results) >= 20:
+                        break
         
         return {
             "tool": "SearchSymbol",
@@ -1017,7 +1060,8 @@ class SkillToolExecutor:
             "type": symbol_type,
             "path": path,
             "results": results,
-            "count": len(results)
+            "count": len(results),
+            "_tool_timing": f"{time.time() - scan_start:.3f}s",
         }
 
 
