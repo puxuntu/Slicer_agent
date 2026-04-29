@@ -17,7 +17,7 @@ The extension is built as a standard Slicer **scripted module** and follows Slic
 | Module framework | Slicer `ScriptedLoadableModule` |
 | UI toolkit | Qt / ctk (Slicer's bundled versions) |
 | Build system | CMake (`CMakeLists.txt`) |
-| LLM backend | OpenAI-compatible APIs (Kimi / Moonshot) and native Anthropic Messages API (Claude) |
+| LLM backend | OpenAI-compatible APIs (Kimi / Moonshot, DeepSeek) and native Anthropic Messages API (Claude) |
 | HTTP client | `urllib.request` (standard library); `httpx` declared in `requirements.txt` |
 | Optional parsing | `tree-sitter` + `tree-sitter-python` + `tree-sitter-cpp` (auto-installed at runtime) |
 | Dense retrieval | `faiss-cpu`, `onnxruntime`, `transformers` (auto-installed at runtime) |
@@ -56,7 +56,7 @@ requirements.txt              # Python dependencies for Slicer to install
 ### Key Files for Agents
 
 - **`SlicerAIAgent.py`** — The monolithic module file containing all four Slicer scripted module classes: `SlicerAIAgent` (metadata), `SlicerAIAgentWidget` (UI setup, streaming display, auto-execution, self-correction, settings persistence), `SlicerAIAgentLogic` (orchestrates LLM client, tool executor, validator, executor, and dense vector retrieval), and `SlicerAIAgentTest` (smoke tests). The Widget implements a queue-based streaming UI (`_streamQueue` + `QTimer` polling at 50 ms) and auto-executes generated code with up to 5 self-correction attempts.
-- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports both OpenAI-compatible and native Anthropic Messages API formats. Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, query decomposition (`decomposeQuery`), and HyDE query rewriting (`hydeRewrite`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
+- **`SlicerAIAgentLib/LLMClient.py`** — Handles all LLM communication. Supports OpenAI-compatible APIs (Kimi/Moonshot, DeepSeek) and native Anthropic Messages API (Claude). Implements streaming (`chatStream`), non-streaming (`chat`), tool-calling loops (`chatWithTools`, `chatWithToolsIsolated`), token/cost tracking, conversation history FIFO trimming (500K character limit), SSE parsing, query decomposition (`decomposeQuery`), and HyDE query rewriting (`hydeRewrite`) for multi-step retrieval. `_buildSystemPrompt` injects vector retrieval results and current MRML scene XML when available.
 - **`SlicerAIAgentLib/SkillTools.py`** — Executes the five tools given to the LLM: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`. Uses `ripgrep` (bundled `rg.exe` on Windows, or system `rg`) for fast aggregated grep. `ReadFile` implements smart slicing: AST boundary extraction (via tree-sitter), markdown heading queries, grep-context fallback, and test-method slicing. `VectorSearch` delegates to `SkillIndexer.VectorRetriever` if a local index is present.
 - **`SlicerAIAgentLib/SkillIndexer.py`** — Dense vector retrieval backend. Contains:
   - `Chunker` — splits P0/P1 knowledge-base files (`.py`, `.cxx`/`.cpp`/`.h`, `.md`) into semantic chunks using tree-sitter AST boundaries or markdown headings. Embeds function signatures and docstrings into the embedding text for better natural-language-to-code matching.

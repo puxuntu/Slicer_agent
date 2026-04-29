@@ -112,6 +112,14 @@ class SlicerAIAgentTest(ScriptedLoadableModuleTest):
         client.setModel("kimi-latest")
         self.assertEqual(client.model, "kimi-k2.5")
 
+        # Test DeepSeek model support
+        client.setModel("deepseek-v4-pro")
+        self.assertEqual(client.model, "deepseek-v4-pro")
+        self.assertTrue(client._supportsThinking())
+        client.setModel("deepseek-v4-flash")
+        self.assertEqual(client.model, "deepseek-v4-flash")
+        self.assertTrue(client._supportsThinking())
+
         # Test conversation history
         client.clearHistory()
         self.assertEqual(len(client.conversation_history), 0)
@@ -402,6 +410,10 @@ class SlicerAIAgentLogicTest(unittest.TestCase):
 
         self.logic.setModel("kimi-latest")
         self.assertEqual(self.logic.llmClient.model, "kimi-k2.5")
+
+        self.logic.setModel("deepseek-v4-pro")
+        self.assertEqual(self.logic.llmClient.model, "deepseek-v4-pro")
+        self.assertTrue(self.logic.llmClient._supportsThinking())
 
     def test_conversation_clear(self):
         """Test conversation clearing."""

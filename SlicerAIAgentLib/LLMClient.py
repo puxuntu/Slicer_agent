@@ -72,6 +72,9 @@ class LLMClient:
         "claude-sonnet-4-6-thinking": {"input": 0.003, "output": 0.015},
         "claude-haiku-4-5-20251001": {"input": 0.0008, "output": 0.004},
         "claude-haiku-4-5-20251001-thinking": {"input": 0.0008, "output": 0.004},
+        # DeepSeek models
+        "deepseek-v4-pro": {"input": 0.00174, "output": 0.00348},
+        "deepseek-v4-flash": {"input": 0.00014, "output": 0.00028},
         # Claude / Anthropic models (legacy fallbacks)
         "claude-opus-4-5": {"input": 0.015, "output": 0.075},
         "claude-sonnet-4-5": {"input": 0.003, "output": 0.015},
@@ -129,7 +132,7 @@ class LLMClient:
         self.base_url = base_url.rstrip('/')
 
     def setProvider(self, provider: str):
-        """Set the API provider ('kimi' or 'claude')."""
+        """Set the API provider ('kimi', 'deepseek', or 'claude')."""
         self.provider = (provider or "kimi").lower()
 
     def _isAnthropicNative(self) -> bool:
@@ -287,6 +290,8 @@ class LLMClient:
         """Return True if the current model should receive the thinking parameter."""
         if self.model.startswith("kimi-k2"):
             return True
+        if self.model.startswith("deepseek-"):
+            return True
         if self.model.endswith("-thinking"):
             return True
         if self.model.startswith("claude-") and ("-4-6" in self.model or "-4-5" in self.model):
@@ -391,10 +396,13 @@ class LLMClient:
         if stream:
             payload["stream"] = True
         if self._supportsThinking():
-            # Models like kimi-k2* require explicit disable because default is ON
+            # Models like kimi-k2* and deepseek-v4* require explicit disable because default is ON
             payload["thinking"] = {"type": "enabled" if enable_thinking else "disabled"}
         elif enable_thinking:
             payload["thinking"] = {"type": "enabled"}
+        # DeepSeek reasoning effort: always high (user override)
+        if self.model.startswith("deepseek-") and enable_thinking:
+            payload["reasoning_effort"] = "high"
         if tools:
             payload["tools"] = tools
         return payload

@@ -145,7 +145,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Row 1: Provider + Model
         providerModelLayout = qt.QHBoxLayout()
         self.providerSelector = qt.QComboBox()
-        self.providerSelector.addItems(["Kimi", "Claude"])
+        self.providerSelector.addItems(["Kimi", "DeepSeek", "Claude"])
         self.providerSelector.setToolTip("Select AI provider")
         providerModelLayout.addWidget(self.providerSelector)
 
@@ -543,7 +543,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 f"Request timed out.\n\n"
                 f"Please check:\n"
                 f"1. Your network connection\n"
-                f"2. The model name is correct (use 'kimi-k2.5')\n"
+                f"2. The model name is correct (e.g. 'kimi-k2.5', 'deepseek-v4-pro')\n"
                 f"3. Your API key has access to K2.5 models\n\n"
                 f"Technical details: {error_msg}")
         else:
@@ -1276,6 +1276,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 .replace("'", "&#x27;"))
 
     def _defaultModelsForProvider(self, provider: str) -> List[str]:
+        if provider == "DeepSeek":
+            return [
+                "deepseek-v4-pro",
+                "deepseek-v4-flash",
+            ]
         if provider == "Claude":
             return [
                 # Claude 4.6 Sonnet variants
@@ -1299,6 +1304,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         return ["kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
 
     def _defaultBaseUrlForProvider(self, provider: str) -> str:
+        if provider == "DeepSeek":
+            return "https://api.deepseek.com"
         if provider == "Claude":
             return "https://api.anthropic.com/v1"
         return "https://api.moonshot.cn/v1"

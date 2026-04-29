@@ -46,6 +46,11 @@
           </item>
           <item>
            <property name="text">
+            <string>DeepSeek</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>Claude</string>
            </property>
           </item>
