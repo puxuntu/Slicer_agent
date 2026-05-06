@@ -59,3 +59,7 @@ demo/
 
 # Internal documentation (not published)
 EXECUTION_FLOW.md
+
+# Ignore all hidden/dot files except .gitignore itself
+.*
+!.gitignore
