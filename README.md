@@ -8,7 +8,7 @@
 
 ## Motivation
 
-When a clinician opens 3D Slicer, the goal is already clear — for example, comparing a patient's pre-operative CT with a 6-month follow-up after mandible reconstruction to assess bone graft integration. But turning that intent into results means navigating a dense UI, hunting through documentation, switching between segmentation tools and 3D views, and manually tuning dozens of parameters. The input data and desired outcome are certain; it is the execution path that is burdensome.
+When a clinician opens 3D Slicer, the goal is already clear. But turning that intent into results means navigating a dense UI, hunting through documentation, switching between segmentation tools and 3D views, and manually tuning dozens of parameters. The input data and desired outcome are certain; it is the execution path that is burdensome.
 
 SlicerAIAgent closes this gap by letting clinicians state their goal in plain language and handling the rest end to end: searching the Slicer knowledge base for the right APIs, confirming exact function signatures, generating executable Python code, and running it directly inside Slicer to manipulate the scene. No scripting, no menu diving, no parameter guessing. This points toward a broader shift in medical software — from learning complex interfaces to simply stating intent and letting the agent operate the application on the user's behalf.
 
@@ -44,36 +44,11 @@ The agent chains multiple Slicer operations: loading data → threshold-based se
 
 ## Technical Approach
 
-SlicerAIAgent is not a simple "prompt → code" wrapper. It implements a **role-composed autonomous pipeline** that combines dense vector retrieval, autonomous tool calling, structured planning, AST-based security validation, safe execution inside Slicer's own Python interpreter, semantic scene verification, and automatic self-correction on failure.
+SlicerAIAgent is not a simple "prompt → code" wrapper. It implements a **role-composed agent pipeline** that combines dense vector retrieval, autonomous tool calling, structured planning, AST-based security validation, safe execution inside Slicer's own Python interpreter, semantic scene verification, and automatic self-correction on failure.
 
-### 1. Architecture Overview
+### 1. Role-Composed Request Pipeline
 
-The extension follows Slicer's standard `ScriptedLoadableModule` pattern with four cooperating classes living in a single module file:
-
-| Class | Responsibility |
-|-------|----------------|
-| `SlicerAIAgent` | Module metadata (title, category, icon, help text). |
-| `SlicerAIAgentWidget` | Qt UI setup, real-time streaming display, role-aware status updates, plan display, auto-execution orchestration, settings persistence, and thinking timer. |
-| `SlicerAIAgentLogic` | Business logic: pre-retrieval, LLM client coordination, tool execution, code validation, scene snapshots, semantic verification, and safe execution scheduling. |
-| `SlicerAIAgentTest` | Smoke tests for imports, validator rules, executor behavior, and skill path resolution. |
-
-Core library code lives under `SlicerAIAgentLib/` and is organized into focused submodules:
-
-| Library | Role |
-|---------|------|
-| `LLMClient.py` | HTTP client for OpenAI-compatible (Kimi, DeepSeek) and native Anthropic (Claude) APIs. Handles streaming, tool-calling loops, required `agent_plan` extraction, conversation history trimming, token/cost tracking, and query decomposition. |
-| `SkillTools.py` | Tool executor: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, and `VectorSearch`. Uses ripgrep for fast aggregated search and tree-sitter for AST-based symbol extraction. |
-| `SkillIndexer.py` | Dense vector retrieval backend: chunking, ONNX Runtime embedding, FAISS indexing, source-type weighting, and incremental index building. |
-| `CodeValidator.py` | AST-based static analysis to block dangerous imports and calls before execution. |
-| `SafeExecutor.py` | Runs generated code in `__main__.__dict__` (same namespace as the Slicer Python Console). Captures stdout/stderr, intercepts VTK C++ errors, and rolls back the MRML scene on failure. |
-| `ConversationStore.py` | Persistent conversation history via Qt `QSettings`, with export/import and per-session stats. |
-| `SlicerCodeTemplates.py` | Reusable Slicer Python snippets for common operations. |
-
----
-
-### 2. The Role-Composed Request Pipeline
-
-Every user prompt travels through a single-agent workflow with explicit internal roles. These roles are encoded in the system prompt, status UI, debug logs, and role trace, but they do not require separate LLM calls for every role.
+Every user prompt travels through an agent workflow with explicit internal roles. These roles are encoded in the system prompt, status UI, debug logs, and role trace, but they do not require separate LLM calls for every role.
 
 | Role | Function |
 |------|----------|
@@ -86,7 +61,9 @@ Every user prompt travels through a single-agent workflow with explicit internal
 | **Verifier** | Compares before/after scene snapshots against optional machine-checkable expectations. |
 | **Repairer** | Performs isolated self-correction if validation, execution, or verification fails. |
 
-#### Phase 1 — Dense Vector Pre-Retrieval (RAG)
+The sections below describe the technical mechanisms used to implement these roles. Some mechanisms support multiple roles, and some roles are intentionally lightweight because they are represented through prompt constraints, validation checks, UI state, and debug artifacts rather than separate execution stages.
+
+#### Observer and Retriever — Dense Vector Pre-Retrieval (RAG)
 
 Before the LLM ever sees the prompt, the system performs an **intelligent multi-retrieval** pass over a local dense vector index built from the Slicer knowledge base (`Resources/Skills/slicer-skill-full/`).
 
@@ -107,11 +84,11 @@ Before the LLM ever sees the prompt, the system performs an **intelligent multi-
 
 5. **Context Injection** — The formatted retrieval results, along with a "search coverage" note listing the sub-queries, are injected into the system prompt under the heading `## RELEVANT KNOWLEDGE BASE SNIPPETS`. The LLM is instructed to treat these snippets as its first source of truth and to avoid re-searching the same topics.
 
-If the vector index is missing or not ready, this phase silently skips itself and the system falls back to the traditional pure tool-calling workflow.
+If the vector index is missing or not ready, this retrieval mechanism silently skips itself and the system falls back to the traditional pure tool-calling workflow.
 
-#### Phase 2 — Autonomous Tool-Calling Loop
+#### Retriever — Autonomous Tool-Calling Loop
 
-After pre-retrieval, the LLM is given **five tools** from the start: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, and `VectorSearch`. The LLM autonomously decides the best path to a solution — no manual phase orchestration is required.
+After pre-retrieval, the LLM is given **five tools** from the start: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, and `VectorSearch`. The LLM autonomously decides the best path to a solution, so no manual staged orchestration is required.
 
 **Workflow:**
 
@@ -129,7 +106,7 @@ After pre-retrieval, the LLM is given **five tools** from the start: `FindFile`,
 
 **Conversation history management:** Full tool results are used within the current turn, but before persisting to `conversation_history`, they are compressed via `_compressToolResultsForHistory()`. ReadFile content is passed through (already sliced at the tool layer), Grep results are kept as-is, and VectorSearch drops the large `formatted_context` field. This prevents context bloat across multi-turn conversations. History is also subject to FIFO character-based trimming (500K character limit), dropping the oldest messages first.
 
-#### Phase 2.5 — Structured Plan Validation
+#### Planner and Programmer — Structured Plan and Code Generation
 
 Before code execution, the assistant response must include a valid parsed `agent_plan`. The plan contains:
 
@@ -144,7 +121,7 @@ Each step includes an action, API evidence, confidence, and optionally `expected
 
 Supported `expected_scene_change` checks include `node_count_delta`, `node_exists`, `node_modified`, `node_has_display`, `node_name_matches`, `layout_changed`, `selection_changed`, `module_entered`, `property_true`, and `not_checked`. Unsupported checks are skipped with warnings instead of forcing unnecessary self-correction.
 
-#### Phase 3 — Code Validation & Safe Execution
+#### Safety Critic, Executor, and Verifier — Validation, Execution, and Scene Verification
 
 Generated code is **auto-executed** without requiring a manual button press.
 
@@ -173,7 +150,7 @@ Generated code is **auto-executed** without requiring a manual button press.
 - After successful execution, the `Verifier` checks any supported `expected_scene_change` items from the plan against the updated scene.
 - Verification failures can trigger the same self-correction path as runtime errors. Unsupported or `not_checked` expectations are treated as warnings or skipped.
 
-#### Phase 4 — Self-Correction & Recovery
+#### Repairer — Self-Correction and Recovery
 
 If execution fails, times out, or produces error indicators in stdout/stderr (including `[VTK ERROR]`), the agent automatically enters **self-correction mode**.
 
@@ -197,7 +174,7 @@ If execution fails, times out, or produces error indicators in stdout/stderr (in
 
 ---
 
-### 3. Streaming & Real-Time Feedback
+### 2. Streaming & Real-Time Feedback
 
 Because MRML scene access and all UI updates must happen on the Qt main thread, HTTP I/O runs in a background `threading.Thread`, while UI updates are marshaled back via a thread-safe `queue.Queue`.
 
@@ -210,7 +187,7 @@ Because MRML scene access and all UI updates must happen on the Qt main thread, 
 
 **UI elements:**
 - **Thinking timer (⏱)** — Updates every 100 ms while the LLM is working.
-- **Role-aware status label** — Shows the active role and phase, such as `Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, `Safety Critic: Validating code...`, `Executor: Executing...`, or `Verifier: Verifying scene...`.
+- **Role-aware status label** — Shows the active role and current activity, such as `Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, `Safety Critic: Validating code...`, `Executor: Executing...`, or `Verifier: Verifying scene...`.
 - **Token/cost label** — Displays per-turn cumulative token usage and estimated cost (e.g., `Turn 3 | Cumulative: 4,231 tokens | $0.0123`).
 
 **Debug artifacts** are written under timestamped run folders:
@@ -224,7 +201,7 @@ Common artifacts include:
 - `{turn}_code.txt` — Generated Python code.
 - `{turn}_first_prompt_debug.txt` — First prompt/messages sent to the LLM.
 - `{turn}_last_prompt_debug.txt` — Final prompt/messages before code generation.
-- `{turn}_performance_log.txt` — Detailed phase-by-phase timing breakdown (scene context, retrieval, API wait, tool execution, validation, execution, verification, self-correction).
+- `{turn}_performance_log.txt` — Detailed timing breakdown for scene context, retrieval, API wait, tool execution, validation, execution, verification, and self-correction.
 - `{turn}_role_trace.json` — Structured role-composed pipeline events.
 - `{turn}_thinking_history.txt` — Reasoning/progress content when available.
 
@@ -232,7 +209,7 @@ Correction artifacts use suffixes such as `{turn}_correction_1_code.txt` and `{t
 
 ---
 
-### 4. Dense Vector Retrieval Backend
+### 3. Dense Vector Retrieval Backend
 
 The `SkillIndexer.py` module implements a complete dense retrieval pipeline that can be built and updated independently via `scripts/build_rag.py`.
 
@@ -262,7 +239,7 @@ The `SkillIndexer.py` module implements a complete dense retrieval pipeline that
 
 ---
 
-### 5. Security Model
+### 4. Security Model
 
 Generated code is treated as untrusted until validated. The security layers are:
 
