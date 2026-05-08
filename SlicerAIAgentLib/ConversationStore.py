@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ConversationStore:
     """
-    Manages conversation history for the SlicerKimiAgent.
+    Manages conversation history for the SlicerAIAgent.
     
     Features:
     - In-memory conversation storage
@@ -193,7 +193,7 @@ class ConversationStore:
         """Save conversations to Slicer settings."""
         try:
             settings = qt.QSettings()
-            settings.beginGroup("SlicerKimiAgent/Conversations")
+            settings.beginGroup("SlicerAIAgent/Conversations")
             
             # Save as JSON string (Slicer settings don't support complex types)
             conversations_json = json.dumps(self.conversations[-50:])  # Keep last 50
@@ -207,7 +207,7 @@ class ConversationStore:
         """Load conversations from Slicer settings."""
         try:
             settings = qt.QSettings()
-            settings.beginGroup("SlicerKimiAgent/Conversations")
+            settings.beginGroup("SlicerAIAgent/Conversations")
             
             conversations_json = settings.value("history", "[]")
             if conversations_json:

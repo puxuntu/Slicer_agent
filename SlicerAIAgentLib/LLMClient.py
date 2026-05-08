@@ -37,7 +37,7 @@ class LLMClient:
     # Compatible with OpenAI API format
     DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
     DEFAULT_MODEL = "kimi-k2.5"
-    DEFAULT_TIMEOUT = None  # No client-side timeout for API requests
+    DEFAULT_TIMEOUT = 60  # seconds; abort hung API calls instead of waiting forever
     MAX_RETRIES = 5  # Retry up to 5 times for transient errors
     LEGACY_MODEL_ALIASES = {
         "kimi-latest": DEFAULT_MODEL,
@@ -357,7 +357,7 @@ class LLMClient:
 
     def _trimHistoryFIFO(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Trim conversation history to stay within 100,000 total characters.
+        Trim conversation history to stay within 500,000 total characters.
         Uses FIFO: drops the oldest messages first. All roles count toward the limit.
         """
         MAX_HISTORY_CHARS = 500_000
@@ -1520,7 +1520,7 @@ class LLMClient:
             "Each sub-task should be a concise natural-language query suitable for code/API retrieval.\n\n"
             "Rules:\n"
             "- If the request is simple (1-2 clear steps), return it as a single task unchanged.\n"
-            "- For complex multi-step requests, break into 2-5 sub-tasks.\n"
+            "- For complex multi-step requests, break it into independent sub-tasks. Group related operations together (e.g., loading data + initial display is one task); split only when the next step needs a different API domain or concept.\n"
             "- Each sub-task must be self-contained and mention the specific Slicer operation.\n"
             "- Output ONLY a JSON array of strings. No markdown, no explanation.\n\n"
             'Output format example: ["load a DICOM volume", '

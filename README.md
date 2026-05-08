@@ -44,7 +44,7 @@ The agent chains multiple Slicer operations: loading data → threshold-based se
 
 ## Technical Approach
 
-SlicerAIAgent is not a simple "prompt → code" wrapper. It implements a **role-composed agent pipeline** that combines dense vector retrieval, autonomous tool calling, structured planning, AST-based security validation, safe execution inside Slicer's own Python interpreter, semantic scene verification, and automatic self-correction on failure.
+SlicerAIAgent is not a simple "prompt → code" wrapper. It implements a **role-composed agent pipeline** that combines dense vector retrieval, autonomous tool calling, structured planning, AST-based security validation, safe execution inside Slicer's own Python interpreter, and automatic self-correction on failure.
 
 ### 1. Role Model
 
@@ -54,12 +54,11 @@ Every user prompt travels through an agent workflow with explicit internal roles
 |------|----------|
 | **Observer** | Reads the user request and current MRML scene context. |
 | **Retriever** | Uses dense retrieval and search/read tools to ground important Slicer APIs. |
-| **Planner** | Produces a structured `agent_plan` with task summary, overall confidence, risk, assumptions, and expected scene changes. |
+| **Planner** | Produces a structured `agent_plan` with task summary, overall confidence, risk, and assumptions. |
 | **Programmer** | Produces the complete executable Python block. |
-| **Safety Critic** | Validates the plan and code, blocks unsafe operations, and requests confirmation for high-risk actions. |
+| **Safety Critic** | Validates the plan and code, blocks unsafe operations, and logs warnings for high-risk actions. |
 | **Executor** | Runs the code on Slicer's Qt main thread. |
-| **Verifier** | Compares before/after scene snapshots against optional machine-checkable expectations. |
-| **Repairer** | Performs isolated self-correction if validation, execution, or verification fails. |
+| **Repairer** | Performs isolated self-correction if validation or execution fails. |
 
 ### 2. End-to-End Request Flow
 
@@ -123,11 +122,9 @@ Before code execution, the assistant response must include a valid parsed `agent
 - `requires_confirmation`
 - `unverified_assumptions`
 
-Each step includes an action, API evidence, confidence, and optionally `expected_scene_change`. This expectation is deliberately conservative and only used when the change is simple and machine-checkable.
+Each step includes an action, API evidence, confidence, and assumptions. The agent does not enforce machine-checkable scene expectations.
 
-Supported `expected_scene_change` checks include `node_count_delta`, `node_exists`, `node_modified`, `node_has_display`, `node_name_matches`, `layout_changed`, `selection_changed`, `module_entered`, `property_true`, and `not_checked`. Unsupported checks are skipped with warnings instead of forcing unnecessary self-correction.
-
-#### 2.3 Validation and Execution — Safety Critic, Executor, and Verifier
+#### 2.3 Validation and Execution — Safety Critic and Executor
 
 Generated code is **auto-executed** without requiring a manual button press.
 
@@ -154,15 +151,9 @@ Generated code is **auto-executed** without requiring a manual button press.
 - If execution raises an exception or times out, it calls `slicer.mrmlScene.Undo()` and then deletes any nodes whose IDs did not exist before execution (catching display nodes, storage nodes, and subject-hierarchy items that `Undo()` may miss because their `UndoEnabled` flag is `False`).
 - The original undo flag is restored regardless of outcome.
 
-##### Scene Verification
-
-- Before execution, the logic records a lightweight scene snapshot including node counts, node names/classes, display state, segmentation/model summaries, active module, layout, and selection IDs.
-- After successful execution, the `Verifier` checks any supported `expected_scene_change` items from the plan against the updated scene.
-- Verification failures can trigger the same self-correction path as runtime errors. Unsupported or `not_checked` expectations are treated as warnings or skipped.
-
 #### 2.4 Self-Correction and Recovery — Repairer
 
-If execution fails, times out, or produces error indicators in stdout/stderr (including `[VTK ERROR]`), the agent automatically enters **self-correction mode**.
+If execution fails, times out, or produces clear error indicators in stdout/stderr (`traceback`, `exception`, `failed`), the agent automatically enters **self-correction mode**.
 
 The correction loop works as follows:
 
@@ -197,7 +188,7 @@ Because MRML scene access and all UI updates must happen on the Qt main thread, 
 
 **UI elements:**
 - **Thinking timer (⏱)** — Updates every 100 ms while the LLM is working.
-- **Role-aware status label** — Shows the active role and current activity, such as `Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, `Safety Critic: Validating code...`, `Executor: Executing...`, or `Verifier: Verifying scene...`.
+- **Role-aware status label** — Shows the active role and current activity, such as `Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, `Safety Critic: Validating code...`, or `Executor: Executing...`.
 - **Token/cost label** — Displays per-turn cumulative token usage and estimated cost (e.g., `Turn 3 | Cumulative: 4,231 tokens | $0.0123`).
 
 **Debug artifacts** are written under timestamped run folders:
@@ -211,7 +202,7 @@ Common artifacts include:
 - `{turn}_code.txt` — Generated Python code.
 - `{turn}_first_prompt_debug.txt` — First prompt/messages sent to the LLM.
 - `{turn}_last_prompt_debug.txt` — Final prompt/messages before code generation.
-- `{turn}_performance_log.txt` — Detailed timing breakdown for scene context, retrieval, API wait, tool execution, validation, execution, verification, and self-correction.
+- `{turn}_performance_log.txt` — Detailed timing breakdown for scene context, retrieval, API wait, tool execution, validation, execution, and self-correction.
 - `{turn}_role_trace.json` — Structured role-composed pipeline events.
 - `{turn}_thinking_history.txt` — Reasoning/progress content when available.
 
