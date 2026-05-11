@@ -16,16 +16,31 @@ SlicerAIAgent closes this gap by letting clinicians state their goal in plain la
 
 ## Demos
 
-### Demo 1 — Volume Rendering
+### Demo 1 — Multi-Turn Segmentation, Reconstruction, and Plane Cutting
 
-**Prompt:**
+**Turn 1:**
 ```
-load an example volume and generate a volume rendering
+load the example CT chest volume
+```
+
+**Turn 2:**
+```
+segment it with threshold from -200 to 1000, reconstruct the 3D shape
+```
+
+**Turn 3:**
+```
+cut the 3D shape into two parts with a random plane, and different part shown with different color
+```
+
+**Turn 4:**
+```
+give a random displacement to one part to separate them
 ```
 
 https://github.com/user-attachments/assets/256e8913-5942-4db3-b5b9-7841796f4eb3
 
-The agent searches for volume-loading APIs, reads the relevant documentation, generates code to download the MRHead sample volume, and creates a GPU volume rendering with a preset transfer function.
+The agent carries out a multi-turn interactive workflow: loading data → threshold-based segmentation → 3D surface reconstruction (`vtkMarchingCubes`) → arbitrary plane clipping → multi-color display → random displacement to separate the clipped parts.
 
 ---
 
