@@ -18,25 +18,13 @@ SlicerAIAgent closes this gap by letting clinicians state their goal in plain la
 
 ### Demo 1 — Multi-Turn Segmentation, Reconstruction, and Plane Cutting
 
-**Turn 1:**
-```
-load the example CT chest volume
-```
+**Turn 1:** load the example CT chest volume
 
-**Turn 2:**
-```
-segment it with threshold from -200 to 1000, reconstruct the 3D shape
-```
+**Turn 2:** segment it with threshold from -200 to 1000, reconstruct the 3D shape
 
-**Turn 3:**
-```
-cut the 3D shape into two parts with a random plane, and different part shown with different color
-```
+**Turn 3:** cut the 3D shape into two parts with a random plane, and different part shown with different color
 
-**Turn 4:**
-```
-give a random displacement to one part to separate them
-```
+**Turn 4:** give a random displacement to one part to separate them
 
 https://github.com/user-attachments/assets/256e8913-5942-4db3-b5b9-7841796f4eb3
 
@@ -44,16 +32,19 @@ The agent carries out a multi-turn interactive workflow: loading data → thresh
 
 ---
 
-### Demo 2 — Segmentation, 3D Reconstruction, and Plane Cutting
+### Demo 2 — Multi-Turn Anatomical Segmentation
 
-**Prompt:**
-```
-Load a sample volume, segment it using a random threshold, and reconstruct it into a 3D shape. Then, cut the 3D shape with a random plane and display each part in a different color
-```
+**Turn 1:** load an example CT volume
+
+**Turn 2:** segment the bone
+
+**Turn 3:** segment the left lung
 
 https://github.com/user-attachments/assets/7cf2846d-887b-48db-95fb-342e4c79fc07
 
-The agent chains multiple Slicer operations: loading data → threshold-based segmentation → 3D surface reconstruction (`vtkMarchingCubes`) → arbitrary plane clipping → multi-color display of the clipped parts.
+> **Note:** The segmentation inference uses SlicerVoxTell. When running on CPU the inference time is very long, so those waiting segments were removed during video editing.
+
+The agent performs a multi-turn segmentation workflow on a CT chest volume, isolating distinct anatomical structures through separate conversational turns.
 
 ---
 
