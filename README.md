@@ -93,11 +93,11 @@ If the vector index is missing or not ready, this retrieval mechanism silently s
 
 ##### Autonomous Tool-Calling Loop
 
-After pre-retrieval, the LLM is given **five tools** from the start: `FindFile`, `SearchSymbol`, `Grep`, `ReadFile`, and `VectorSearch`. The LLM autonomously decides the best path to a solution, so no manual staged orchestration is required.
+After pre-retrieval, the LLM is given **five tools** from the start: `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`, and `GenerateSegmentationCode`. The LLM autonomously decides the best path to a solution, so no manual staged orchestration is required.
 
 The tool loop has three main operations:
 
-1. **Search** — The LLM may call `Grep`, `FindFile`, or `SearchSymbol` to locate relevant APIs across the skill knowledge base. Multiple tool calls are executed in parallel via a `ThreadPoolExecutor`.
+1. **Search** — The LLM may call `Grep` or `SearchSymbol` to locate relevant APIs across the skill knowledge base. Multiple tool calls are executed in parallel via a `ThreadPoolExecutor`.
 
 2. **Read** — Once promising files are identified, the LLM calls `ReadFile` to confirm exact function signatures and usage patterns. `ReadFile` implements **smart slicing** to keep token usage low:
    - Files under 500 lines → full content.
@@ -108,6 +108,8 @@ The tool loop has three main operations:
    - Gist dead-end detection flags sections that contain only external gist links with no local executable examples.
 
 3. **Generate** — When the LLM has enough information, it must output two fenced blocks in order: a structured ` ```agent_plan ` JSON block followed by a complete ` ```python ` code block. The tool loop terminates when executable code is detected. If the LLM reaches the maximum tool rounds without generating code, the system appends a force-generate user message that still requires both `agent_plan` and Python code.
+
+For anatomical segmentation requests, the LLM may call `GenerateSegmentationCode` to obtain a ready-to-run VoxTell snippet (including GPU detection and model-path resolution) that is embedded directly into the final executable block.
 
 **Conversation history management:** Full tool results are used within the current turn, but before persisting to `conversation_history`, they are compressed via `_compressToolResultsForHistory()`. ReadFile content is passed through (already sliced at the tool layer), Grep results are kept as-is, and VectorSearch drops the large `formatted_context` field. This prevents context bloat across multi-turn conversations. History is also subject to FIFO character-based trimming (500K character limit), dropping the oldest messages first.
 
