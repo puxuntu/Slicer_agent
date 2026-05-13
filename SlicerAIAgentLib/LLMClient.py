@@ -133,7 +133,7 @@ class LLMClient:
         self.base_url = base_url.rstrip('/')
 
     def setProvider(self, provider: str):
-        """Set the API provider ('kimi', 'deepseek', or 'claude')."""
+        """Set the API provider ('kimi', 'deepseek', 'claude', or 'openai')."""
         self.provider = (provider or "kimi").lower()
 
     def setDebugOutputDir(self, path: Optional[str]):

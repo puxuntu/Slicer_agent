@@ -152,7 +152,7 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Row 1: Provider + Model
         providerModelLayout = qt.QHBoxLayout()
         self.providerSelector = qt.QComboBox()
-        self.providerSelector.addItems(["Kimi", "DeepSeek", "Claude"])
+        self.providerSelector.addItems(["Kimi", "DeepSeek", "Claude", "OpenAI"])
         self.providerSelector.setToolTip("Select AI provider")
         providerModelLayout.addWidget(self.providerSelector)
 
@@ -1728,6 +1728,20 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 .replace("'", "&#x27;"))
 
     def _defaultModelsForProvider(self, provider: str) -> List[str]:
+        if provider == "OpenAI":
+            return [
+                "gpt-5.5",
+                "gpt-5.5-mini",
+                "gpt-5.5-turbo",
+                "gpt-4.5",
+                "gpt-4o",
+                "gpt-4o-mini",
+                "gpt-4-turbo",
+                "o3",
+                "o3-mini",
+                "o1",
+                "o1-mini",
+            ]
         if provider == "DeepSeek":
             return [
                 "deepseek-v4-pro",
@@ -1756,6 +1770,8 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         return ["kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview", "kimi-k2-0905-preview", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
 
     def _defaultBaseUrlForProvider(self, provider: str) -> str:
+        if provider == "OpenAI":
+            return "https://api.openai.com/v1"
         if provider == "DeepSeek":
             return "https://api.deepseek.com"
         if provider == "Claude":
