@@ -163,6 +163,25 @@ class LLMClient:
         """Backward-compat alias: True only for native Anthropic API."""
         return self._isAnthropicNative()
 
+    def _isDeepSeek(self) -> bool:
+        """True for DeepSeek models that support reasoning_effort."""
+        return self.model.startswith("deepseek-")
+
+    def _isOpenAIReasoningModel(self) -> bool:
+        """True for OpenAI o-series and gpt-5 reasoning models that support reasoning_effort."""
+        m = self.model
+        # O-series reasoning models (o1, o3, o4-mini, etc.)
+        if m.startswith(("o1", "o3", "o4-")):
+            return True
+        # GPT-5 series reasoning models (exclude chat-only variants)
+        if m.startswith("gpt-5") and "-chat-latest" not in m:
+            return True
+        return False
+
+    def _isClaudeAdaptive(self) -> bool:
+        """True for Claude 4.6+ models that support adaptive thinking + output_config.effort."""
+        return bool(re.search(r'claude-.+-4-[6-9]\d*', self.model))
+
     def _getChatUrl(self) -> str:
         if self._isAnthropicNative():
             return f"{self.base_url}/messages"
@@ -368,12 +387,14 @@ class LLMClient:
             total_chars -= len(str(removed.get('content', '')))
         return trimmed
 
-    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None, thinking: Optional[bool] = None) -> Dict[str, Any]:
+    def _buildPayload(self, messages: List[Dict[str, Any]], stream: bool = False, tools: Optional[List[Dict]] = None, thinking: Optional[bool] = None, reasoning_effort: str = "high") -> Dict[str, Any]:
         """Build the API payload for chat completion requests.
 
         Args:
             thinking: Explicitly enable/disable thinking mode. If None,
                       uses the model's default capability check.
+            reasoning_effort: "low", "medium", or "high" for reasoning models.
+                              Applied to DeepSeek, OpenAI o-series/gpt-5, and Claude 4.6+.
         """
         enable_thinking = self._supportsThinking() if thinking is None else thinking
 
@@ -391,10 +412,15 @@ class LLMClient:
             if tools:
                 payload["tools"] = self._convertToolsForClaude(tools)
             if enable_thinking:
-                # Anthropic thinking API requires budget_tokens and max_tokens > budget_tokens
-                budget = 4096
-                payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
-                payload["max_tokens"] = max(payload["max_tokens"], budget + 4096)
+                if self._isClaudeAdaptive():
+                    # Claude 4.6+ adaptive thinking with effort control
+                    payload["thinking"] = {"type": "adaptive"}
+                    payload["output_config"] = {"effort": reasoning_effort}
+                else:
+                    # Legacy Extended Thinking (4.5 and earlier): fixed token budget
+                    budget = 4096
+                    payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
+                    payload["max_tokens"] = max(payload["max_tokens"], budget + 4096)
             return payload
 
         payload = {
@@ -408,9 +434,10 @@ class LLMClient:
             payload["thinking"] = {"type": "enabled" if enable_thinking else "disabled"}
         elif enable_thinking:
             payload["thinking"] = {"type": "enabled"}
-        # DeepSeek reasoning effort: always high (user override)
-        if self.model.startswith("deepseek-") and enable_thinking:
-            payload["reasoning_effort"] = "high"
+        # Reasoning effort for supported providers
+        if enable_thinking:
+            if self._isDeepSeek() or self._isOpenAIReasoningModel():
+                payload["reasoning_effort"] = reasoning_effort
         if tools:
             payload["tools"] = tools
         return payload
@@ -677,44 +704,6 @@ class LLMClient:
         if reasoning_content:
             assistant_entry['reasoning_content'] = reasoning_content
         self.conversation_history.append(assistant_entry)
-
-    def _summarizeToolResultsWithLLM(self, tool_results_text: str, user_prompt: str) -> str:
-        """
-        Ask the LLM to dynamically extract only the high-signal snippets from tool results.
-        Returns the LLM-selected summary, or empty string on failure (caller should fallback).
-        """
-        if not self.api_key:
-            return ""
-        summary_prompt = (
-            "You are compressing tool search results for conversation history. "
-            "Below are the full contents of files read from a Slicer skill knowledge base. "
-            "The user's original request was:\n"
-            f"---\n{user_prompt}\n---\n\n"
-            "Extract ONLY the snippets that are useful for answering the user's request in future turns. "
-            "Prefer complete ```python code blocks and exact API signatures. "
-            "Discard long prose, explanations, and unrelated examples. "
-            "Do NOT add your own commentary --- output only the raw extracted snippets.\n\n"
-            "TOOL RESULTS:\n"
-            f"{tool_results_text}"
-        )
-        messages = [{"role": "user", "content": summary_prompt}]
-        payload = self._buildPayload(messages, stream=False, thinking=False)
-        url = self._getChatUrl()
-        try:
-            request = self._buildRequest(url, payload)
-            with self._openRequest(request) as response:
-                data = json.loads(response.read().decode('utf-8'))
-            if self._isClaude():
-                data = self._normalizeClaudeResponse(data)
-            content = self._coerceText(data['choices'][0]['message'].get('content', ''))
-            # Track token usage for summary request
-            usage = data.get('usage', {})
-            self.total_tokens_used += usage.get('total_tokens', 0)
-            self.total_cost += self._calculateCost(usage)
-            return content.strip()
-        except Exception as e:
-            logger.warning(f"LLM summarization failed, will fallback: {e}")
-            return ""
 
     def _compressReadFileResult(self, full_content: str, grep_keywords: List[str] = None) -> str:
         """ReadFile now handles slicing at the tool layer; this is a passthrough."""
@@ -1132,6 +1121,7 @@ class LLMClient:
         max_tool_rounds: int,
         on_progress: Optional[Callable[[Dict], None]] = None,
         on_status: Optional[Callable[[str], None]] = None,
+        reasoning_effort: str = "high",
     ) -> Dict[str, Any]:
         """
         Core tool-calling loop. Operates on messages in-place.
@@ -1166,7 +1156,7 @@ class LLMClient:
             try:
                 api_start = time.time()
 
-                payload = self._buildPayload(messages, stream=False, tools=tools)
+                payload = self._buildPayload(messages, stream=False, tools=tools, reasoning_effort=reasoning_effort)
                 request = self._buildRequest(url, payload)
 
                 # On first round, run a quick TCP probe to catch network issues early
@@ -1426,7 +1416,7 @@ class LLMClient:
         intermediate_messages.append(messages[-1])
 
         final_start = time.time()
-        payload = self._buildPayload(messages, stream=False, tools=None)
+        payload = self._buildPayload(messages, stream=False, tools=None, reasoning_effort=reasoning_effort)
         request = self._buildRequest(url, payload)
         with self._openRequest(request) as response:
             data = json.loads(response.read().decode('utf-8'))
@@ -1513,6 +1503,7 @@ class LLMClient:
             max_tool_rounds=max_tool_rounds,
             on_progress=on_progress,
             on_status=on_status,
+            reasoning_effort="high",
         )
 
         content = result['content']
@@ -1686,6 +1677,7 @@ class LLMClient:
             tool_executor=tool_executor,
             max_tool_rounds=max_tool_rounds,
             on_progress=on_progress,
+            reasoning_effort="high",
         )
 
         content = result['content']
