@@ -1068,9 +1068,9 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Capture scene state BEFORE execution for semantic verification
         before_snapshot = None
-        if self.logic and hasattr(self.logic, 'buildSceneSnapshot'):
+        if hasattr(self, 'buildSceneSnapshot'):
             try:
-                before_snapshot = self.logic.buildSceneSnapshot()
+                before_snapshot = self.buildSceneSnapshot()
             except Exception as e:
                 logger.warning(f"Failed to build pre-execution scene snapshot: {e}")
 
@@ -1122,11 +1122,11 @@ class SlicerAIAgentWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # Semantic scene verification: compare before/after snapshots against agent_plan expectations
             if result.get("success") and not result.get("timed_out", False) and before_snapshot:
                 try:
-                    if self.logic and hasattr(self.logic, 'buildSceneSnapshot') and hasattr(self.logic, 'verifySceneAgainstPlan'):
-                        after_snapshot = self.logic.buildSceneSnapshot()
+                    if hasattr(self, 'buildSceneSnapshot') and hasattr(self, 'verifySceneAgainstPlan'):
+                        after_snapshot = self.buildSceneSnapshot()
                         plan = getattr(self, 'currentAgentPlan', None)
                         if plan:
-                            verification = self.logic.verifySceneAgainstPlan(before_snapshot, after_snapshot, plan)
+                            verification = self.verifySceneAgainstPlan(before_snapshot, after_snapshot, plan)
                             if not verification.get("valid", True):
                                 output_has_errors = True
                                 verr = "; ".join(verification.get("errors", []))
