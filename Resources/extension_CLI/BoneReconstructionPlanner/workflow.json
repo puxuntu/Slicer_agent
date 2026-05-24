@@ -1,0 +1,474 @@
+{
+  "phases": [
+    {
+      "name": "create_bone_models",
+      "optional": false
+    },
+    {
+      "name": "add_mandibular_curve",
+      "optional": false
+    },
+    {
+      "name": "add_cut_plane",
+      "optional": false
+    },
+    {
+      "name": "add_fibula_line",
+      "optional": false
+    },
+    {
+      "name": "center_fibula_line",
+      "optional": false
+    },
+    {
+      "name": "update_fibula_planes",
+      "optional": false
+    },
+    {
+      "name": "hard_vsp_update",
+      "optional": false
+    },
+    {
+      "name": "create_reconstruction_3d_model",
+      "optional": false
+    },
+    {
+      "name": "create_dental_implant_fiducials",
+      "optional": true
+    },
+    {
+      "name": "create_dental_implant_cylinders",
+      "optional": true
+    },
+    {
+      "name": "create_plate_curve",
+      "optional": true
+    },
+    {
+      "name": "create_custom_plate",
+      "optional": true
+    },
+    {
+      "name": "create_miter_boxes",
+      "optional": true
+    },
+    {
+      "name": "create_fibula_screw_fiducials",
+      "optional": true
+    },
+    {
+      "name": "create_fibula_screw_cylinders",
+      "optional": true
+    },
+    {
+      "name": "boolean_fibula_guide",
+      "optional": true
+    },
+    {
+      "name": "create_mandible_saw_boxes",
+      "optional": true
+    },
+    {
+      "name": "create_mandible_screw_fiducials",
+      "optional": true
+    },
+    {
+      "name": "create_mandible_screw_cylinders",
+      "optional": true
+    },
+    {
+      "name": "boolean_mandible_guide",
+      "optional": true
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "create_bone_models",
+      "phase": "create_bone_models",
+      "step_type": "automated",
+      "description": "Generate 3D surface models from mandible and fibula segmentations using the module's Logic.",
+      "method_name": "makeModels",
+      "depends_on": [],
+      "produces_nodes": [],
+      "code_template": "templates/create_bone_models.py.tpl"
+    },
+    {
+      "step_id": "add_mandibular_curve",
+      "phase": "add_mandibular_curve",
+      "step_type": "interactive",
+      "description": "Place a markup curve along the ideal mandibular arch to guide initial cut plane positioning.",
+      "method_name": "addMandibularCurve",
+      "interaction_type": "curve",
+      "node_class": "vtkMRMLMarkupsCurveNode",
+      "placement_instructions": "Switch to curve placement mode. Click on the mandibular segmentation to define a curve. Use at least three points for an accurate curve representation.",
+      "min_control_points": 3,
+      "validation_rules": [
+        "minimum 3 control points"
+      ],
+      "is_optional": false,
+      "produces_nodes": [],
+      "reactive_chains": [
+        {
+          "trigger_event": "PointModifiedEvent",
+          "recompute_description": "Curve point modifications trigger recomputation of mandibular cut planes and associated geometry.",
+          "debounce_ms": 300
+        }
+      ],
+      "depends_on": [
+        "create_bone_models"
+      ],
+      "pre_template": "templates/add_mandibular_curve_pre.py.tpl",
+      "post_template": "templates/add_mandibular_curve_post.py.tpl"
+    },
+    {
+      "step_id": "add_cut_plane",
+      "phase": "add_cut_plane",
+      "step_type": "interactive",
+      "description": "Place a markup plane on the mandible model; adjacent planes define bone pieces for reconstruction.",
+      "method_name": "addCutPlane",
+      "interaction_type": "plane",
+      "node_class": "vtkMRMLMarkupsPlaneNode",
+      "placement_instructions": "Switch to persistent plane placement mode. Click three points on the mandibular model to define each cut plane. Continue placing planes until all resections are defined.",
+      "min_control_points": 3,
+      "validation_rules": [
+        "minimum 3 control points"
+      ],
+      "is_optional": false,
+      "produces_nodes": [],
+      "reactive_chains": [
+        {
+          "trigger_event": "PointModifiedEvent",
+          "recompute_description": "Modifying plane points triggers automatic update of VSP (Virtual Surgical Plan) components, including cutting guides and fibula positioning.",
+          "debounce_ms": 300
+        }
+      ],
+      "depends_on": [
+        "add_mandibular_curve"
+      ],
+      "pre_template": "templates/add_cut_plane_pre.py.tpl",
+      "post_template": "templates/add_cut_plane_post.py.tpl"
+    },
+    {
+      "step_id": "add_fibula_line",
+      "phase": "add_fibula_line",
+      "step_type": "interactive",
+      "description": "Draw a markup line along the fibula diaphysis (distal to proximal) to define the fibula axis.",
+      "method_name": "addFibulaLine",
+      "interaction_type": "line",
+      "node_class": "vtkMRMLMarkupsLineNode",
+      "placement_instructions": "Switch to line placement mode. Click two points along the fibula segmentation to define the fibula axis.",
+      "min_control_points": 2,
+      "validation_rules": [
+        "minimum 2 control points"
+      ],
+      "is_optional": false,
+      "produces_nodes": [],
+      "reactive_chains": [],
+      "depends_on": [
+        "add_mandibular_curve"
+      ],
+      "pre_template": "templates/add_fibula_line_pre.py.tpl",
+      "post_template": "templates/add_fibula_line_post.py.tpl"
+    },
+    {
+      "step_id": "center_fibula_line",
+      "phase": "center_fibula_line",
+      "step_type": "automated",
+      "description": "Automatically adjust the fibula line to coincide with the anatomical axis of the fibula model.",
+      "method_name": "centerFibulaLine",
+      "depends_on": [
+        "add_fibula_line",
+        "create_bone_models"
+      ],
+      "produces_nodes": [],
+      "code_template": "templates/center_fibula_line.py.tpl"
+    },
+    {
+      "step_id": "update_fibula_planes",
+      "phase": "update_fibula_planes",
+      "step_type": "automated",
+      "description": "Compute fibula cut planes from mandible planes and fibula axis, create bone pieces, and transform them to the mandible position.",
+      "method_name": "onGenerateFibulaPlanesTimerTimeout",
+      "depends_on": [
+        "center_fibula_line",
+        "add_mandibular_curve"
+      ],
+      "produces_nodes": [],
+      "code_template": "templates/update_fibula_planes.py.tpl"
+    },
+    {
+      "step_id": "hard_vsp_update",
+      "phase": "hard_vsp_update",
+      "step_type": "automated",
+      "description": "Force a complete recomputation of the virtual surgical plan outputs without modifying input objects.",
+      "method_name": "hardVSPUpdate",
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "produces_nodes": [],
+      "code_template": "templates/hard_vsp_update.py.tpl"
+    },
+    {
+      "step_id": "create_reconstruction_3d_model",
+      "phase": "create_reconstruction_3d_model",
+      "step_type": "automated",
+      "description": "Generate a combined STL model of the neomandible (mandible plus fibula pieces) for 3D printing.",
+      "method_name": "create3DModelOfTheReconstruction",
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "produces_nodes": [],
+      "code_template": "templates/create_reconstruction_3d_model.py.tpl"
+    },
+    {
+      "step_id": "create_dental_implant_fiducials",
+      "phase": "create_dental_implant_fiducials",
+      "step_type": "branch",
+      "description": "Place fiducial points on neomandible pieces where dental implant cylinders should be positioned.",
+      "method_name": "createDentalImplantCylindersFiducialList",
+      "interaction_type": "fiducial",
+      "node_class": "vtkMRMLMarkupsFiducialNode",
+      "placement_instructions": "Switch to fiducial placement mode. Click on the mandibular model to mark each dental implant location.",
+      "min_control_points": 1,
+      "validation_rules": [
+        "minimum 1 control points"
+      ],
+      "is_optional": true,
+      "produces_nodes": [],
+      "reactive_chains": [
+        {
+          "trigger_event": "PointModifiedEvent",
+          "recompute_description": "Adding or modifying fiducials triggers update of dental implant cylinders and drill guides.",
+          "debounce_ms": 300
+        }
+      ],
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "condition": "Place fiducial points on neomandible pieces where dental implant cylinders should be positioned.",
+      "branches": {
+        "yes": "create_dental_implant_fiducials",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_dental_implant_cylinders",
+      "phase": "create_dental_implant_cylinders",
+      "step_type": "branch",
+      "description": "Generate cylindrical models representing dental implants at the fiducial locations on the neomandible.",
+      "method_name": "createCylindersFromFiducialListAndNeomandiblePieces",
+      "depends_on": [
+        "create_dental_implant_fiducials"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Generate cylindrical models representing dental implants at the fiducial locations on the neomandible.",
+      "branches": {
+        "yes": "create_dental_implant_cylinders",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_plate_curve",
+      "phase": "create_plate_curve",
+      "step_type": "branch",
+      "description": "Draw a markup curve along the neomandible surface to define the path of the custom titanium plate.",
+      "method_name": "createPlateCurve",
+      "interaction_type": "curve",
+      "node_class": "vtkMRMLMarkupsCurveNode",
+      "placement_instructions": "Switch to curve placement mode. Click on the mandibular segmentation to define a curve. Use at least three points for an accurate curve representation.",
+      "min_control_points": 3,
+      "validation_rules": [
+        "minimum 3 control points"
+      ],
+      "is_optional": true,
+      "produces_nodes": [],
+      "reactive_chains": [
+        {
+          "trigger_event": "PointModifiedEvent",
+          "recompute_description": "Curve point modifications trigger recomputation of mandibular cut planes and associated geometry.",
+          "debounce_ms": 300
+        }
+      ],
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "condition": "Draw a markup curve along the neomandible surface to define the path of the custom titanium plate.",
+      "branches": {
+        "yes": "create_plate_curve",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_custom_plate",
+      "phase": "create_custom_plate",
+      "step_type": "branch",
+      "description": "Generate a 3D model of a patient-specific titanium plate following the plate curve.",
+      "method_name": "createCustomPlate",
+      "depends_on": [
+        "create_plate_curve"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Generate a 3D model of a patient-specific titanium plate following the plate curve.",
+      "branches": {
+        "yes": "create_custom_plate",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_miter_boxes",
+      "phase": "create_miter_boxes",
+      "step_type": "branch",
+      "description": "Create miter box models for fibula osteotomies; each box includes a slit for the saw blade.",
+      "method_name": "createMiterBoxesFromFibulaPlanes",
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Create miter box models for fibula osteotomies; each box includes a slit for the saw blade.",
+      "branches": {
+        "yes": "create_miter_boxes",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_fibula_screw_fiducials",
+      "phase": "create_fibula_screw_fiducials",
+      "step_type": "branch",
+      "description": "Place fiducial points on the fibula guide base where screw holes will be drilled.",
+      "method_name": "createFibulaCylindersFiducialList",
+      "interaction_type": "fiducial",
+      "node_class": "vtkMRMLMarkupsLineNode",
+      "placement_instructions": "Switch to line placement mode. Click two points along the fibula segmentation to define the fibula axis.",
+      "min_control_points": 2,
+      "validation_rules": [
+        "minimum 2 control points"
+      ],
+      "is_optional": true,
+      "produces_nodes": [],
+      "reactive_chains": [],
+      "depends_on": [
+        "create_miter_boxes"
+      ],
+      "condition": "Place fiducial points on the fibula guide base where screw holes will be drilled.",
+      "branches": {
+        "yes": "create_fibula_screw_fiducials",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_fibula_screw_cylinders",
+      "phase": "create_fibula_screw_cylinders",
+      "step_type": "branch",
+      "description": "Generate cylinder models for screw holes on the fibula guide base at the fiducial locations.",
+      "method_name": "createCylindersFromFiducialListAndFibulaSurgicalGuideBase",
+      "depends_on": [
+        "create_fibula_screw_fiducials"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Generate cylinder models for screw holes on the fibula guide base at the fiducial locations.",
+      "branches": {
+        "yes": "create_fibula_screw_cylinders",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "boolean_fibula_guide",
+      "phase": "boolean_fibula_guide",
+      "step_type": "branch",
+      "description": "Perform Boolean subtraction to combine screw holes, dental implant cylinders, and miter boxes into a final fibula surgical guide prototype.",
+      "method_name": "makeBooleanOperationsToFibulaSurgicalGuideBase",
+      "depends_on": [
+        "create_fibula_screw_cylinders",
+        "create_miter_boxes"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Perform Boolean subtraction to combine screw holes, dental implant cylinders, and miter boxes into a final fibula surgical guide prototype.",
+      "branches": {
+        "yes": "boolean_fibula_guide",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_mandible_saw_boxes",
+      "phase": "create_mandible_saw_boxes",
+      "step_type": "branch",
+      "description": "Create saw box models for mandible osteotomies at the first and last cut planes.",
+      "method_name": "createSawBoxesFromFirstAndLastMandiblePlanes",
+      "depends_on": [
+        "update_fibula_planes"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Create saw box models for mandible osteotomies at the first and last cut planes.",
+      "branches": {
+        "yes": "create_mandible_saw_boxes",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_mandible_screw_fiducials",
+      "phase": "create_mandible_screw_fiducials",
+      "step_type": "branch",
+      "description": "Place fiducial points on the mandible guide base where screw holes will be drilled.",
+      "method_name": "createMandibleCylindersFiducialList",
+      "interaction_type": "fiducial",
+      "node_class": "vtkMRMLMarkupsFiducialNode",
+      "placement_instructions": "",
+      "min_control_points": 0,
+      "validation_rules": [
+        "minimum 0 control points"
+      ],
+      "is_optional": true,
+      "produces_nodes": [],
+      "reactive_chains": [],
+      "depends_on": [
+        "create_mandible_saw_boxes"
+      ],
+      "condition": "Place fiducial points on the mandible guide base where screw holes will be drilled.",
+      "branches": {
+        "yes": "create_mandible_screw_fiducials",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "create_mandible_screw_cylinders",
+      "phase": "create_mandible_screw_cylinders",
+      "step_type": "branch",
+      "description": "Generate cylinder models for screw holes on the mandible guide base at the fiducial locations.",
+      "method_name": "createCylindersFromFiducialListAndMandibleSurgicalGuideBase",
+      "depends_on": [
+        "create_mandible_screw_fiducials"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Generate cylinder models for screw holes on the mandible guide base at the fiducial locations.",
+      "branches": {
+        "yes": "create_mandible_screw_cylinders",
+        "no": ""
+      }
+    },
+    {
+      "step_id": "boolean_mandible_guide",
+      "phase": "boolean_mandible_guide",
+      "step_type": "branch",
+      "description": "Perform Boolean subtraction to combine screw holes, bridge model, and saw boxes into a final mandible surgical guide prototype.",
+      "method_name": "makeBooleanOperationsToMandibleSurgicalGuideBase",
+      "depends_on": [
+        "create_mandible_screw_cylinders",
+        "create_mandible_saw_boxes"
+      ],
+      "produces_nodes": [],
+      "is_optional": true,
+      "condition": "Perform Boolean subtraction to combine screw holes, bridge model, and saw boxes into a final mandible surgical guide prototype.",
+      "branches": {
+        "yes": "boolean_mandible_guide",
+        "no": ""
+      }
+    }
+  ]
+}

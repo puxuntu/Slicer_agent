@@ -48,6 +48,8 @@ class CodeValidator:
         'functools', 'json', 're', 'string', 'hashlib', 'copy',
         'typing', 'abc', 'enum', 'decimal', 'fractions', 'numbers',
         'statistics', 'csv', 'io', 'base64', 'binascii', 'struct',
+        # Markup/interaction modules for interactive workflow templates
+        'vtkSlicerMarkupsModuleMRML', 'vtkSlicerMarkupsModuleLogic',
     }
     
     # Destructive operations that require confirmation

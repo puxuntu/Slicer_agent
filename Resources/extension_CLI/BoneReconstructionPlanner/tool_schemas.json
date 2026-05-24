@@ -1,0 +1,54 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "BoneReconstructionPlanner",
+      "description": "Guided interactive workflow for BoneReconstructionPlanner. Execute steps in order. Interactive steps require user 3D interaction. Steps: 'create_bone_models': Generate 3D surface models from mandible and fibula segmentations using the module's Logic.; 'add_mandibular_curve': Place a markup curve along the ideal mandibular arch to guide initial cut plane positioning. (interactive: curve); 'add_cut_plane': Place a markup plane on the mandible model; adjacent planes define bone pieces for reconstruction. (interactive: plane); 'add_fibula_line': Draw a markup line along the fibula diaphysis (distal to proximal) to define the fibula axis. (interactive: line); 'center_fibula_line': Automatically adjust the fibula line to coincide with the anatomical axis of the fibula model.; 'update_fibula_planes': Compute fibula cut planes from mandible planes and fibula axis, create bone pieces, and transform them to the mandible position.; 'hard_vsp_update': Force a complete recomputation of the virtual surgical plan outputs without modifying input objects.; 'create_reconstruction_3d_model': Generate a combined STL model of the neomandible (mandible plus fibula pieces) for 3D printing.; 'create_dental_implant_fiducials': Place fiducial points on neomandible pieces where dental implant cylinders should be positioned. (optional — ask user first); 'create_dental_implant_cylinders': Generate cylindrical models representing dental implants at the fiducial locations on the neomandible. (optional — ask user first)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "workflow_step": {
+            "type": "string",
+            "enum": [
+              "create_bone_models",
+              "add_mandibular_curve",
+              "add_cut_plane",
+              "add_fibula_line",
+              "center_fibula_line",
+              "update_fibula_planes",
+              "hard_vsp_update",
+              "create_reconstruction_3d_model",
+              "create_dental_implant_fiducials",
+              "create_dental_implant_cylinders",
+              "create_plate_curve",
+              "create_custom_plate",
+              "create_miter_boxes",
+              "create_fibula_screw_fiducials",
+              "create_fibula_screw_cylinders",
+              "boolean_fibula_guide",
+              "create_mandible_saw_boxes",
+              "create_mandible_screw_fiducials",
+              "create_mandible_screw_cylinders",
+              "boolean_mandible_guide"
+            ],
+            "description": "Which workflow step to execute"
+          },
+          "user_action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "proceed",
+              "skip",
+              "cancel"
+            ],
+            "description": "Action: 'start' to begin a step, 'proceed' after user completes interaction, 'skip' for optional steps, 'cancel' to abort workflow"
+          }
+        },
+        "required": [
+          "workflow_step",
+          "user_action"
+        ]
+      }
+    }
+  }
+]

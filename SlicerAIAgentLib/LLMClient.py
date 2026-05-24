@@ -602,6 +602,11 @@ class LLMClient:
             base_prompt += "Example: `ext:VoxTell/` to search VoxTell source, `ext:VoxTell/VoxTell.py` to read a file.\n\n"
             base_prompt += "\n".join(ext_source_info)
 
+        # Inject active workflow state if one is running
+        if context and context.get("workflow_state"):
+            base_prompt += "\n\n## ACTIVE WORKFLOW\n"
+            base_prompt += context["workflow_state"]
+
         return base_prompt
 
     def _openRequest(self, request: urllib.request.Request):

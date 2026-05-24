@@ -1,0 +1,308 @@
+[
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_bone_models"
+    },
+    "description": "Generate 3D surface models from mandible and fibula segmentations using the module's Logic.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "automated",
+    "template_file": "templates/create_bone_models.py.tpl"
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "add_mandibular_curve"
+    },
+    "description": "Place a markup curve along the ideal mandibular arch to guide initial cut plane positioning.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "interactive",
+    "pre_template_file": "templates/add_mandibular_curve_pre.py.tpl",
+    "post_template_file": "templates/add_mandibular_curve_post.py.tpl",
+    "interaction_descriptor": {
+      "interaction_type": "curve",
+      "node_class": "vtkMRMLMarkupsCurveNode",
+      "placement_instructions": "Switch to curve placement mode. Click on the mandibular segmentation to define a curve. Use at least three points for an accurate curve representation."
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "add_cut_plane"
+    },
+    "description": "Place a markup plane on the mandible model; adjacent planes define bone pieces for reconstruction.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "interactive",
+    "pre_template_file": "templates/add_cut_plane_pre.py.tpl",
+    "post_template_file": "templates/add_cut_plane_post.py.tpl",
+    "interaction_descriptor": {
+      "interaction_type": "plane",
+      "node_class": "vtkMRMLMarkupsPlaneNode",
+      "placement_instructions": "Switch to persistent plane placement mode. Click three points on the mandibular model to define each cut plane. Continue placing planes until all resections are defined."
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "add_fibula_line"
+    },
+    "description": "Draw a markup line along the fibula diaphysis (distal to proximal) to define the fibula axis.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "interactive",
+    "pre_template_file": "templates/add_fibula_line_pre.py.tpl",
+    "post_template_file": "templates/add_fibula_line_post.py.tpl",
+    "interaction_descriptor": {
+      "interaction_type": "line",
+      "node_class": "vtkMRMLMarkupsLineNode",
+      "placement_instructions": "Switch to line placement mode. Click two points along the fibula segmentation to define the fibula axis."
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "center_fibula_line"
+    },
+    "description": "Automatically adjust the fibula line to coincide with the anatomical axis of the fibula model.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "automated",
+    "template_file": "templates/center_fibula_line.py.tpl"
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "update_fibula_planes"
+    },
+    "description": "Compute fibula cut planes from mandible planes and fibula axis, create bone pieces, and transform them to the mandible position.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "automated",
+    "template_file": "templates/update_fibula_planes.py.tpl"
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "hard_vsp_update"
+    },
+    "description": "Force a complete recomputation of the virtual surgical plan outputs without modifying input objects.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "automated",
+    "template_file": "templates/hard_vsp_update.py.tpl"
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_reconstruction_3d_model"
+    },
+    "description": "Generate a combined STL model of the neomandible (mandible plus fibula pieces) for 3D printing.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "automated",
+    "template_file": "templates/create_reconstruction_3d_model.py.tpl"
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_dental_implant_fiducials"
+    },
+    "description": "Place fiducial points on neomandible pieces where dental implant cylinders should be positioned.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Place fiducial points on neomandible pieces where dental implant cylinders should be positioned.",
+    "branches": {
+      "yes": "create_dental_implant_fiducials",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_dental_implant_cylinders"
+    },
+    "description": "Generate cylindrical models representing dental implants at the fiducial locations on the neomandible.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Generate cylindrical models representing dental implants at the fiducial locations on the neomandible.",
+    "branches": {
+      "yes": "create_dental_implant_cylinders",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_plate_curve"
+    },
+    "description": "Draw a markup curve along the neomandible surface to define the path of the custom titanium plate.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Draw a markup curve along the neomandible surface to define the path of the custom titanium plate.",
+    "branches": {
+      "yes": "create_plate_curve",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_custom_plate"
+    },
+    "description": "Generate a 3D model of a patient-specific titanium plate following the plate curve.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Generate a 3D model of a patient-specific titanium plate following the plate curve.",
+    "branches": {
+      "yes": "create_custom_plate",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_miter_boxes"
+    },
+    "description": "Create miter box models for fibula osteotomies; each box includes a slit for the saw blade.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Create miter box models for fibula osteotomies; each box includes a slit for the saw blade.",
+    "branches": {
+      "yes": "create_miter_boxes",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_fibula_screw_fiducials"
+    },
+    "description": "Place fiducial points on the fibula guide base where screw holes will be drilled.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Place fiducial points on the fibula guide base where screw holes will be drilled.",
+    "branches": {
+      "yes": "create_fibula_screw_fiducials",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_fibula_screw_cylinders"
+    },
+    "description": "Generate cylinder models for screw holes on the fibula guide base at the fiducial locations.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Generate cylinder models for screw holes on the fibula guide base at the fiducial locations.",
+    "branches": {
+      "yes": "create_fibula_screw_cylinders",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "boolean_fibula_guide"
+    },
+    "description": "Perform Boolean subtraction to combine screw holes, dental implant cylinders, and miter boxes into a final fibula surgical guide prototype.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Perform Boolean subtraction to combine screw holes, dental implant cylinders, and miter boxes into a final fibula surgical guide prototype.",
+    "branches": {
+      "yes": "boolean_fibula_guide",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_mandible_saw_boxes"
+    },
+    "description": "Create saw box models for mandible osteotomies at the first and last cut planes.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Create saw box models for mandible osteotomies at the first and last cut planes.",
+    "branches": {
+      "yes": "create_mandible_saw_boxes",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_mandible_screw_fiducials"
+    },
+    "description": "Place fiducial points on the mandible guide base where screw holes will be drilled.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Place fiducial points on the mandible guide base where screw holes will be drilled.",
+    "branches": {
+      "yes": "create_mandible_screw_fiducials",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "create_mandible_screw_cylinders"
+    },
+    "description": "Generate cylinder models for screw holes on the mandible guide base at the fiducial locations.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Generate cylinder models for screw holes on the mandible guide base at the fiducial locations.",
+    "branches": {
+      "yes": "create_mandible_screw_cylinders",
+      "no": ""
+    }
+  },
+  {
+    "tool_name": "BoneReconstructionPlanner",
+    "param_signature": {
+      "workflow_step": "boolean_mandible_guide"
+    },
+    "description": "Perform Boolean subtraction to combine screw holes, bridge model, and saw boxes into a final mandible surgical guide prototype.",
+    "requirements": [
+      "BoneReconstructionPlanner extension must be installed"
+    ],
+    "step_type": "branch",
+    "condition": "Perform Boolean subtraction to combine screw holes, bridge model, and saw boxes into a final mandible surgical guide prototype.",
+    "branches": {
+      "yes": "boolean_mandible_guide",
+      "no": ""
+    }
+  }
+]

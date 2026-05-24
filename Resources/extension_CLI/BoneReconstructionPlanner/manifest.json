@@ -1,0 +1,31 @@
+{
+  "extension_name": "BoneReconstructionPlanner",
+  "extension_module_name": "BoneReconstructionPlanner",
+  "logic_class_name": "BoneReconstructionPlannerLogic",
+  "version": "1.0.0",
+  "status": "validated",
+  "workflow_type": "interactive",
+  "workflow_graph_file": "workflow.json",
+  "stages": [
+    "create_bone_models",
+    "add_mandibular_curve",
+    "add_cut_plane",
+    "add_fibula_line",
+    "center_fibula_line",
+    "update_fibula_planes",
+    "hard_vsp_update",
+    "create_reconstruction_3d_model",
+    "create_dental_implant_fiducials",
+    "create_dental_implant_cylinders",
+    "create_plate_curve",
+    "create_custom_plate",
+    "create_miter_boxes",
+    "create_fibula_screw_fiducials",
+    "create_fibula_screw_cylinders",
+    "boolean_fibula_guide",
+    "create_mandible_saw_boxes",
+    "create_mandible_screw_fiducials",
+    "create_mandible_screw_cylinders",
+    "boolean_mandible_guide"
+  ]
+}

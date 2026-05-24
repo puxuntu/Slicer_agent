@@ -1,0 +1,151 @@
+[
+  {
+    "attempt": 1,
+    "timestamp": "2026-05-23T04:21:34.132735",
+    "stage": "initial_generation",
+    "trigger": "user_request",
+    "analysis_stages_completed": [
+      1,
+      "1.5",
+      2,
+      "2.5",
+      3,
+      "3.5",
+      4,
+      "4.5",
+      "4.7",
+      "4.9",
+      5,
+      6,
+      "6.5",
+      7,
+      8
+    ],
+    "validation_result": {
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "templates/create_bone_models.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 7)",
+        "templates/add_mandibular_curve_pre.py.tpl: Unknown MRML node class: 'Add Mandibular Curve'",
+        "templates/add_mandibular_curve_post.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 1)",
+        "templates/add_cut_plane_pre.py.tpl: Unknown MRML node class: 'Add Cut Plane'",
+        "templates/add_cut_plane_post.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 4)",
+        "templates/add_fibula_line_pre.py.tpl: Unknown MRML node class: 'Add Fibula Line'",
+        "templates/add_fibula_line_post.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 2)",
+        "templates/center_fibula_line.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 2)",
+        "templates/update_fibula_planes.py.tpl: Unrecognized module: logging (line 1)",
+        "templates/update_fibula_planes.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 3)",
+        "templates/hard_vsp_update.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 4)",
+        "templates/hard_vsp_update.py.tpl: Unknown MRML node class: 'vtkMRMLScriptedModuleNode'",
+        "templates/hard_vsp_update.py.tpl: Unknown MRML node class: 'BoneReconstructionPlannerParameters'",
+        "templates/create_reconstruction_3d_model.py.tpl: Unrecognized module: logging (line 1)",
+        "templates/create_reconstruction_3d_model.py.tpl: Unrecognized module: BoneReconstructionPlanner (line 8)"
+      ],
+      "per_template": {
+        "templates/create_bone_models.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 7)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_mandibular_curve_pre.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unknown MRML node class: 'Add Mandibular Curve'"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_mandibular_curve_post.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 1)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_cut_plane_pre.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unknown MRML node class: 'Add Cut Plane'"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_cut_plane_post.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 4)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_fibula_line_pre.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unknown MRML node class: 'Add Fibula Line'"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/add_fibula_line_post.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 2)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/center_fibula_line.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 2)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/update_fibula_planes.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: logging (line 1)",
+            "Unrecognized module: BoneReconstructionPlanner (line 3)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/hard_vsp_update.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: BoneReconstructionPlanner (line 4)",
+            "Unknown MRML node class: 'vtkMRMLScriptedModuleNode'",
+            "Unknown MRML node class: 'BoneReconstructionPlannerParameters'"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        },
+        "templates/create_reconstruction_3d_model.py.tpl": {
+          "valid": true,
+          "reason": null,
+          "warnings": [
+            "Unrecognized module: logging (line 1)",
+            "Unrecognized module: BoneReconstructionPlanner (line 8)"
+          ],
+          "requires_confirmation": false,
+          "destructive_ops": []
+        }
+      }
+    }
+  }
+]

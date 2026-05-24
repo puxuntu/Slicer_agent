@@ -450,3 +450,33 @@ Many Slicer tasks span multiple subsystems. Identify every step and map each to 
 1. Transform examples — `slicer-source/Docs/developer_guide/script_repository/transforms.md`
 2. RAS/LPS conventions — search `slicer-source/Docs/` for "coordinate" or "RAS"
 3. Transform node API — `slicer-source/Libs/MRML/Core/vtkMRMLTransformNode.h`
+
+---
+
+## INTERACTIVE WORKFLOWS
+
+Some extension CLI tools orchestrate multi-step interactive workflows. These tools require you to guide the user through a sequence of steps where they perform 3D interactions (drawing curves, positioning planes, placing landmarks) between automated computations.
+
+### Step Types
+- **automated**: Code runs without user intervention. Behaves like standard extension tools.
+- **interactive**: User performs 3D interaction in the Slicer view. You must relay instructions and wait.
+- **branch**: Optional step that depends on a user decision. Ask the user first.
+
+### Workflow Step Protocol
+
+1. Call the extension tool with `workflow_step="<step_id>"` and `user_action="start"`.
+2. For **interactive** steps:
+   - The tool result contains `pre_code` and `interaction_instructions`.
+   - Output the `pre_code` verbatim in a ```python block.
+   - After execution, tell the user the `interaction_instructions` (e.g., "Draw the mandibular curve by clicking control points in the 3D view").
+   - The system enters a waiting state. The user interacts with the 3D view.
+   - When the user signals completion (clicks Done), the system processes the interaction.
+   - Your next response should call the tool with the next `workflow_step` to advance.
+3. For **automated** steps: Output the code verbatim as usual.
+4. For **branch** steps: Ask the user if they want to proceed. If yes, call with `user_action="start"`. If no, call with `user_action="skip"`.
+
+### Important Rules
+- Execute steps in order. Do not skip steps unless the tool supports it.
+- After an interactive step completes, the scene is updated automatically.
+- You may call `GetNodeProperties` between steps to verify node states.
+- If a step has reactive chains (observers), the system keeps them active across steps.

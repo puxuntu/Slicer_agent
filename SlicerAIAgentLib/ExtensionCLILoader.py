@@ -160,6 +160,7 @@ def _fill_template(template_str: str, kwargs: Dict[str, str]) -> str:
     - {name}: replaced with kwargs[name], KeyError if missing
     - {name: default}: replaced with kwargs[name] if present, else default
     - {{ and }} are preserved as literal braces
+    - Brace pairs inside Python string/f-string literals are left untouched
     """
     import re
 
@@ -170,11 +171,11 @@ def _fill_template(template_str: str, kwargs: Dict[str, str]) -> str:
 
     def _replace(match):
         name = match.group(1)
-        # Check if this match has the default-value groups (4 groups total)
-        if match.lastindex and match.lastindex >= 4:
-            has_default = match.group(2) is not None
-            default = match.group(4) if has_default else None
-        else:
+        # Detect {name: default} pattern: group(2) is the ": default" wrapper
+        try:
+            default = match.group(4)
+            has_default = default is not None
+        except IndexError:
             has_default = False
             default = None
 
@@ -184,10 +185,28 @@ def _fill_template(template_str: str, kwargs: Dict[str, str]) -> str:
             return default
         raise KeyError(name)
 
-    # Match {name} or {name: default} — default can contain any chars except unbalanced }
-    buf = re.sub(r'\{(\w+)((: )(.*?))\}', _replace, buf)
-    # Match remaining simple {name} placeholders
-    buf = re.sub(r'\{(\w+)\}', _replace, buf)
+    # Mask out Python string literals so regex does not touch braces inside them.
+    # Handles: '...', "...", f"...", r"...", b"...", and triple-quoted variants.
+    _STRING_PLACEHOLDER = "\x00STR\x00"
+    string_ranges = []
+    for m in re.finditer(
+        r'(?:[fFrRbBuU]{0,2})("""|\'\'\'|"|\')(.*?)\1',
+        buf, re.DOTALL
+    ):
+        string_ranges.append((m.start(), m.end()))
+
+    def _in_string(pos):
+        return any(s <= pos < e for s, e in string_ranges)
+
+    def _replace_if_not_in_string(match):
+        if _in_string(match.start()):
+            return match.group(0)
+        return _replace(match)
+
+    # Match {name: default} — skip those inside string literals
+    buf = re.sub(r'\{(\w+)((: )(.*?))\}', _replace_if_not_in_string, buf)
+    # Match remaining simple {name} placeholders, but skip those inside strings
+    buf = re.sub(r'\{(\w+)\}', _replace_if_not_in_string, buf)
 
     # Restore escaped braces
     buf = buf.replace(sentinel_l, "{").replace(sentinel_r, "}")
@@ -202,10 +221,15 @@ def _generate_from_template(
 ) -> Dict:
     """
     Fill a code template with the provided arguments and return the result dict.
+    For interactive workflows, delegates to dispatch_workflow_step.
     """
     ext_dir = ext_data["dir"]
     generators = ext_data["generators"]
     manifest = ext_data["manifest"]
+
+    # Route interactive workflows to the workflow dispatch
+    if manifest.get("workflow_type") == "interactive":
+        return dispatch_workflow_step(ext_name, ext_data, tool_name, arguments)
 
     # Find the matching generator entry
     stage = arguments.get("stage", "")
@@ -324,6 +348,255 @@ def _generate_from_template(
         "explanation": best_match.get("description", ""),
         "requirements": best_match.get("requirements", []),
     }
+
+
+# Track completed/skipped steps per workflow so the skip handler can compute
+# the next step without needing a reference to the WorkflowOrchestrator.
+_workflow_completed_steps: Dict[str, set] = {}
+
+
+def _find_next_step_local(
+    workflow_graph: Dict, completed: set
+) -> Optional[Dict]:
+    """Find the next workflow step whose dependencies are all completed."""
+    for step in workflow_graph.get("steps", []):
+        sid = step.get("step_id", "")
+        if sid in completed:
+            continue
+        deps = step.get("depends_on", [])
+        if all(d in completed for d in deps):
+            is_optional = (
+                step.get("step_type") == "branch"
+                or step.get("is_optional", False)
+            )
+            return {
+                "step_id": sid,
+                "step_type": step.get("step_type", "automated"),
+                "description": step.get("description", ""),
+                "is_optional": is_optional,
+            }
+    return None
+
+
+def dispatch_workflow_step(
+    ext_name: str,
+    ext_data: Dict,
+    tool_name: str,
+    arguments: Dict,
+) -> Dict:
+    """
+    Dispatch a tool call for an interactive workflow extension.
+
+    Reads the workflow.json, matches the requested step, and returns
+    either pre-interaction code (for interactive steps), full code (for
+    automated steps), or branch info (for branch steps).
+
+    Returns:
+        Dict with type-specific fields:
+        - type: "interactive" | "automated" | "branch" | "error"
+        - For interactive: pre_code, interaction descriptor, instructions
+        - For automated: code, instruction
+        - For branch: condition, branches
+    """
+    ext_dir = ext_data["dir"]
+    generators = ext_data["generators"]
+
+    # Load workflow graph
+    workflow_path = os.path.join(ext_dir, "workflow.json")
+    if not os.path.isfile(workflow_path):
+        return {"error": f"workflow.json not found for {ext_name}"}
+
+    with open(workflow_path, "r", encoding="utf-8") as f:
+        workflow_graph = json.load(f)
+
+    # Get requested step and action
+    workflow_step = arguments.get("workflow_step", "")
+    user_action = arguments.get("user_action", "start")
+
+    if user_action == "cancel":
+        return {
+            "tool": tool_name,
+            "type": "cancelled",
+            "message": "Workflow cancelled.",
+        }
+
+    # Find the matching step
+    target_step = None
+    for step in workflow_graph.get("steps", []):
+        if step["step_id"] == workflow_step:
+            target_step = step
+            break
+
+    if not target_step:
+        available = [s["step_id"] for s in workflow_graph.get("steps", [])]
+        return {
+            "error": f"Unknown workflow step '{workflow_step}'. Available: {available}",
+        }
+
+    step_type = target_step.get("step_type", "automated")
+
+    # Track step completion for the local next-step resolver.
+    # When start/proceed is called, the current step's depends_on are all done.
+    # Add them to the completed set so subsequent skip calls can compute
+    # the correct next step.
+    done = _workflow_completed_steps.setdefault(ext_name, set())
+    for dep in target_step.get("depends_on", []):
+        done.add(dep)
+
+    # Find the matching generator entry
+    target_gen = None
+    for gen in generators:
+        gen_step = gen.get("param_signature", {}).get("workflow_step", "")
+        if gen_step == workflow_step:
+            target_gen = gen
+            break
+
+    if user_action == "skip":
+        # Mark the step as completed so _find_next_step_local skips it
+        done = _workflow_completed_steps.setdefault(ext_name, set())
+        done.add(workflow_step)
+        # Find the next step whose dependencies are all satisfied
+        next_step = _find_next_step_local(workflow_graph, done)
+        result = {
+            "tool": tool_name,
+            "type": "skipped",
+            "step_id": workflow_step,
+            "message": f"Step '{workflow_step}' skipped.",
+        }
+        if next_step:
+            result["next_step"] = next_step
+            is_opt = next_step.get("is_optional", False)
+            if is_opt:
+                result["instruction"] = (
+                    f"Next step '{next_step['step_id']}' is optional: "
+                    f"{next_step['description']} "
+                    f"Ask the user if they want to proceed. "
+                    f"If yes, call {tool_name} with workflow_step='{next_step['step_id']}' user_action='start'. "
+                    f"If no, call with workflow_step='{next_step['step_id']}' user_action='skip'."
+                )
+            else:
+                result["instruction"] = (
+                    f"Proceed by calling {tool_name} with "
+                    f"workflow_step='{next_step['step_id']}' user_action='start'."
+                )
+        else:
+            result["instruction"] = "All remaining optional steps have been handled. Workflow is complete."
+        return result
+
+    if step_type == "automated":
+        # Fill and return the code template
+        if not target_gen:
+            return {"error": f"No generator for automated step '{workflow_step}'"}
+
+        template_rel = target_gen.get("template_file", "")
+        template_path = os.path.join(ext_dir, template_rel)
+        if not os.path.isfile(template_path):
+            return {"error": f"Template not found: {template_rel}"}
+
+        with open(template_path, "r", encoding="utf-8") as f:
+            template_str = f.read()
+
+        # Build format kwargs from arguments
+        format_kwargs = {}
+        for key, value in arguments.items():
+            if isinstance(value, str):
+                format_kwargs[key] = repr(value)
+            elif value is None:
+                format_kwargs[key] = "None"
+            else:
+                format_kwargs[key] = repr(value)
+
+        try:
+            code = _fill_template(template_str, format_kwargs)
+        except KeyError as e:
+            return {"error": f"Template placeholder not filled: {e}"}
+
+        return {
+            "tool": tool_name,
+            "type": "automated",
+            "code": code,
+            "instruction": (
+                "STOP. Do NOT make any more tool calls. "
+                "Your NEXT response must be an ```agent_plan JSON block followed by a ```python block "
+                "containing the 'code' field above VERBATIM. "
+                "Do NOT call any more tools until this code has been executed."
+            ),
+            "explanation": target_step.get("description", ""),
+            "step_id": workflow_step,
+        }
+
+    elif step_type == "interactive":
+        # Return pre-interaction code for the LLM to output
+        if not target_gen:
+            return {"error": f"No generator for interactive step '{workflow_step}'"}
+
+        pre_template_rel = target_gen.get("pre_template_file", "")
+        if pre_template_rel:
+            pre_template_path = os.path.join(ext_dir, pre_template_rel)
+            if os.path.isfile(pre_template_path):
+                with open(pre_template_path, "r", encoding="utf-8") as f:
+                    pre_template = f.read()
+            else:
+                pre_template = None
+        else:
+            pre_template = None
+
+        if pre_template:
+            format_kwargs = {}
+            for key, value in arguments.items():
+                if isinstance(value, str):
+                    format_kwargs[key] = repr(value)
+                elif value is None:
+                    format_kwargs[key] = "None"
+                else:
+                    format_kwargs[key] = repr(value)
+            try:
+                pre_code = _fill_template(pre_template, format_kwargs)
+            except KeyError as e:
+                return {"error": f"Pre-template placeholder not filled: {e}"}
+        else:
+            pre_code = None
+
+        interaction_desc = target_gen.get("interaction_descriptor", {})
+
+        return {
+            "tool": tool_name,
+            "type": "interactive",
+            "pre_code": pre_code,
+            "code": pre_code,
+            "instruction": (
+                "STOP. Do NOT make any more tool calls. "
+                "Your NEXT response must be an ```agent_plan JSON block followed by a ```python block "
+                "containing the 'code' field above VERBATIM. "
+                "After the code executes, tell the user to perform the interaction "
+                "described in 'interaction_instructions' and click Done when finished. "
+                "Do NOT call any more tools until the user clicks Done."
+            ),
+            "interaction_instructions": interaction_desc.get("placement_instructions", ""),
+            "interaction_type": interaction_desc.get("interaction_type", ""),
+            "step_id": workflow_step,
+            "explanation": target_step.get("description", ""),
+        }
+
+    elif step_type == "branch":
+        condition = target_step.get("condition", "Optional step")
+        return {
+            "tool": tool_name,
+            "type": "branch",
+            "step_id": workflow_step,
+            "condition": condition,
+            "branches": target_step.get("branches", {}),
+            "explanation": target_step.get("description", ""),
+            "instruction": (
+                f"Ask the user: '{condition}' "
+                f"If yes, call {tool_name} with workflow_step='{workflow_step}' "
+                f"user_action='start'. "
+                f"If no, call with workflow_step='{workflow_step}' "
+                f"user_action='skip'."
+            ),
+        }
+
+    return {"error": f"Unknown step type: {step_type}"}
 
 
 def get_all_cli_manifests() -> List[Dict]:
@@ -532,7 +805,14 @@ def save_cli_package(
 
     # Write templates
     for tpl_name, tpl_content in templates.items():
-        tpl_path = os.path.join(ext_dir, "templates", tpl_name)
+        if tpl_name == "workflow.json":
+            # Workflow graph goes at CLI root, not in templates/
+            tpl_path = os.path.join(ext_dir, tpl_name)
+        else:
+            # tpl_name may already include "templates/" prefix — strip it
+            clean_name = tpl_name.removeprefix("templates/")
+            tpl_path = os.path.join(ext_dir, "templates", clean_name)
+        os.makedirs(os.path.dirname(tpl_path), exist_ok=True)
         with open(tpl_path, "w", encoding="utf-8") as f:
             f.write(tpl_content)
 
