@@ -57,14 +57,7 @@ def _derive_interaction_type(node_class, fallback="generic"):
     return _NODE_CLASS_TO_INTERACTION_TYPE.get(node_class or "", fallback)
 
 
-def _validate_extension_name(name: str) -> str:
-    """Validate and sanitize an extension name to prevent path traversal.
-
-    Returns the sanitized name.  Raises ValueError if the name is invalid.
-    """
-
-
-def __collect_attr_chain(node) -> List[str]:
+def _collect_attr_chain(node) -> List[str]:
     """Recursively collect attribute chain from an AST node.
 
     Turns `slicer.app.layoutManager().setLayout` into
@@ -88,6 +81,13 @@ def __collect_attr_chain(node) -> List[str]:
             break
     parts.reverse()
     return parts
+
+
+def _validate_extension_name(name: str) -> str:
+    """Validate and sanitize an extension name to prevent path traversal.
+
+    Returns the sanitized name.  Raises ValueError if the name is invalid.
+    """
     if not name or not name.strip():
         raise ValueError("Extension name must not be empty.")
     # Reject path separators and traversal patterns
@@ -3703,7 +3703,7 @@ Return ONLY the JSON array, no markdown fences.""")
         for node in _ast.walk(tree):
             # Match: slicer.something.something(...).method(...)
             if isinstance(node, _ast.Call):
-                attrs = _ExtensionCLIAnalyzer__collect_attr_chain(node.func)
+                attrs = _collect_attr_chain(node.func)
                 if attrs and attrs[0] == "slicer" and len(attrs) >= 2:
                     chains.append(".".join(attrs))
         return chains
