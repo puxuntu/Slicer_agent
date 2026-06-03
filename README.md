@@ -11,30 +11,55 @@ SlicerAIAgent operates in two complementary modes:
 
 ## Demos
 
-### Demo 1 — Multi-Turn Segmentation, Reconstruction, and Plane Cutting
+### Demo 1 — Pelvic fracture reduction
 
-**Turn 1:** load the example CT chest volume  
-**Turn 2:** segment it with threshold from -200 to 1000, reconstruct the 3D shape  
-**Turn 3:** cut the 3D shape into two parts with a random plane, and different part shown with different color  
-**Turn 4:** give a random displacement to one part to separate them
+**Turn 1:** load the CT volume  
+**Turn 2:** segment the pelvic fracture
+**Turn 3:** implement the screw placement planning
 
-https://github.com/user-attachments/assets/8c6b1c14-0ffb-4b37-b80e-98ad92dc9890
-
-The agent carries out a multi-turn interactive workflow: loading data → threshold-based segmentation → 3D surface reconstruction (`vtkMarchingCubes`) → arbitrary plane clipping → multi-color display → random displacement to separate the clipped parts.
+https://github.com/user-attachments/assets/ea27d290-b2c5-4be0-9954-8051650bda90
 
 ---
 
-### Demo 2 — Multi-Turn Anatomical Segmentation
+### Demo 2 — Voxtell Segmentation
 
-**Turn 1:** load an example CT volume  
-**Turn 2:** segment the bone  
-**Turn 3:** segment the left lung
+**Turn 1:** load an example CT chest volume
+**Turn 2:** segment the Spine  
+**Turn 3:** segment the left lung with the red color
+**Turn 4:** segment the right lung with the green color
+**Turn 5:** segment the rib with the yellow color
 
-https://github.com/user-attachments/assets/dfd6c95c-ed83-4381-a8af-5f4cd918bc48
+https://github.com/user-attachments/assets/59d5265e-e488-413f-84b5-55eb2f8a2da9
 
-> **Note:** The segmentation inference uses SlicerVoxTell. When running on CPU the inference time is very long, so those waiting segments were removed during video editing.
+---
 
-The agent performs a multi-turn segmentation workflow on a CT chest volume, isolating distinct anatomical structures through separate conversational turns.
+### Demo 3 — surgical planning of mandibular reconstruction
+
+1. If the fibula is from the right leg, tick the "Right side leg" checkbox.
+2. In the "Select mandibular segmentation" section, choose the mandibular segmentation.
+3. In the "Select fibula segmentation" section, choose the fibula segmentation.
+4. For the "Current Scalar Volume" option, select the Mandible Volume.
+5. Click "Create bone models from segmentations" button.
+6. Change the layout to "Conventional".
+7. For the R (red) view, toggle on "slice visibility in 3D view".
+8. For the R (red) view, toggle on "FOV, Spacing match 2D" (adjusts slice resolution to match the 2D viewport pixel spacing).
+9. In the toolbar, turn on "slice intersection visibility". In the slice intersection interaction options, turn on "set interaction", then enable both "Translate" and "Rotate".
+10. Manually adjust the slice intersection position by holding Shift and moving the mouse in a view.
+11. Click the "Add mandibular curve" button.
+12. Configure the display settings of the mandibular curve created by the "Add mandibular curve" button so it is shown in both "View 1" and "Red".
+13. Manually click and draw on the "Red" view to create a curve along the mandible.
+14. Change the layout to "BoneReconstructionPlanner".
+15. For the R (red) view, toggle off "slice visibility in 3D view".
+16. Manually set how many cut planes you want.
+17. Click "Add cut plane" button.
+18. Place one mandibular cut plane using the extension's Add cut plane workflow. If the user requested N cut planes, repeat the Add cut plane + place plane
+  interaction N times. Do not store these planes as a rotation plane; they are mandibular cut planes managed by the extension.
+19. Click "Add fibula line" button.
+20. Draw a line over the fibula in "3D View 2", starting with the first point distally and the last point proximally.
+21. Click "Center fibula line using fibula model" button to align the line with the anatomical axis of the fibula.
+22. Click "Update fibula planes over fibula line; update fibula bone pieces and transform them to mandible" to generate the reconstruction and create the fibula cut planes.
+
+https://github.com/user-attachments/assets/f4714688-2969-48fd-aec7-83a44d06bb87
 
 ---
 
