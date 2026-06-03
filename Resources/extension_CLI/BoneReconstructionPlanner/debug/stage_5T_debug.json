@@ -1,161 +1,145 @@
 {
   "stage": "5T",
-  "total_operations": 4,
-  "started": 4,
-  "finished": 4,
-  "errors_count": 1,
+  "debug_schema_version": 2,
+  "debug_features": [
+    "slicer_op_classification",
+    "slicer_ui_analysis_evidence_audit",
+    "source_verification_summary",
+    "generated_code_preview",
+    "final_state_intent"
+  ],
+  "total_operations": 6,
+  "started": 6,
+  "finished": 6,
+  "errors_count": 0,
   "operations": [
     {
       "step": 6,
       "key": "cb_step_6_0",
-      "description": "Change layout to 'Conventional' using Slicer core API",
+      "description": "Change the layout to Conventional",
       "keywords": [
         "layout",
-        "conventional",
-        "setLayout"
+        "Conventional"
       ],
       "category": "layout_slice_view",
+      "final_state_intent": {
+        "mode": "unspecified",
+        "state": null,
+        "confidence": "none",
+        "source": ""
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "layout_slice_view",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": null,
+        "slicer_op_category": "layout_slice_view"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "slicer-ui-analysis",
+          "qMRMLSliceControllerWidget",
+          "actionShow_in_3D",
+          "layoutManager",
+          "vtkMRMLLayoutNode",
+          "sliceWidget",
+          "mrmlSliceNode",
+          "sliceController",
+          "setSliceVisible",
+          "SetSliceResolutionMode"
+        ]
+      },
       "status": "done",
-      "total_time_s": 58.2,
-      "code_chars": 168,
-      "tool_rounds": 5,
-      "api_calls": 6,
+      "total_time_s": 11.89,
+      "code_chars": 91,
+      "tool_rounds": 2,
+      "api_calls": 3,
       "error": null,
       "progress_events": [
         {
           "round": 1,
           "phase": "search",
-          "message": "[Search] Round 1: |   Grep: \"setLayout.*Layout\" \u2192 slicer-source/Base/Python |   Grep: \"ConventionalLayout\" \u2192 slicer-source"
+          "message": "[Search] Round 1: |   VectorSearch: \"slicer layoutManager setLayout Conventional\" |   Grep: \"Conventional\" \u2192 slicer-source/Libs/MRML/Core"
         },
         {
           "round": 2,
-          "phase": "search",
-          "message": "[Search] Round 2: |   VectorSearch: \"Change layout to Conventional using setLayout in Slicer\""
-        },
-        {
-          "round": 3,
           "phase": "read",
-          "message": "[Read] Round 3: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/gui.md"
-        },
-        {
-          "round": 4,
-          "phase": "search",
-          "message": "[Search] Round 4: |   VectorSearch: \"vtkMRMLLayoutNode Conventional layout enum SlicerLayout\""
-        },
-        {
-          "round": 5,
-          "phase": "read",
-          "message": "[Read] Round 5: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLLayoutNode.h"
+          "message": "[Read] Round 2: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/gui.md"
         }
       ],
       "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nChange the layout to Conventional\nSuggested API terms to search for: slicer-ui-analysis, qMRMLSliceControllerWidget, actionShow_in_3D, layoutManager, vtkMRMLLayoutNode, sliceWidget, mrmlSliceNode, sliceController\nAPI keyword hints: layout, Conventional\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
       "executor_ready": true,
       "tool_count": 3,
       "last_progress": {
-        "round": 5,
+        "round": 2,
         "phase": "read",
-        "message": "[Read] Round 5: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLLayoutNode.h"
+        "message": "[Read] Round 2: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/gui.md"
       },
-      "tool_loop_s": 56.6,
-      "total_tokens": 52795,
-      "total_api_time_s": 50.401,
-      "total_tool_time_s": 5.114,
+      "tool_loop_s": 10.65,
+      "total_tokens": 17369,
+      "total_api_time_s": 6.987,
+      "total_tool_time_s": 3.269,
       "tool_names_called": [
-        "Grep",
         "VectorSearch",
+        "Grep",
         "ReadFile"
       ],
       "rounds": [
         {
           "round": 1,
           "phase": "search",
-          "api_time_s": 12.5,
-          "tool_time_s": 0.149,
-          "round_time_s": 12.649,
+          "api_time_s": 2.327,
+          "tool_time_s": 2.787,
+          "round_time_s": 5.114,
           "tools": [
-            "Grep",
+            "VectorSearch",
             "Grep"
           ],
-          "tokens": 1637
+          "tokens": 2228
         },
         {
           "round": 2,
-          "phase": "search",
-          "api_time_s": 6.749,
-          "tool_time_s": 3.15,
-          "round_time_s": 9.899,
+          "phase": "read",
+          "api_time_s": 2.722,
+          "tool_time_s": 0.482,
+          "round_time_s": 3.204,
           "tools": [
-            "VectorSearch"
+            "ReadFile"
           ],
-          "tokens": 1853
+          "tokens": 6388
         },
         {
           "round": 3,
-          "phase": "read",
-          "api_time_s": 7.204,
-          "tool_time_s": 0.55,
-          "round_time_s": 7.754,
-          "tools": [
-            "ReadFile"
-          ],
-          "tokens": 3276
-        },
-        {
-          "round": 4,
-          "phase": "search",
-          "api_time_s": 8.0,
-          "tool_time_s": 0.714,
-          "round_time_s": 8.714,
-          "tools": [
-            "VectorSearch"
-          ],
-          "tokens": 5743
-        },
-        {
-          "round": 5,
-          "phase": "read",
-          "api_time_s": 8.499,
-          "tool_time_s": 0.55,
-          "round_time_s": 9.05,
-          "tools": [
-            "ReadFile"
-          ],
-          "tokens": 18709
-        },
-        {
-          "round": 6,
           "phase": "generate",
-          "api_time_s": 7.449,
+          "api_time_s": 1.939,
           "tool_time_s": 0.0,
-          "round_time_s": 7.45,
+          "round_time_s": 1.939,
           "tools": [],
-          "tokens": 21577
+          "tokens": 8753
         }
       ],
       "tool_calls_history": [
         {
-          "tool": "Grep",
-          "args": {
-            "pattern": "setLayout.*Layout",
-            "path": "slicer-source/Base/Python"
-          },
-          "result_preview": "ERROR: ripgrep (rg) is not installed. Please install ripgrep and ensure it is in your PATH. Download: https://github.com/BurntSushi/ripgrep#installation"
-        },
-        {
-          "tool": "Grep",
-          "args": {
-            "pattern": "ConventionalLayout",
-            "path": "slicer-source"
-          },
-          "result_preview": "ERROR: ripgrep (rg) is not installed. Please install ripgrep and ensure it is in your PATH. Download: https://github.com/BurntSushi/ripgrep#installation"
-        },
-        {
           "tool": "VectorSearch",
           "args": {
-            "query": "Change layout to Conventional using setLayout in Slicer",
+            "query": "slicer layoutManager setLayout Conventional",
             "top_k": 5
           },
-          "result_preview": ""
+          "result_preview": "VectorSearch: 5 result(s)\n## Relevant code snippets from knowledge base:\n\n[1] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 636-641) [doc_example] similarity:0.693 boosted:0.901\n```markdown\n# for your custom layout ID.\ncustomLayoutId=501\n\nlayoutManager = slicer.app.layoutManager()\nlayoutManager.layoutLogic().GetLayoutNode().AddLayoutDescription(customLayoutId, customLayout)\n```\n\n[2] slicer-source/Docs/developer_guide/script_repository/models.md (lines 268-288) [doc_example] similarity:0.683 boosted:0.887\n```markdown\n# Create a custom layout\nnumberOfRows = int(math.ceil(len(modelFiles)/numberOfColumns))\ncustomLayoutId=567  # we pick a random id that is not used by others\nslicer.app.setRenderPaused(True)\ncustomLayout = '<layout type=\"vertical\">'\nviewIndex = 0\nfor rowIndex in range(numberOfRows):\n  customLayout += '<item><layout type=\"horizontal\">'\n  for colIndex in range(numberOfColumns):\n    name = os.path.basename(modelFiles[viewIndex]) if viewIndex < len(modelFiles) else \"compare \" + str(viewIndex)\n    customLayout += '<item><view class=\"vtkMRMLViewNode\" singletontag=\"'+name\n    customLayout += '\"><property name=\"viewlabel\" action=\"default\">'+name+'</property></view></item>'\n    viewIndex += 1\n  customLayout += '</layout></item>'\n\ncustomLayout += '</layout>'\nif not slicer.app.layoutManager().layoutLogic().GetLayoutNode().SetLayoutDescription(customLayoutId, customLayout):\n    slicer.app.layoutManager().layoutLogic().GetLayoutNode().AddLayoutDescription(customLayoutId, customLayout)\n\nslicer.app.layoutManager().setLayout(customLayoutId)\n```\n\n[3] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 642-650) [doc_example] similarity:0.677 boosted:0.880\n```markdown\n# Switch to the new custom layout\nlayoutManager.setLayout(customLayoutId)\n```\n\nSee description of standard layouts (that can be used as examples) here: https://github.com/Slicer/Slicer/blob/main/Libs/MRML/Logic/vtkMRMLLayoutLogic.cxx\n\nYou can use this code snippet to add a button to the layout select..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "Conventional",
+            "path": "slicer-source/Libs/MRML/Core"
+          },
+          "result_preview": "Grep: 3 hit(s) in 1 file(s): slicer-source/Libs/MRML/Core/vtkMRMLLayoutNode.h (3)"
         },
         {
           "tool": "ReadFile",
@@ -164,46 +148,90 @@
             "query": "setLayout"
           },
           "result_preview": "### Activate hanging protocol by keyboard shortcut\n\nThis code snippet shows how to specify a hanging protocol for PET/CT with the following properties:\n- window/level and colormap is set to standardized values\n- any acquisition transforms hardened on the images (these transforms are created for example when the image is acquired with varying slice spacing)\n- show PET/CT images fused in slice views\n- show PET image and fused image slices in 3D view\n\nThe hanging protocol can be activated using the Ctrl+9 keyboard shortcut.\n\n```python\ndef useHangingProtocolPetCt():\n    ctImage = None\n    petImage = None\n\n    shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)\n    petColor = slicer.mrmlScene.GetFirstNodeByName('PET-Heat')\n    for imageNode in slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode'):\n        # Harden any transform (in case the image is stored non-uniform spacing, etc.\n        # hardening the acquisition transforms creates a single Cartesian volume)\n        imageNode.HardenTransform()\n\n        # Set window/level and colormap for recognized image types\n        imageItem = shNode.GetItemByDataNode(imageNode)\n        modality = shNode.GetItemAttribute(imageItem, 'DICOM.Modality')\n        if modality == \"CT\":\n            ctImage = imageNode\n            ctImage.GetVolumeDisplayNode().SetAndObserveColorNodeID(petColor.GetID())\n            slicer.modules.volumes.logic().ApplyVolumeDisplayPreset(ctImage.GetVolumeDisplayNode(), \"CT_ABDOMEN\")\n        elif modality == \"PT\":\n            petImage = imageNode\n            petImage.GetVolumeDisplayNode().SetAndObserveColorNodeID(petColor.GetID())\n            petImage.GetVolumeDisplayNode().SetWindowLevelMinMax(0, 20)\n\n    # Set up view layout and content\n    slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView)\n    slicer.util.setSliceViewerLayers(background=ctImage, foreground=petImage, foregroundOpacity=0.3, fit=True)\n\n    # Show the PET image in 3D view u..."
-        },
-        {
-          "tool": "VectorSearch",
-          "args": {
-            "query": "vtkMRMLLayoutNode Conventional layout enum SlicerLayout",
-            "top_k": 5
-          },
-          "result_preview": ""
-        },
-        {
-          "tool": "ReadFile",
-          "args": {
-            "path": "slicer-source/Libs/MRML/Core/vtkMRMLLayoutNode.h",
-            "query": "SlicerLayoutConventional"
-          },
-          "result_preview": "#ifndef __vtkMRMLLayoutNode_h\n#define __vtkMRMLLayoutNode_h\n\n// MRML includes\n#include \"vtkMRMLAbstractLayoutNode.h\"\n\nclass vtkXMLDataElement;\nclass vtkMRMLAbstractViewNode;\n\n/// \\brief Node that describes the view layout of the application.\n///\n/// When the scene is closing (vtkMRMLScene::Clear), the view arrangement is\n/// set to none due to the Copy() call on an empty node.\nclass VTK_MRML_EXPORT vtkMRMLLayoutNode : public vtkMRMLAbstractLayoutNode\n{\npublic:\n  static vtkMRMLLayoutNode* New();\n  vtkTypeMacro(vtkMRMLLayoutNode, vtkMRMLAbstractLayoutNode);\n  vtkMRMLNode* CreateNodeInstance() override;\n  void PrintSelf(ostream& os, vtkIndent indent) override;\n\n  //--------------------------------------------------------------------------\n  /// MRML methods\n  //--------------------------------------------------------------------------\n\n  /// Set node attributes\n  void ReadXMLAttributes(const char** atts) override;\n\n  /// Write this node's information to a MRML file in XML format.\n  void WriteXML(ostream& of, int indent) override;\n\n  /// Copy the node's attributes to this object\n  void CopyContent(vtkMRMLNode* node, bool deepCopy = true) override;\n\n  /// \\brief Reimplemented to reset maximized view node.\n  void Reset(vtkMRMLNode* defaultNode) override;\n\n  /// Get/Set for Current layout\n  vtkGetMacro(ViewArrangement, int);\n  virtual void SetViewArrangement(int);\n\n  vtkGetMacro(GUIPanelVisibility, int);\n  vtkSetMacro(GUIPanelVisibility, int);\n\n  vtkGetMacro(BottomPanelVisibility, int);\n  vtkSetMacro(BottomPanelVisibility, int);\n\n  /// 0 is left side, 1 is right side\n  vtkGetMacro(GUIPanelLR, int);\n  vtkSetMacro(GUIPanelLR, int);\n\n  /// Control the collapse state of the SliceControllers\n  vtkGetMacro(CollapseSliceControllers, int);\n  vtkSetMacro(CollapseSliceControllers, int);\n\n  /// CompareView configuration Get/Set methods\n  vtkGetMacro(NumberOfCompareViewRows, int);\n  vtkSetClampMacro(NumberOfCompareViewRows, int, 1, 50);\n  vtkGetMacro(NumberOfCompareViewColumns, int);\n..."
         }
       ],
-      "reasoning_chars": 1862,
-      "reasoning_preview": "[Round 1]\nThe user wants a Python code template for changing the layout to 'Conventional' in 3D Slicer. This is a straightforward operation that I know from training - I can use `slicer.app.layoutManager().setLayout()` with the appropriate layout ID. Let me search to confirm the exact API.\n\n[Round 2]\nGrep isn't available, let me use VectorSearch instead.\n\n[Round 3]\nLet me look at the GUI markdown file to find the exact API for setting layout to Conventional.\n\n[Round 4]\nI can see the API clearly from the examples. The key pattern is:\n\n```python\nslicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView)\n```\n\nFor the \"Conventional\" layout, I need to find the correct enum value. The Conventional layout is the standard 3D + 3 slice views layout. Let me check what the enum name is.\n\nFrom the code snippet, I can see examples like `SlicerLayoutOneUpRedSliceView`, `SlicerLayoutFourUpView`. For \"Conventional\" (which is typically the 4-up view with 3D + Red/Yellow/Green), let me search for the exact enum name.\n\n[Round 5]\nNow I have enough information. I can see that the layout enum is used like `slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView`. For the \"Conventional\" layout, I need to find the correct enum value. The \"Conventional\" layout is the standard 4-up view with 3D + Red/Yellow/Green. Let me look at the vtkMRMLLayoutNode header to find the exact enum value for \"Conventional\".\n\nActually, from my training data, I know the enum is `SlicerLayoutConventionalView`. But let me verify by checking the header file.\n\n[Round 6]\nNow I have the exact enum. The \"Conventional\" layout is:\n```cpp\nSlicerLayoutConventionalView = 2,\n```\n\nSo the Python code is:\n```python\nslicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)\n```\n\nThis is very straightforward. Let me generate the code template."
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": false,
+          "query_paths": [],
+          "result_files": [],
+          "matched_lines_preview": [],
+          "connected_slots": [],
+          "api_footprints": [],
+          "implementation_candidates": []
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Docs/developer_guide/script_repository/models.md",
+            "slicer-source/Docs/developer_guide/script_repository/plots.md",
+            "slicer-source/Libs/MRML/Core",
+            "slicer-source/Libs/MRML/Core/vtkMRMLLayoutNode.h"
+          ],
+          "source_type_counts": {
+            "doc_example": 6,
+            "mrml_definition": 1
+          }
+        },
+        "searches": {
+          "vector_queries": [
+            "slicer layoutManager setLayout Conventional"
+          ],
+          "grep_patterns": [
+            "Conventional"
+          ],
+          "read_paths": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md"
+          ]
+        }
+      },
+      "reasoning_chars": 1185,
+      "reasoning_preview": "[Round 1]\nThe user wants to change the layout to \"Conventional\" in 3D Slicer. This is a straightforward operation using `layoutManager.setLayout()`. Let me search the knowledge base to confirm the exact enum value.\n\n[Round 2]\nNow I have all the information I need. The \"Conventional\" layout corresponds to `SlicerLayoutConventionalView` with value 2 in the enum `vtkMRMLLayoutNode`. \n\nIn Python, this can be accessed as:\n- `slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView` \n- or simply using the integer value 2\n\nThe standard API to change layout is:\n```python\nlayoutManager = slicer.app.layoutManager()\nlayoutManager.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)\n```\n\nLet me also quickly check the GUI documentation to see if there's an example of setting a standard layout.\n\n[Round 3]\nI now have everything I need. The code to change to the \"Conventional\" layout is:\n\n```python\nslicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)\n```\n\nThis is confirmed from the documentation examples that show exactly this pattern for other layouts like `SlicerLayoutFourUpView`. The enum value is `SlicerLayoutConventionalView = 2`.",
+      "generated_code_preview": "slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)"
     },
     {
-      "step": 8,
-      "key": "cb_step_8_1",
-      "description": "Toggle on FOV/Spacing match 2D for the Red view",
+      "step": 7,
+      "key": "cb_step_7_1",
+      "description": "Toggle on slice visibility in 3D view for the Red view",
       "keywords": [
-        "layout_slice_view"
+        "node_display"
       ],
-      "category": "layout_slice_view",
+      "category": "node_display",
+      "final_state_intent": {
+        "mode": "set",
+        "state": true,
+        "confidence": "high",
+        "source": "toggle on"
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "node_display",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": null,
+        "slicer_op_category": "node_display"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "GetDisplayNode",
+          "SetVisibility",
+          "AddViewNodeID"
+        ]
+      },
       "status": "done",
-      "total_time_s": 44.05,
-      "code_chars": 834,
-      "tool_rounds": 3,
-      "api_calls": 4,
+      "total_time_s": 19.73,
+      "code_chars": 139,
+      "tool_rounds": 4,
+      "api_calls": 5,
       "error": null,
       "progress_events": [
         {
           "round": 1,
           "phase": "search",
-          "message": "[Search] Round 1: |   Grep: \"SliceResolutionMatch2DView\" \u2192 slicer-source |   VectorSearch: \"SetSliceResolutionMode SliceResolutionMatch2DView slice view FOV spacing match 2D\""
+          "message": "[Search] Round 1: |   VectorSearch: \"slice visibility in 3D view SetVisibility slice node display node\" |   Grep: \"SetSliceVisible|SetVisibility.*slice|AddViewNodeID\" \u2192 slicer-source/Base/Python"
         },
         {
           "round": 2,
@@ -213,119 +241,1071 @@
         {
           "round": 3,
           "phase": "search",
-          "message": "[Search] Round 3: |   VectorSearch: \"SetSliceResolutionMode SliceResolutionMatch2DView toggle FOV spacing match 2D view slice node Python\""
+          "message": "[Search] Round 3: |   Grep: \"setSliceVisible\" \u2192 slicer-source/Libs/MRML/Widgets"
+        },
+        {
+          "round": 4,
+          "phase": "read",
+          "message": "[Read] Round 4: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
         }
       ],
       "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nToggle on slice visibility in 3D view for the Red view\nSuggested API terms to search for: GetDisplayNode, SetVisibility, AddViewNodeID\nAPI keyword hints: node_display\nInterpreted state intent: set the requested UI/API state to True. Do not invert the current state.\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
       "executor_ready": true,
       "tool_count": 3,
       "last_progress": {
-        "round": 3,
-        "phase": "search",
-        "message": "[Search] Round 3: |   VectorSearch: \"SetSliceResolutionMode SliceResolutionMatch2DView toggle FOV spacing match 2D view slice node Python\""
+        "round": 4,
+        "phase": "read",
+        "message": "[Read] Round 4: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
       },
-      "tool_loop_s": 42.0,
-      "total_tokens": 117487,
-      "total_api_time_s": 39.098,
-      "total_tool_time_s": 2.049,
+      "tool_loop_s": 17.95,
+      "total_tokens": 53729,
+      "total_api_time_s": 13.139,
+      "total_tool_time_s": 3.872,
       "tool_names_called": [
-        "Grep",
         "VectorSearch",
+        "Grep",
         "ReadFile"
       ],
       "rounds": [
         {
           "round": 1,
           "phase": "search",
-          "api_time_s": 12.0,
-          "tool_time_s": 0.8,
-          "round_time_s": 12.8,
+          "api_time_s": 2.8,
+          "tool_time_s": 0.715,
+          "round_time_s": 3.515,
           "tools": [
-            "Grep",
-            "VectorSearch"
+            "VectorSearch",
+            "Grep"
           ],
-          "tokens": 1614
+          "tokens": 2237
         },
         {
           "round": 2,
           "phase": "read",
-          "api_time_s": 9.699,
-          "tool_time_s": 0.65,
-          "round_time_s": 10.349,
+          "api_time_s": 2.85,
+          "tool_time_s": 0.549,
+          "round_time_s": 3.399,
           "tools": [
             "ReadFile"
           ],
-          "tokens": 28244
+          "tokens": 7999
         },
         {
           "round": 3,
           "phase": "search",
-          "api_time_s": 7.25,
-          "tool_time_s": 0.6,
-          "round_time_s": 7.85,
+          "api_time_s": 2.24,
+          "tool_time_s": 1.559,
+          "round_time_s": 3.799,
           "tools": [
-            "VectorSearch"
+            "Grep"
           ],
-          "tokens": 32274
+          "tokens": 8727
         },
         {
           "round": 4,
+          "phase": "read",
+          "api_time_s": 2.55,
+          "tool_time_s": 1.049,
+          "round_time_s": 3.6,
+          "tools": [
+            "ReadFile"
+          ],
+          "tokens": 15428
+        },
+        {
+          "round": 5,
           "phase": "generate",
-          "api_time_s": 10.15,
+          "api_time_s": 2.698,
           "tool_time_s": 0.0,
-          "round_time_s": 10.15,
+          "round_time_s": 2.699,
           "tools": [],
-          "tokens": 55355
+          "tokens": 19338
+        }
+      ],
+      "tool_calls_history": [
+        {
+          "tool": "VectorSearch",
+          "args": {
+            "query": "slice visibility in 3D view SetVisibility slice node display node",
+            "top_k": 10
+          },
+          "result_preview": "VectorSearch: 10 result(s)\n## Relevant code snippets from knowledge base:\n\n[1] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 682-686) [doc_example] similarity:0.724 boosted:0.941\n```markdown\n### Hide slice view annotations\n\nThis script can hide node name, patient information displayed in corners of slice views (managed by DataProbe module).\n\n```python\n```\n\n[2] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 797-807) [doc_example] similarity:0.673 boosted:0.875\n```markdown\n### Show slice views in 3D window\n\nEquivalent to clicking 'eye' icon in the slice view controller.\n\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sliceViewName).sliceController()\n  controller.setSliceVisible(True)\n```\n```\n\n[3] slicer-source/Docs/developer_guide/script_repository/volumes.md (lines 424-429) [doc_example] similarity:0.663 boosted:0.861\n```markdown\n# Show in slice views and set its window/level\nslicer.util.setSliceViewerLayers(background=volumeNode)\nvolumeNode.GetScalarVolumeDisplayNode().AutoWindowLevelOff()\nvolumeNode.GetScalarVolumeDisplayNode().SetWindowLevel(110,130)\n```\n```\n\n[4] slicer-source/Docs/developer_guide/script_repository/volumes.md (lines 645-675) [doc_example] similarity:0.652 boosted:0.848\n```markdown\n### Show a volume in slice views\n\nRecommended:\n\n```python\nvolumeNode = slicer.util.getNode(\"YourVolumeNode\")\nslicer.util.setSliceViewerLayers(background=volumeNode)\n```\n\nor\n\nShow volume in all visible views where volume selection propagation is enabled:\n\n```python\nvolumeNode = slicer.util.getNode(\"YourVolumeNode\")\napplicationLogic = slicer.app.applicationLogic()\nselectionNode = applicationLogic.GetSelectionNode()\nselectionNode.SetSecondaryVolumeID(volumeNode.GetID())\napplicationLogic.PropagateForegroundVolumeSelection(0)\n```\n\nor\n\nShow volume in selected views:\n\n```python\nn =  slicer.util.getNode(\"YourVolumeNode\")\nfor color in [\"Red\", \"Yellow\", \"Green\"]:\n  sli..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "SetSliceVisible|SetVisibility.*slice|AddViewNodeID",
+            "path": "slicer-source/Base/Python"
+          },
+          "result_preview": "Grep: 0 hit(s) in 0 file(s): "
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "query": "Show slice views in 3D window"
+          },
+          "result_preview": "### Show slice views in 3D window\n\nEquivalent to clicking 'eye' icon in the slice view controller.\n\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sliceViewName).sliceController()\n  controller.setSliceVisible(True)\n```\n\n"
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "setSliceVisible",
+            "path": "slicer-source/Libs/MRML/Widgets"
+          },
+          "result_preview": "Grep: 9 hit(s) in 4 file(s): slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx (4), slicer-source/Libs/MRML/Widgets/qMRMLSliceInformationWidget.cxx (3), slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.h (1), slicer-source/Libs/MRML/Widgets/qMRMLSliceInformationWidget.h (1)"
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h",
+            "query": "SetSliceVisible"
+          },
+          "result_preview": "/*=auto=========================================================================\n\n  Portions (c) Copyright 2005 Brigham and Women's Hospital (BWH) All Rights Reserved.\n\n  See COPYRIGHT.txt\n  or http://www.slicer.org/copyright/copyright.txt for details.\n\n  Program:   3D Slicer\n  Module:    $RCSfile: vtkMRMLSliceNode.h,v $\n  Date:      $Date: 2006/03/19 17:12:29 $\n  Version:   $Revision: 1.3 $\n\n=========================================================================auto=*/\n\n#ifndef __vtkMRMLSliceNode_h\n#define __vtkMRMLSliceNode_h\n\n// MRML includes\n#include \"vtkMRMLAbstractViewNode.h\"\nclass vtkMRMLVolumeNode;\n\n// VTK includes\nclass vtkImplicitFunction;\nclass vtkMatrix3x3;\nclass vtkMatrix4x4;\nclass vtkPlane;\n\n/// \\brief MRML node for storing a slice through RAS space.\n///\n/// This node stores the information about how to map from RAS space to\n/// the desired slice plane.\n/// \\li SliceToRAS is the matrix that rotates and translates the slice plane\n/// \\li FieldOfView tells the size of slice plane\nclass VTK_MRML_EXPORT vtkMRMLSliceNode : public vtkMRMLAbstractViewNode\n{\npublic:\n  /// \\brief Instantiate a new Slice node without any orientation presets.\n  ///\n  /// \\note To instantiate a vtkMRMLSliceNode with preconfigured\n  /// orientation preset matrices (the default presets are: Axial,\n  /// Sagittal and Coronal in default), it is necessary to use\n  /// vtkMRMLScene::CreateNodeByClass(const char*)\n  static vtkMRMLSliceNode* New();\n  vtkTypeMacro(vtkMRMLSliceNode, vtkMRMLAbstractViewNode);\n  void PrintSelf(ostream& os, vtkIndent indent) override;\n\n  vtkMRMLNode* CreateNodeInstance() override;\n\n  ///\n  /// Set node attributes\n  void ReadXMLAttributes(const char** atts) override;\n\n  ///\n  /// Write this node's information to a MRML file in XML format.\n  void WriteXML(ostream& of, int indent) override;\n\n  /// Copy node content (excludes basic data, such as name and node references).\n  /// \\sa vtkMRMLNode::CopyContent\n  vtkMRMLCopyContentMacro(vtkMRMLSliceNode);\n\n  /// \\bri..."
+        }
+      ],
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": true,
+          "query_paths": [],
+          "result_files": [
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md"
+          ],
+          "matched_lines_preview": [
+            "## action: actionSliceEdgeVisibility3D",
+            "- Confidence: `linked_to_api`",
+            "- Search text: Show slice edge | Show slice edge in the 3D view | actionSliceEdgeVisibility3D",
+            "- Text: Show slice edge",
+            "- Tooltip: Show slice edge in the 3D view",
+            "- Implementation candidates: `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget.h`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h`",
+            "- Matched implementation lines:",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:175: QObject::connect(this->actionSliceEdgeVisibility3D, SIGNAL(triggered(bool)), q, SLOT(setSliceEdgeVisibility3D(bool)));`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:582: this->SliceModelMenu->addAction(this->actionSliceEdgeVisibility3D);`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:831: this->actionSliceEdgeVisibility3D->setChecked(sliceNode->GetSliceEdgeVisibility3D());`",
+            "- Connected slots/functions: `setSliceEdgeVisibility3D`",
+            "- API footprints: `EndSliceNodeInteraction`, `GetSliceEdgeVisibility3D`, `SetSliceEdgeVisibility3D`, `StartSliceNodeInteraction`, `vtkMRMLSliceNode::SliceEdgeVisibility3DFlag`",
+            "- Key UI properties: {\"checkable\": \"true\", \"checked\": \"true\"}"
+          ],
+          "connected_slots": [
+            "setSliceEdgeVisibility3D"
+          ],
+          "api_footprints": [
+            "EndSliceNodeInteraction",
+            "GetSliceEdgeVisibility3D",
+            "SetSliceEdgeVisibility3D",
+            "StartSliceNodeInteraction",
+            "vtkMRMLSliceNode::SliceEdgeVisibility3DFlag"
+          ],
+          "implementation_candidates": [
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.h",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h"
+          ]
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Docs/developer_guide/script_repository/volumes.md",
+            "slicer-source/Docs/developer_guide/script_repository/markups.md",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceDisplayNode.h",
+            "slicer-source/Base/Python",
+            "slicer-source/Libs/MRML/Widgets",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceInformationWidget.cxx",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.h",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceInformationWidget.h",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
+          ],
+          "source_type_counts": {
+            "doc_example": 9,
+            "ui_analysis": 1,
+            "mrml_definition": 2,
+            "ui_implementation": 4
+          }
+        },
+        "searches": {
+          "vector_queries": [
+            "slice visibility in 3D view SetVisibility slice node display node"
+          ],
+          "grep_patterns": [
+            "SetSliceVisible|SetVisibility.*slice|AddViewNodeID",
+            "setSliceVisible"
+          ],
+          "read_paths": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
+          ]
+        }
+      },
+      "reasoning_chars": 2534,
+      "reasoning_preview": "[Round 1]\nThe user wants to toggle on slice visibility in 3D view for the Red view. Let me search for relevant API examples.\n\nLet me search for the API related to slice visibility in 3D views.\n\n[Round 2]\nFrom the VectorSearch results, I found a relevant code example in `slicer-source/Docs/developer_guide/script_repository/gui.md`:\n\n### Show slice views in 3D window\n\nEquivalent to clicking 'eye' icon in the slice view controller.\n\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sliceViewName).sliceController()\n  controller.setSliceVisible(True)\n```\n\nBut the user wants only the Red view, not all views. Let me look at the actual implementation to find the exact API. Let me check the qMRMLSliceControllerWidget for the setSliceVisible method.\n\n[Round 3]\nI found the exact example. Now let me just adapt it for the \"Red\" view specifically, not all views. The API is:\n\n```python\nlayoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(True)\n```\n\nThis sets the slice visibility in 3D view to True for the Red slice view. The \"eye\" icon in the slice view controller controls the slice visibility in 3D view.\n\nLet me verify this is the correct API by checking the qMRMLSliceControllerWidget implementation.\n\n[Round 4]\nThe implementation confirms it. The `setSliceVisible(bool)` method is available on the slice controller widget. It connects to the \"Show in 3D\" action (the eye icon in the slice view controller). Under the hood it calls `this->mrmlSliceNode()->SetSliceVisible(visible)`.\n\nFor the Red view specifically:\n\n```python\nlayoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(True)\n```\n\nThis is exactly what I found in the script repository example. Let me just adapt it for a single view \"Red\" instead of looping over all views.\n\n[Round 5]\nI now have all the information needed. The operation is to toggle on slice visibility in 3D view for the Red view. The API is:\n\n```python\nlayoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(True)\n```\n\nThis is a final-state operation setting visibility to True (not a toggle). The user explicitly said \"Toggle on\" and \"set the requested UI/API state to True. Do not invert the current state.\"\n\nI have sufficient evidence. Let me output the code.",
+      "generated_code_preview": "layoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(True)"
+    },
+    {
+      "step": 8,
+      "key": "cb_step_8_2",
+      "description": "Toggle on FOV/Spacing match 2D for the Red view",
+      "keywords": [
+        "layout_slice_view"
+      ],
+      "category": "layout_slice_view",
+      "final_state_intent": {
+        "mode": "set",
+        "state": true,
+        "confidence": "high",
+        "source": "toggle on"
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "layout_slice_view",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": null,
+        "slicer_op_category": "layout_slice_view"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "slicer-ui-analysis",
+          "qMRMLSliceControllerWidget",
+          "actionShow_in_3D",
+          "layoutManager",
+          "vtkMRMLLayoutNode",
+          "sliceWidget",
+          "mrmlSliceNode",
+          "sliceController",
+          "setSliceVisible",
+          "SetSliceResolutionMode"
+        ]
+      },
+      "status": "done",
+      "total_time_s": 34.94,
+      "code_chars": 225,
+      "tool_rounds": 5,
+      "api_calls": 6,
+      "error": null,
+      "progress_events": [
+        {
+          "round": 1,
+          "phase": "search",
+          "message": "[Search] Round 1: |   Grep: \"FOV.*spacing.*2D|match.*2D|Spacing.*match\" \u2192 slicer-ui-analysis |   Grep: \"matchSpacing|FOVMatch|SpacingMatch|fov_spacing\" \u2192 slicer-source"
+        },
+        {
+          "round": 2,
+          "phase": "read",
+          "message": "[Read] Round 2: |   ReadFile: slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md"
+        },
+        {
+          "round": 3,
+          "phase": "read",
+          "message": "[Read] Round 3: |   ReadFile: slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx |   ReadFile: slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx"
+        },
+        {
+          "round": 4,
+          "phase": "search",
+          "message": "[Search] Round 4: |   Grep: \"vtkMRMLSliceNodeRed|GetSliceNode|GetNodeByID.*SliceNode\" \u2192 slicer-source/Docs/developer_guide/script_repository |   Grep: \"GetSliceNode|SliceResolutionMatch|sliceNode.*Red\" \u2192 slicer-source/Base/Python"
+        },
+        {
+          "round": 5,
+          "phase": "read",
+          "message": "[Read] Round 5: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
+        }
+      ],
+      "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nToggle on FOV/Spacing match 2D for the Red view\nSuggested API terms to search for: slicer-ui-analysis, qMRMLSliceControllerWidget, actionShow_in_3D, layoutManager, vtkMRMLLayoutNode, sliceWidget, mrmlSliceNode, sliceController\nAPI keyword hints: layout_slice_view\nInterpreted state intent: set the requested UI/API state to True. Do not invert the current state.\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
+      "executor_ready": true,
+      "tool_count": 3,
+      "last_progress": {
+        "round": 5,
+        "phase": "read",
+        "message": "[Read] Round 5: |   ReadFile: slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
+      },
+      "tool_loop_s": 32.35,
+      "total_tokens": 110177,
+      "total_api_time_s": 25.046,
+      "total_tool_time_s": 6.017,
+      "tool_names_called": [
+        "Grep",
+        "ReadFile"
+      ],
+      "rounds": [
+        {
+          "round": 1,
+          "phase": "search",
+          "api_time_s": 1.795,
+          "tool_time_s": 1.504,
+          "round_time_s": 3.3,
+          "tools": [
+            "Grep",
+            "Grep"
+          ],
+          "tokens": 2260
+        },
+        {
+          "round": 2,
+          "phase": "read",
+          "api_time_s": 9.199,
+          "tool_time_s": 0.503,
+          "round_time_s": 9.703,
+          "tools": [
+            "ReadFile"
+          ],
+          "tokens": 10581
+        },
+        {
+          "round": 3,
+          "phase": "read",
+          "api_time_s": 4.215,
+          "tool_time_s": 1.527,
+          "round_time_s": 5.742,
+          "tools": [
+            "ReadFile",
+            "ReadFile"
+          ],
+          "tokens": 13637
+        },
+        {
+          "round": 4,
+          "phase": "search",
+          "api_time_s": 2.999,
+          "tool_time_s": 1.454,
+          "round_time_s": 4.454,
+          "tools": [
+            "Grep",
+            "Grep"
+          ],
+          "tokens": 21628
+        },
+        {
+          "round": 5,
+          "phase": "read",
+          "api_time_s": 3.037,
+          "tool_time_s": 1.028,
+          "round_time_s": 4.066,
+          "tools": [
+            "ReadFile"
+          ],
+          "tokens": 29701
+        },
+        {
+          "round": 6,
+          "phase": "generate",
+          "api_time_s": 3.799,
+          "tool_time_s": 0.0,
+          "round_time_s": 3.799,
+          "tools": [],
+          "tokens": 32370
         }
       ],
       "tool_calls_history": [
         {
           "tool": "Grep",
           "args": {
-            "pattern": "SliceResolutionMatch2DView",
+            "pattern": "FOV.*spacing.*2D|match.*2D|Spacing.*match",
+            "path": "slicer-ui-analysis"
+          },
+          "result_preview": "Grep: 20 hit(s) in 1 file(s): slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md (20)"
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "matchSpacing|FOVMatch|SpacingMatch|fov_spacing",
             "path": "slicer-source"
           },
-          "result_preview": "ERROR: ripgrep (rg) is not installed. Please install ripgrep and ensure it is in your PATH. Download: https://github.com/BurntSushi/ripgrep#installation"
+          "result_preview": "Grep: 20 hit(s) in 4 file(s): slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx (8), slicer-source/Libs/MRML/Logic/vtkMRMLSliceLogic.cxx (4), slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h (4), slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.cxx (4)"
         },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md",
+            "query": "actionSliceModelMode"
+          },
+          "result_preview": "## action: actionSliceModelModeVolumes\n\n- Confidence: `linked_to_api`\n- Widget/action class: `action`\n- Search text: FOV, Spacing match Volumes | actionSliceModelModeVolumes\n- Text: FOV, Spacing match Volumes\n- Implementation candidates: `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget.h`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h`\n- Matched implementation lines:\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:186: QObject::connect(this->actionSliceModelModeVolumes, SIGNAL(triggered()), q, SLOT(setSliceModelModeVolumes()));`\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:189: QObject::connect(this->actionSliceModelModeVolumes_2D, SIGNAL(triggered()), q, SLOT(setSliceModelModeVolumes_2D()));`\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:494: this->SliceModelMenu->addAction(this->actionSliceModelModeVolumes);`\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:497: this->SliceModelMenu->addAction(this->actionSliceModelModeVolumes_2D);`\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:792: this->actionSliceModelModeVolumes->setChecked(sliceNode->GetSliceResolutionMode() == vtkMRMLSliceNode::SliceResolutionMatchVolumes);`\n  - `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:795: this->actionSliceModelModeVolumes_2D->setChecked(sliceNode->GetSliceResolutionMode() == vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView);`\n- Connected slots/functions: `setSliceModelModeVolumes`, `setSliceModelModeVolumes_2D`\n- API footprints: `GetSliceResolutionMode`, `vtkMRMLSliceNode::SliceFOVMatch2DViewSpacingMatchVolumes`, `vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView`, `vtkMRMLSliceNode::SliceResolutionCustom`, `vtkMRMLSliceNode::SliceResolutionMatch2DView`, `vtkMRMLSliceNode::SliceResolutionMatchVolumes`\n- Key UI properties: {\"checkable\": \"true\"}\n\n\n\n... [other sections omitted] ...\n\n## action: actionSliceModelMode2D\n\n- Confidence: `linked_to_api`\n- Widget/action class: `action`\n- S..."
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "query": "setSliceModelMode2D"
+          },
+          "result_preview": "  this->SliceOffsetSlider = nullptr;\n\n  this->CompositingMenu = nullptr;\n  this->SliceSpacingMenu = nullptr;\n  this->SliceModelMenu = nullptr;\n  this->SegmentationMenu = nullptr;\n  this->LabelMapMenu = nullptr;\n  this->OrientationMarkerMenu = nullptr;\n  this->RulerMenu = nullptr;\n  this->SlabReconstructionMenu = nullptr;\n\n  this->SliceSpacingSpinBox = nullptr;\n  this->SliceFOVSpinBox = nullptr;\n\n  this->SliceModelFOVXSpinBox = nullptr;\n  this->SliceModelFOVYSpinBox = nullptr;\n\n  this->SliceModelOriginXSpinBox = nullptr;\n  this->SliceModelOriginYSpinBox = nullptr;\n\n  this->SliceModelDimensionXSpinBox = nullptr;\n  this->SliceModelDimensionYSpinBox = nullptr;\n}\n\n//---------------------------------------------------------------------------\nqMRMLSliceControllerWidgetPrivate::~qMRMLSliceControllerWidgetPrivate() = default;\n\n//---------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidgetPrivate::setColor(QColor barColor)\n{\n  this->Superclass::setColor(barColor);\n}\n\n//---------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidgetPrivate::setupPopupUi()\n{\n  Q_Q(qMRMLSliceControllerWidget);\n\n  this->Superclass::setupPopupUi();\n  this->Ui_qMRMLSliceControllerWidget::setupUi(this->PopupWidget);\n\n  this->SegmentationOpacitySlider->spinBox()->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);\n  this->LabelMapOpacitySlider->spinBox()->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);\n  this->ForegroundOpacitySlider->spinBox()->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);\n  this->BackgroundOpacitySlider->spinBox()->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);\n\n  this->ForegroundOpacitySlider->slider()->setOrientation(Qt::Vertical);\n  this->BackgroundOpacitySlider->slider()->setOrientation(Qt::Vertical);\n\n  this->BackgroundOpacitySlider->popup()->setHideDelay(400);\n\n  this->BackgroundOpacitySlider->popup()->setAlignment(Qt::AlignBottom | Qt::AlignLe..."
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "query": "void qMRMLSliceControllerWidget::setSliceModelMode"
+          },
+          "result_preview": "  Q_D(qMRMLSliceControllerWidget);\n  double oldFov[3];\n  this->mrmlSliceNode()->GetFieldOfView(oldFov);\n  if (qAbs(qMin(oldFov[0], oldFov[1]) - fov) < 0.01)\n  {\n    return;\n  }\n  if (!d->SliceLogics)\n  {\n    d->SliceLogic->FitFOVToBackground(fov);\n    return;\n  }\n  vtkMRMLSliceLogic* sliceLogic = nullptr;\n  vtkCollectionSimpleIterator it;\n  for (d->SliceLogics->InitTraversal(it); (sliceLogic = static_cast<vtkMRMLSliceLogic*>(d->SliceLogics->GetNextItemAsObject(it)));)\n  {\n    if (sliceLogic == d->SliceLogic || this->isLinked())\n    {\n      sliceLogic->FitFOVToBackground(fov);\n    }\n  }\n}\n\n// --------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidget::setSliceModelFOV(int index, double fov)\n{\n  double oldFov[3];\n  this->mrmlSliceNode()->GetUVWExtents(oldFov);\n  if (qAbs(oldFov[index] - fov) < 0.01)\n  {\n    return;\n  }\n  oldFov[index] = fov;\n  this->mrmlSliceNode()->SetSliceResolutionMode(vtkMRMLSliceNode::SliceResolutionCustom);\n  this->mrmlSliceNode()->SetUVWExtents(oldFov);\n}\n\n// --------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidget::setSliceModelFOVX(double fov)\n{\n  this->setSliceModelFOV(0, fov);\n}\n// --------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidget::setSliceModelFOVY(double fov)\n{\n  this->setSliceModelFOV(1, fov);\n}\n\n// --------------------------------------------------------------------------\nvoid qMRMLSliceControllerWidget::setSliceModelDimension(int index, int dimension)\n{\n  int oldDimension[3];\n  this->mrmlSliceNode()->GetUVWDimensions(oldDimension);\n  if (qAbs(oldDimension[index] - dimension) < 0.01)\n  {\n    return;\n  }\n  oldDimension[index] = dimension;\n  this->mrmlSliceNode()->SetSliceResolutionMode(vtkMRMLSliceNode::SliceResolutionCustom);\n  this->mrmlSliceNode()->SetUVWDimensions(oldDimension);\n}\n\n// --------------------------------------------------------------------------\nvoid qMRMLSliceControll..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "vtkMRMLSliceNodeRed|GetSliceNode|GetNodeByID.*SliceNode",
+            "path": "slicer-source/Docs/developer_guide/script_repository"
+          },
+          "result_preview": "Grep: 15 hit(s) in 5 file(s): slicer-source/Docs/developer_guide/script_repository/gui.md (6), slicer-source/Docs/developer_guide/script_repository/volumes.md (4), slicer-source/Docs/developer_guide/script_repository/markups.md (2), slicer-source/Docs/developer_guide/script_repository/screencapture.md (2), slicer-source/Docs/developer_guide/script_repository/segmentations.md (1)"
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "GetSliceNode|SliceResolutionMatch|sliceNode.*Red",
+            "path": "slicer-source/Base/Python"
+          },
+          "result_preview": "Grep: 0 hit(s) in 0 file(s): "
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h",
+            "query": "SliceResolutionModeType"
+          },
+          "result_preview": "  ///\n  /// Set/get the slice spacing to use when the SliceSpacingMode is\n  /// \"Prescribed\"\n  vtkSetVector3Macro(PrescribedSliceSpacing, double);\n  vtkGetVector3Macro(PrescribedSliceSpacing, double);\n\n  ///\n  /// Get/Set the current distance from the origin to the slice plane\n  double GetSliceOffset();\n  void SetSliceOffset(double offset);\n\n  /// Set/get the active slice in the lightbox. The active slice is\n  /// shown in the 3D scene\n  vtkSetMacro(ActiveSlice, int);\n  vtkGetMacro(ActiveSlice, int);\n\n  /// Adjusts the slice node to align with the\n  /// native space of the image data so that no oblique resampling\n  /// occurs when rendering (helps to see original acquisition data\n  /// and for oblique volumes with few slices).\n  /// \\param forceSlicePlaneToSingleSlice If the volume is single-slice and forceSlicePlaneToSingleSlice\n  /// is enabled then slice view will be aligned with the volume's slice plane. If the flag is disabled\n  /// or the volume has more than one slice then the slice view will be rotated to the closest orthogonal axis.\n  void RotateToVolumePlane(vtkMRMLVolumeNode* volumeNode, bool forceSlicePlaneToSingleSlice = true);\n\n  /// Adjusts the slice node to align with the\n  /// axes of the provided reference coordinate system\n  /// so that no oblique resampling\n  /// occurs when rendering (helps to see original acquisition data\n  /// and for oblique volumes with few slices).\n  /// If sliceNormalAxisIndex is >=0 then slice plane normal will\n  /// be aligned with that axis.\n  void RotateToAxes(vtkMatrix4x4* referenceToRAS, int sliceNormalAxisIndex = -1);\n\n  /// Get/Set a flag indicating whether this node is actively being\n  /// manipulated (usually) by a user interface. This flag is used by\n  /// logic classes to determine whether state changes should be\n  /// propagated to other nodes to implement linked controls. Does not\n  /// cause a Modified().\n  void SetInteracting(int);\n  vtkGetMacro(Interacting, int);\n  vtkBooleanMacro(Interacting, int);\n\n  ///..."
+        }
+      ],
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": true,
+          "query_paths": [
+            "slicer-ui-analysis",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md"
+          ],
+          "result_files": [
+            "slicer-ui-analysis/.",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md"
+          ],
+          "matched_lines_preview": [
+            "- Search text: FOV, Spacing match Volumes | actionSliceModelModeVolumes",
+            "- Text: FOV, Spacing match Volumes",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:795: this->actionSliceModelModeVolumes_2D->setChecked(sliceNode->GetSliceResolutionMode() == vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView);`",
+            "- API footprints: `GetSliceResolutionMode`, `vtkMRMLSliceNode::SliceFOVMatch2DViewSpacingMatchVolumes`, `vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView`, `vtkMRMLSliceNode::SliceResolutionCustom`, `vtkMRMLSliceNode::SliceResolutionMatch2DView`, `vtkMRMLSliceNode::SliceResolutionMatchVolumes`",
+            "## action: actionSliceModelModeVolumes",
+            "- Confidence: `linked_to_api`",
+            "- Implementation candidates: `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget.h`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h`",
+            "- Matched implementation lines:",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:186: QObject::connect(this->actionSliceModelModeVolumes, SIGNAL(triggered()), q, SLOT(setSliceModelModeVolumes()));`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:189: QObject::connect(this->actionSliceModelModeVolumes_2D, SIGNAL(triggered()), q, SLOT(setSliceModelModeVolumes_2D()));`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:494: this->SliceModelMenu->addAction(this->actionSliceModelModeVolumes);`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:497: this->SliceModelMenu->addAction(this->actionSliceModelModeVolumes_2D);`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:792: this->actionSliceModelModeVolumes->setChecked(sliceNode->GetSliceResolutionMode() == vtkMRMLSliceNode::SliceResolutionMatchVolumes);`",
+            "- Connected slots/functions: `setSliceModelModeVolumes`, `setSliceModelModeVolumes_2D`",
+            "- Key UI properties: {\"checkable\": \"true\"}",
+            "## action: actionSliceModelMode2D",
+            "- Search text: FOV, Spacing match 2D | actionSliceModelMode2D",
+            "- Text: FOV, Spacing match 2D",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:187: QObject::connect(this->actionSliceModelMode2D, SIGNAL(triggered()), q, SLOT(setSliceModelMode2D()));`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:188: QObject::connect(this->actionSliceModelMode2D_Volumes, SIGNAL(triggered()), q, SLOT(setSliceModelMode2D_Volumes()));`"
+          ],
+          "connected_slots": [
+            "setSliceModelModeVolumes",
+            "setSliceModelModeVolumes_2D"
+          ],
+          "api_footprints": [
+            "GetSliceResolutionMode",
+            "vtkMRMLSliceNode::SliceFOVMatch2DViewSpacingMatchVolumes",
+            "vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView",
+            "vtkMRMLSliceNode::SliceResolutionCustom",
+            "vtkMRMLSliceNode::SliceResolutionMatch2DView",
+            "vtkMRMLSliceNode::SliceResolutionMatchVolumes"
+          ],
+          "implementation_candidates": [
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.h",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h"
+          ]
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "slicer-source/Libs/MRML/Logic/vtkMRMLSliceLogic.cxx",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.cxx",
+            "slicer-source/Docs/developer_guide/script_repository",
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Docs/developer_guide/script_repository/volumes.md",
+            "slicer-source/Docs/developer_guide/script_repository/markups.md",
+            "slicer-source/Docs/developer_guide/script_repository/screencapture.md",
+            "slicer-source/Docs/developer_guide/script_repository/segmentations.md",
+            "slicer-source/Base/Python"
+          ],
+          "source_type_counts": {
+            "ui_analysis": 2,
+            "ui_implementation": 3,
+            "source": 1,
+            "mrml_definition": 3,
+            "doc_example": 5
+          }
+        },
+        "searches": {
+          "vector_queries": [],
+          "grep_patterns": [
+            "FOV.*spacing.*2D|match.*2D|Spacing.*match",
+            "matchSpacing|FOVMatch|SpacingMatch|fov_spacing",
+            "vtkMRMLSliceNodeRed|GetSliceNode|GetNodeByID.*SliceNode",
+            "GetSliceNode|SliceResolutionMatch|sliceNode.*Red"
+          ],
+          "read_paths": [
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceNode.h"
+          ]
+        }
+      },
+      "reasoning_chars": 7317,
+      "reasoning_preview": "[Round 1]\nLet me search for information about \"FOV/Spacing match 2D\" in the UI analysis and source code.\n\n[Round 2]\nLet me analyze the results:\n\n1. The UI action for \"FOV, Spacing match Volumes\" is `actionSliceModelModeVolumes_2D` - with the label \"FOV, Spacing match Volumes\" - which corresponds to setting `SliceFOVMatchVolumesSpacingMatch2DView`.\n\nWait, let me re-read. The UI analysis says:\n- `actionSliceModelModeVolumes` \u2192 \"FOV, Spacing match Volumes\" \u2192 `setSliceModelModeVolumes()`\n- `actionSliceModelModeVolumes_2D` \u2192 let me check...\n\nActually from the UI analysis:\n- Line 724: \"Search text: FOV, Spacing match Volumes | actionSliceModelModeVolumes\"\n- Line 727: \"QObject::connect(this->actionSliceModelModeVolumes_2D, SIGNAL(triggered()), q, SLOT(setSliceModelModeVolumes_2D()));\"\n- Line 734: \"Connected slots/functions: `setSliceModelModeVolumes`, `setSliceModelModeVolumes_2D`\"\n- Line 795: \"this->actionSliceModelModeVolumes_2D->setChecked(sliceNode->GetSliceResolutionMode() == vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView);\"\n\nSo `actionSliceModelModeVolumes_2D` is the action for \"FOV, Spacing match Volumes\" which sets to `SliceFOVMatchVolumesSpacingMatch2DView`.\n\nWait, let me re-read more carefully. The text says \"FOV, Spacing match Volumes\" - this is the label of the action. \n\nFrom the enum:\n```\nSliceResolutionMatchVolumes = 0,\nSliceResolutionMatch2DView,\nSliceFOVMatch2DViewSpacingMatchVolumes,\nSliceFOVMatchVolumesSpacingMatch2DView,\nSliceResolutionCustom\n```\n\nThe action `actionSliceModelModeVolumes_2D` with label text \"FOV, Spacing match Volumes\" corresponds to `SliceFOVMatchVolumesSpacingMatch2DView`.\n\nBut the user asks for \"Toggle on FOV/Spacing match 2D\" - which is \"FOV/Spacing match 2D\". Let me look at the naming more carefully.\n\nThere are two combined modes:\n- `SliceFOVMatch2DViewSpacingMatchVolumes` \u2192 FOV matches 2D view, Spacing matches volumes\n- `SliceFOVMatchVolumesSpacingMatch2DView` \u2192 FOV matches volumes, Spacing matches 2D view\n\nThe user says \"FOV/Spacing match 2D\" - so FOV matches 2D view AND spacing matches 2D view? No, that doesn't make sense with the enum options.\n\nActually, \"FOV/Spacing match 2D\" probably means: FOV matches 2D view, Spacing matches 2D view? But the options are combined:\n- `SliceFOVMatch2DViewSpacingMatchVolumes` (FOV=2D, Spacing=Volumes) - action \"2D, Spacing match Volumes\" based on `actionSliceModelMode2D_Volumes`\n- `SliceFOVMatchVolumesSpacingMatch2DView` (FOV=Volumes, Spacing=2D) - action \"FOV, Spacing match Volumes\" based on `actionSliceModelModeVolumes_2D`\n\nHmm, wait. Let me look at the naming again. The action names:\n- `actionSliceModelModeVolumes` \u2192 `setSliceModelModeVolumes()` \u2192 `SliceResolutionMatchVolumes`\n- `actionSliceModelMode2D` \u2192 `setSliceModelMode2D()` \u2192 `SliceResolutionMatch2DView`\n- `actionSliceModelMode2D_Volumes` \u2192 `setSliceModelMode2D_Volumes()` \u2192 `SliceFOVMatch2DViewSpacingMatchVolumes`\n- `actionSliceModelModeVolumes_2D` \u2192 `setSliceModelModeVolumes_2D()` \u2192 `SliceFOVMatchVolumesSpac",
+      "generated_code_preview": "# Toggle on FOV/Spacing match 2D for the Red view\nredSliceNode = slicer.mrmlScene.GetNodeByID(\"vtkMRMLSliceNodeRed\")\nif redSliceNode:\n    redSliceNode.SetSliceResolutionMode(slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView)"
+    },
+    {
+      "step": 9,
+      "key": "cb_step_9_3",
+      "description": "Turn on slice intersection visibility, set interaction mode, and enable Translate and Rotate",
+      "keywords": [
+        "slice intersection",
+        "visibility",
+        "interaction",
+        "Translate",
+        "Rotate"
+      ],
+      "category": "crosshair",
+      "final_state_intent": {
+        "mode": "set",
+        "state": true,
+        "confidence": "high",
+        "source": "turn on"
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "crosshair",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": null,
+        "slicer_op_category": "crosshair"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "slicer-ui-analysis",
+          "sliceIntersectionsVisibilityCheckBox",
+          "SetIntersectingSlicesEnabled",
+          "vtkMRMLApplicationLogic",
+          "IntersectingSlicesVisibility",
+          "IntersectingSlicesInteractive",
+          "IntersectingSlicesTranslation",
+          "IntersectingSlicesRotation",
+          "qSlicerViewersToolBar",
+          "vtkMRMLSliceDisplayNode"
+        ]
+      },
+      "status": "done",
+      "total_time_s": 23.85,
+      "code_chars": 701,
+      "tool_rounds": 4,
+      "api_calls": 5,
+      "error": null,
+      "progress_events": [
+        {
+          "round": 1,
+          "phase": "search",
+          "message": "[Search] Round 1: |   VectorSearch: \"slice intersection visibility SetIntersectingSlicesEnabled interaction mode Translate Rotate\" |   Grep: \"SetIntersectingSlicesEnabled\" \u2192 slicer-source"
+        },
+        {
+          "round": 2,
+          "phase": "read",
+          "message": "[Read] Round 2: |   ReadFile: slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.h"
+        },
+        {
+          "round": 3,
+          "phase": "search",
+          "message": "[Search] Round 3: |   Grep: \"GetIntersectingSlicesEnabled\" \u2192 slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx"
+        },
+        {
+          "round": 4,
+          "phase": "read",
+          "message": "[Read] Round 4: |   ReadFile: slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx"
+        }
+      ],
+      "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nTurn on slice intersection visibility, set interaction mode, and enable Translate and Rotate\nSuggested API terms to search for: slicer-ui-analysis, sliceIntersectionsVisibilityCheckBox, SetIntersectingSlicesEnabled, vtkMRMLApplicationLogic, IntersectingSlicesVisibility, IntersectingSlicesInteractive, IntersectingSlicesTranslation, IntersectingSlicesRotation\nAPI keyword hints: slice intersection, visibility, interaction, Translate, Rotate\nInterpreted state intent: set the requested UI/API state to True. Do not invert the current state.\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
+      "executor_ready": true,
+      "tool_count": 3,
+      "last_progress": {
+        "round": 4,
+        "phase": "read",
+        "message": "[Read] Round 4: |   ReadFile: slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx"
+      },
+      "tool_loop_s": 20.6,
+      "total_tokens": 128112,
+      "total_api_time_s": 14.758,
+      "total_tool_time_s": 4.054,
+      "tool_names_called": [
+        "VectorSearch",
+        "Grep",
+        "ReadFile"
+      ],
+      "rounds": [
+        {
+          "round": 1,
+          "phase": "search",
+          "api_time_s": 2.199,
+          "tool_time_s": 2.35,
+          "round_time_s": 4.55,
+          "tools": [
+            "VectorSearch",
+            "Grep"
+          ],
+          "tokens": 2256
+        },
+        {
+          "round": 2,
+          "phase": "read",
+          "api_time_s": 4.45,
+          "tool_time_s": 0.449,
+          "round_time_s": 4.9,
+          "tools": [
+            "ReadFile"
+          ],
+          "tokens": 25949
+        },
+        {
+          "round": 3,
+          "phase": "search",
+          "api_time_s": 2.95,
+          "tool_time_s": 0.204,
+          "round_time_s": 3.154,
+          "tools": [
+            "Grep"
+          ],
+          "tokens": 30394
+        },
+        {
+          "round": 4,
+          "phase": "read",
+          "api_time_s": 1.664,
+          "tool_time_s": 1.05,
+          "round_time_s": 2.715,
+          "tools": [
+            "ReadFile"
+          ],
+          "tokens": 32551
+        },
+        {
+          "round": 5,
+          "phase": "generate",
+          "api_time_s": 3.494,
+          "tool_time_s": 0.0,
+          "round_time_s": 3.495,
+          "tools": [],
+          "tokens": 36962
+        }
+      ],
+      "tool_calls_history": [
         {
           "tool": "VectorSearch",
           "args": {
-            "query": "SetSliceResolutionMode SliceResolutionMatch2DView slice view FOV spacing match 2D",
+            "query": "slice intersection visibility SetIntersectingSlicesEnabled interaction mode Translate Rotate",
             "top_k": 10
           },
-          "result_preview": ""
+          "result_preview": "VectorSearch: 10 result(s)\n## Relevant code snippets from knowledge base:\n\n[1] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 661-667) [doc_example] similarity:0.790 boosted:1.026\n```markdown\n### Turn on slice intersections\n\n```python\nsliceDisplayNodes = slicer.util.getNodesByClass(\"vtkMRMLSliceDisplayNode\")\nfor sliceDisplayNode in sliceDisplayNodes:\n  sliceDisplayNode.SetIntersectingSlicesVisibility(1)\n```\n\n[2] slicer-source/Libs/MRML/Core/vtkMRMLSliceDisplayNode.h (lines 1-238) [mrml_definition] [Full file included \u2014 no need to ReadFile or VectorSearch this file]\n```\n/*==============================================================================\n\n  Program: 3D Slicer\n\n  Copyright (c) Ebatinca S.L., Las Palmas de Gran Canaria, Spain\n\n  See COPYRIGHT.txt\n  or http://www.slicer.org/copyright/copyright.txt for details.\n\n  Unless required by applicable law or agreed to in writing, software\n  distributed under the License is distributed on an \"AS IS\" BASIS,\n  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n  See the License for the specific language governing permissions and\n  limitations under the License.\n\n==============================================================================*/\n\n#ifndef __vtkMRMLSliceDisplayNode_h\n#define __vtkMRMLSliceDisplayNode_h\n\n// MRML includes\n#include \"vtkMRMLModelDisplayNode.h\"\n\n/// \\brief MRML node to store display properties of slice nodes.\n///\n/// This node controls appearance of slice intersections in slice views\n/// and slices in 3D views.\nclass VTK_MRML_EXPORT vtkMRMLSliceDisplayNode : public vtkMRMLModelDisplayNode\n{\npublic:\n  static vtkMRMLSliceDisplayNode* New();\n  vtkTypeMacro(vtkMRMLSliceDisplayNode, vtkMRMLModelDisplayNode);\n  void PrintSelf(ostream& os, vtkIndent indent) override;\n\n  /// Read node attributes from XML file\n  void ReadXMLAttributes(const char** atts) override;\n\n  /// Write this node's information to a MRML file in XML format.\n  void WriteXML(ostream& of, int indent) override;\n\n  /// Copy ..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "SetIntersectingSlicesEnabled",
+            "path": "slicer-source"
+          },
+          "result_preview": "Grep: 14 hit(s) in 6 file(s): slicer-source/Base/QTGUI/qSlicerViewersToolBar.cxx (4), slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx (4), slicer-source/Modules/Loadable/SubjectHierarchy/Widgets/qSlicerSubjectHierarchyViewContextMenuPlugin.cxx (3), slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.h (1), slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx (1)"
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.h",
+            "query": "IntersectingSlicesOperation"
+          },
+          "result_preview": "/*==============================================================================\n\n  Program: 3D Slicer\n\n  Copyright (c) Kitware Inc.\n\n  See COPYRIGHT.txt\n  or http://www.slicer.org/copyright/copyright.txt for details.\n\n  Unless required by applicable law or agreed to in writing, software\n  distributed under the License is distributed on an \"AS IS\" BASIS,\n  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n  See the License for the specific language governing permissions and\n  limitations under the License.\n\n  This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.\n  and was partially funded by NIH grant 3P41RR013218-12S1\n\n==============================================================================*/\n\n#ifndef __vtkMRMLApplicationLogic_h\n#define __vtkMRMLApplicationLogic_h\n\n// MRMLLogic includes\n#include \"vtkMRMLAbstractLogic.h\"\n\n#include \"vtkMRMLLogicExport.h\"\n#include \"vtkMRMLSliceCompositeNode.h\"\n\nclass vtkMRMLColorLogic;\nclass vtkMRMLModelDisplayNode;\nclass vtkMRMLSliceNode;\nclass vtkMRMLSliceLogic;\nclass vtkMRMLSelectionNode;\nclass vtkMRMLStorableNode;\nclass vtkMRMLStorageNode;\nclass vtkMRMLInteractionNode;\nclass vtkMRMLMessageCollection;\nclass vtkMRMLViewLogic;\nclass vtkMRMLViewNode;\nclass vtkTextProperty;\n\n// VTK includes\nclass vtkCollection;\nclass vtkImageData;\n\n// STD includes\n#include <vector>\n\nclass VTK_MRML_LOGIC_EXPORT vtkMRMLApplicationLogic : public vtkMRMLAbstractLogic\n{\npublic:\n  static vtkMRMLApplicationLogic* New();\n  void PrintSelf(ostream& os, vtkIndent indent) override;\n  vtkTypeMacro(vtkMRMLApplicationLogic, vtkMRMLAbstractLogic);\n\n  /// Get default Selection node\n  vtkMRMLSelectionNode* GetSelectionNode() const;\n\n  /// Get default Interaction node\n  vtkMRMLInteractionNode* GetInteractionNode() const;\n\n  /// All the slice logics in the application\n  void SetSliceLogics(vtkCollection* sliceLogics);\n  vtkCollection* GetSliceLogics() const;\n  vtkMRMLSliceLogic* GetSliceLogic(vtkMRMLSliceNode* slice..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "GetIntersectingSlicesEnabled",
+            "path": "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx"
+          },
+          "result_preview": "Grep: 7 hit(s) in 1 file(s): slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx (7)"
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx",
+            "query": "SetIntersectingSlicesEnabled"
+          },
+          "result_preview": "//---------------------------------------------------------------------------\nvoid vtkMRMLApplicationLogic::ProcessMRMLNodesEvents(vtkObject* caller, unsigned long event, void* callData)\n{\n  if (vtkMRMLInteractionNode::SafeDownCast(caller) && event == vtkMRMLInteractionNode::EditNodeEvent)\n  {\n    if (callData != nullptr)\n    {\n      vtkMRMLNode* nodeToBeEdited = reinterpret_cast<vtkMRMLNode*>(callData);\n      this->EditNode(nodeToBeEdited);\n    }\n  }\n  else if (vtkMRMLInteractionNode::SafeDownCast(caller) && event == vtkMRMLInteractionNode::ShowViewContextMenuEvent)\n  {\n    this->InvokeEvent(ShowViewContextMenuEvent, callData);\n  }\n  else\n  {\n    this->Superclass::ProcessMRMLNodesEvents(caller, event, callData);\n  }\n}\n\n//----------------------------------------------------------------------------\nvoid vtkMRMLApplicationLogic::EditNode(vtkMRMLNode* node)\n{\n  // Observers in qSlicerCoreApplication listen for this event\n  this->InvokeEvent(EditNodeEvent, node);\n}\n\n//----------------------------------------------------------------------------\nvoid vtkMRMLApplicationLogic::SetModuleLogic(const char* moduleName, vtkMRMLAbstractLogic* moduleLogic)\n{\n  if (!moduleName)\n  {\n    vtkErrorMacro(\"AddModuleLogic: invalid module name.\");\n    return;\n  }\n  if (moduleLogic)\n  {\n    this->Internal->ModuleLogicMap[moduleName] = moduleLogic;\n  }\n  else\n  {\n    // If no logic is provided, erase the module-logic association.\n    this->Internal->ModuleLogicMap.erase(moduleName);\n  }\n}\n\n//----------------------------------------------------------------------------\nvtkMRMLAbstractLogic* vtkMRMLApplicationLogic::GetModuleLogic(const char* moduleName) const\n{\n  if (!moduleName)\n  {\n    vtkErrorMacro(\"GetModuleLogic: invalid module name\");\n    return nullptr;\n  }\n  // Check that the logic is registered.\n  if (this->Internal->ModuleLogicMap.count(moduleName) == 0)\n  {\n    return nullptr;\n  }\n  return this->Internal->ModuleLogicMap[moduleName];\n}\n\n//---------------------------------------------..."
+        }
+      ],
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": false,
+          "query_paths": [],
+          "result_files": [],
+          "matched_lines_preview": [],
+          "connected_slots": [],
+          "api_footprints": [],
+          "implementation_candidates": []
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceDisplayNode.h",
+            "slicer-source/Modules/Loadable/Segmentations/EditorEffects/Python/SegmentEditorEffects/SegmentEditorLevelTracingEffect.py",
+            "slicer-source/Libs/MRML/Core/vtkMRMLSliceDisplayNode.cxx",
+            "slicer-source/Modules/Loadable/Segmentations/EditorEffects/Python/SegmentEditorEffects/SegmentEditorDrawEffect.py",
+            "slicer-source/Docs/developer_guide/script_repository/markups.md",
+            "slicer-source/Modules/Loadable/Segmentations/EditorEffects/Python/SegmentEditorEffects/SegmentEditorFillBetweenSlicesEffect.py",
+            "slicer-source",
+            "slicer-source/Base/QTGUI/qSlicerViewersToolBar.cxx",
+            "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx",
+            "slicer-source/Modules/Loadable/SubjectHierarchy/Widgets/qSlicerSubjectHierarchyViewContextMenuPlugin.cxx",
+            "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.h",
+            "slicer-source/Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "slicer-source/Modules/Loadable/Markups/qSlicerMarkupsModuleWidget.cxx"
+          ],
+          "source_type_counts": {
+            "doc_example": 5,
+            "mrml_definition": 2,
+            "effect_implementation": 3,
+            "source": 6,
+            "ui_implementation": 2,
+            "loadable_module": 1
+          }
+        },
+        "searches": {
+          "vector_queries": [
+            "slice intersection visibility SetIntersectingSlicesEnabled interaction mode Translate Rotate"
+          ],
+          "grep_patterns": [
+            "SetIntersectingSlicesEnabled",
+            "GetIntersectingSlicesEnabled"
+          ],
+          "read_paths": [
+            "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.h",
+            "slicer-source/Libs/MRML/Logic/vtkMRMLApplicationLogic.cxx"
+          ]
+        }
+      },
+      "reasoning_chars": 3899,
+      "reasoning_preview": "[Round 1]\nLet me search for the relevant API evidence for slice intersection visibility, interaction mode, Translate, and Rotate.\n\n[Round 2]\nI have all the evidence I need. Let me look at the header file more carefully for the enum values.\n\nFrom the grep results on `vtkMRMLApplicationLogic.h`:\n```cpp\nenum IntersectingSlicesOperation\n{\n    IntersectingSlicesVisibility,\n    IntersectingSlicesInteractive,\n    IntersectingSlicesTranslation,\n    IntersectingSlicesRotation,\n    IntersectingSlicesThickSlabInteractive,\n};\n```\n\nAnd the usage pattern in the toolbar:\n```cpp\nthis->MRMLAppLogic->SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesVisibility, visible);\nthis->MRMLAppLogic->SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesInteractive, visible);\nthis->MRMLAppLogic->SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesRotation, visible);\nthis->MRMLAppLogic->SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesTranslation, visible);\n```\n\nThe operation says:\n1. Turn on slice intersection visibility \u2192 `SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesVisibility, True)`\n2. Set interaction mode \u2192 `SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesInteractive, True)`\n3. Enable Translate \u2192 `SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesTranslation, True)`\n4. Enable Rotate \u2192 `SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesRotation, True)`\n\nI need to use `slicer.app.applicationLogic()` to get the app logic. Let me also check the script repository example to confirm the Python API access.\n\nFrom the VectorSearch results, the script repository shows using sliceDisplayNode directly, but the toolbar code shows using the application logic's `SetIntersectingSlicesEnabled` with the operation enum. The latter is the preferred approach as it handles all slice display nodes at once.\n\nLet me generate the code.\n\n[Round 3]\nI now have everything I need. The enum and API are clear:\n\n```cpp\nenum IntersectingSlicesOperation\n{\n    IntersectingSlicesVisibility,\n    IntersectingSlicesInteractive,\n    IntersectingSlicesTranslation,\n    IntersectingSlicesRotation,\n    IntersectingSlicesThickSlabInteractive,\n};\n\nvoid SetIntersectingSlicesEnabled(IntersectingSlicesOperation operation, bool enabled);\n```\n\nIn Python, accessed via `slicer.app.applicationLogic()`. The operations requested:\n1. Turn on slice intersection visibility \u2192 `SetIntersectingSlicesEnabled(slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility, True)`\n2. Set interaction mode (enable interaction) \u2192 `SetIntersectingSlicesEnabled(slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive, True)`\n3. Enable Translate \u2192 `SetIntersectingSlicesEnabled(slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation, True)`\n4. Enable Rotate \u2192 `SetIntersectingSlicesEnabled(slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation, True)`\n\nLet me ",
+      "generated_code_preview": "# Turn on slice intersection visibility, interaction mode, Translate, and Rotate\n\nappLogic = slicer.app.applicationLogic()\n\n# Enable slice intersection visibility\nappLogic.SetIntersectingSlicesEnabled(\n    slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility, True)\n\n# Enable slice intersection interaction mode\nappLogic.SetIntersectingSlicesEnabled(\n    slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive, True)\n\n# Enable Translate handles\nappLogic.SetIntersectingSlicesEnabled(\n    slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation, True)\n\n# Enable Rotate handles\nappLogic.SetIntersectingSlicesEnabled(\n    slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation, True)"
+    },
+    {
+      "step": 12,
+      "key": "cb_step_12_4",
+      "description": "Configure display settings of the mandibular curve to show in View 1 and Red",
+      "keywords": [
+        "markups",
+        "display",
+        "view",
+        "visibility"
+      ],
+      "category": "markups_display",
+      "final_state_intent": {
+        "mode": "set",
+        "state": true,
+        "confidence": "high",
+        "source": "show"
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "markups_display",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": "vtkMRMLMarkupsCurveNode",
+        "slicer_op_category": "markups_display"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "slicer-ui-analysis",
+          "qSlicerMarkupsModule.ui",
+          "qMRMLDisplayNodeViewComboBox",
+          "vtkMRMLMarkupsDisplayNode",
+          "AddViewNodeID",
+          "SetActiveListID",
+          "Markups display advanced view"
+        ]
+      },
+      "status": "done",
+      "total_time_s": 34.76,
+      "code_chars": 1510,
+      "tool_rounds": 4,
+      "api_calls": 5,
+      "error": null,
+      "progress_events": [
+        {
+          "round": 1,
+          "phase": "search",
+          "message": "[Search] Round 1: |   VectorSearch: \"markups display view visibility AddViewNodeID vtkMRMLMarkupsDisplayNode view 1 red slice\" |   Grep: \"AddViewNodeID|SetActiveListID|qMRMLDisplayNodeViewComboBox\" \u2192 slicer-ui-analysis"
+        },
+        {
+          "round": 2,
+          "phase": "search+read",
+          "message": "[Search+Read] Round 2: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/gui.md |   Grep: \"threeDWidget\\(|mrmlThreeDViewNode\\(|ThreeDViewNode\" \u2192 slicer-source/Docs/developer_guide/script_repository"
+        },
+        {
+          "round": 3,
+          "phase": "search+read",
+          "message": "[Search+Read] Round 3: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/markups.md |   Grep: \"mrmlViewNode\\(\\)|GetID\\(\\)|layoutName.*View 1\" \u2192 slicer-source/Docs/developer_guide/script_repository/gui.md"
+        },
+        {
+          "round": 4,
+          "phase": "search",
+          "message": "[Search] Round 4: |   Grep: \"GetLayoutName.*View 1|layoutName.*1|threeDWidget.*mrmlViewNode\" \u2192 slicer-source/Docs/developer_guide/script_repository"
+        }
+      ],
+      "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nConfigure display settings of the mandibular curve to show in View 1 and Red\nSuggested API terms to search for: slicer-ui-analysis, qSlicerMarkupsModule.ui, qMRMLDisplayNodeViewComboBox, vtkMRMLMarkupsDisplayNode, AddViewNodeID, SetActiveListID, Markups display advanced view\nAPI keyword hints: markups, display, view, visibility\nInterpreted state intent: set the requested UI/API state to True. Do not invert the current state.\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
+      "executor_ready": true,
+      "tool_count": 3,
+      "last_progress": {
+        "round": 4,
+        "phase": "search",
+        "message": "[Search] Round 4: |   Grep: \"GetLayoutName.*View 1|layoutName.*1|threeDWidget.*mrmlViewNode\" \u2192 slicer-source/Docs/developer_guide/script_repository"
+      },
+      "tool_loop_s": 30.14,
+      "total_tokens": 145789,
+      "total_api_time_s": 24.632,
+      "total_tool_time_s": 3.749,
+      "tool_names_called": [
+        "VectorSearch",
+        "Grep",
+        "ReadFile"
+      ],
+      "rounds": [
+        {
+          "round": 1,
+          "phase": "search",
+          "api_time_s": 2.643,
+          "tool_time_s": 1.577,
+          "round_time_s": 4.221,
+          "tools": [
+            "VectorSearch",
+            "Grep"
+          ],
+          "tokens": 2307
+        },
+        {
+          "round": 2,
+          "phase": "search+read",
+          "api_time_s": 6.826,
+          "tool_time_s": 0.673,
+          "round_time_s": 7.5,
+          "tools": [
+            "ReadFile",
+            "Grep"
+          ],
+          "tokens": 26688
+        },
+        {
+          "round": 3,
+          "phase": "search+read",
+          "api_time_s": 3.242,
+          "tool_time_s": 0.699,
+          "round_time_s": 3.941,
+          "tools": [
+            "ReadFile",
+            "Grep"
+          ],
+          "tokens": 33514
+        },
+        {
+          "round": 4,
+          "phase": "search",
+          "api_time_s": 4.081,
+          "tool_time_s": 0.8,
+          "round_time_s": 4.881,
+          "tools": [
+            "Grep"
+          ],
+          "tokens": 40075
+        },
+        {
+          "round": 5,
+          "phase": "generate",
+          "api_time_s": 7.839,
+          "tool_time_s": 0.0,
+          "round_time_s": 7.84,
+          "tools": [],
+          "tokens": 43205
+        }
+      ],
+      "tool_calls_history": [
+        {
+          "tool": "VectorSearch",
+          "args": {
+            "query": "markups display view visibility AddViewNodeID vtkMRMLMarkupsDisplayNode view 1 red slice",
+            "top_k": 10
+          },
+          "result_preview": "VectorSearch: 10 result(s)\n## Relevant code snippets from knowledge base:\n\n[1] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 1136-1143) [doc_example] similarity:0.705 boosted:0.916\n```markdown\n# Red slice view\nsliceViewLabel = \"Red\"\nsliceViewNode = slicer.mrmlScene.GetNodeByID(f\"vtkMRMLSliceNode{sliceViewLabel}\")\nappLogic = slicer.app.applicationLogic()\ndisplayableManager = appLogic.GetViewDisplayableManagerByClassName(sliceViewNode, \"vtkMRMLCrosshairDisplayableManager\")\n\nwidget = displayableManager.GetSliceIntersectionWidget()\n```\n\n[2] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 439-453) [doc_example] similarity:0.703 boosted:0.914\n```markdown\n### Display a node in only some views\n\nShow a displayable node in a predefined set of views. Here, show a markups line only in `Red+`, `Green+` and `Yellow+` views.\n\n```python\ndisplayableNode = getNode(\"L\")\n\nviewNodeIDs = [\n  slicer.app.layoutManager().sliceWidget(viewName).mrmlSliceNode().GetID()\n  for viewName in [\"Red+\", \"Green+\", \"Yellow+\"]\n]\n\ndisplayableNode.GetDisplayNode().SetViewNodeIDs(viewNodeIDs)\n```\n```\n\n[3] slicer-source/Libs/MRML/Core/vtkMRMLMarkupsDisplayNode.cxx (lines 1-974) [mrml_definition] [Full file included \u2014 no need to ReadFile or VectorSearch this file]\n```\n/*==============================================================================\n\n  Program: 3D Slicer\n\n  Portions (c) Copyright Brigham and Women's Hospital (BWH) All Rights Reserved.\n\n  See COPYRIGHT.txt\n  or http://www.slicer.org/copyright/copyright.txt for details.\n\n  Unless required by applicable law or agreed to in writing, software\n  distributed under the License is distributed on an \"AS IS\" BASIS,\n  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n  See the License for the specific language governing permissions and\n  limitations under the License.\n\n==============================================================================*/\n\n// MRML includes\n#include <vtkMRMLAbstractViewNode.h>\n#include <vtkMRMLI..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "AddViewNodeID|SetActiveListID|qMRMLDisplayNodeViewComboBox",
+            "path": "slicer-ui-analysis"
+          },
+          "result_preview": "Grep: 13 hit(s) in 6 file(s): slicer-ui-analysis/Modules__Loadable__VolumeRendering__Resources__UI__qSlicerVolumeRenderingModuleWidget.ui.md (3), slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md (2), slicer-ui-analysis/Modules__Loadable__Colors__Widgets__Resources__UI__qMRMLColorLegendDisplayNodeWidget.ui.md (2), slicer-ui-analysis/Modules__Loadable__Models__Widgets__Resources__UI__qMRMLModelDisplayNodeWidget.ui.md (2), slicer-ui-analysis/Modules__Loadable__Markups__Widgets__Resources__UI__qMRMLMarkupsDisplayNodeWidget.ui.md (2)"
         },
         {
           "tool": "ReadFile",
           "args": {
             "path": "slicer-source/Docs/developer_guide/script_repository/gui.md",
-            "query": "slice resolution"
+            "query": "Display a node in only some views"
           },
-          "result_preview": "## Install Slicer\n\nThere are different approaches to install Slicer and extensions programmatically:\n\n- Install Slicer manually and install extensions by using `slicer.app.extensionsManagerModel()`. See example [below](#download-and-install-extension) and in [install-slicer-extension.py](https://github.com/pieper/SlicerDockers/blob/master/slicer-plus/install-slicer-extension.py)\n- Directly interact with the REST API endpoints of https://slicer-packages.kitware.com using `curl` and `jq`. See [slicer-download.sh](https://github.com/Slicer/SlicerDocker/blob/master/scripts/slicer-download.sh)\n\n## Launch Slicer\n\n### Open a file with Slicer at the command line\n\nOpen Slicer to view the `c:\\some\\folder\\MRHead.nrrd` image file:\n\n```console\n\"c:\\Users\\myusername\\AppData\\Local\\NA-MIC\\Slicer 4.11.20210226\\Slicer.exe\" c:\\some\\folder\\MRHead.nrrd\n```\n\n:::{note}\n\nIt is necessary to specify full path to the Slicer executable and to the file that needs to be loaded.\n\n:::\n\nOn Windows, the installer registers the `Slicer` application during install. This makes it possible to use `start` command to launch the most recently installed Slicer. For example, this command on the command-line starts Slicer and loads an image:\n\n```console\nstart Slicer c:\\some\\folder\\MRHead.nrrd\n```\n\nTo load a file with non-default options, you can use `--python-code` option to run `slicer.util.load...` commands.\n\n### Open an .mrb file with Slicer at the command line\n\n```console\nSlicer.exe --python-code \"slicer.util.loadScene('f:/2013-08-23-Scene.mrb')\"\n```\n\n### Run Python commands in the Slicer environment\n\nRun Python commands, without showing any graphical user interface:\n\n```console\nSlicer.exe --python-code \"doSomething; doSomethingElse; etc.\" --testing --no-splash --no-main-window\n```\n\nSlicer exits when the commands are completed because `--testing` options is specified.\n\n### Run a Python script file in the Slicer environment\n\nRun a Python script on Windows (stored in script file), without showing any graphic..."
+          "result_preview": "### Display a node in only some views\n\nShow a displayable node in a predefined set of views. Here, show a markups line only in `Red+`, `Green+` and `Yellow+` views.\n\n```python\ndisplayableNode = getNode(\"L\")\n\nviewNodeIDs = [\n  slicer.app.layoutManager().sliceWidget(viewName).mrmlSliceNode().GetID()\n  for viewName in [\"Red+\", \"Green+\", \"Yellow+\"]\n]\n\ndisplayableNode.GetDisplayNode().SetViewNodeIDs(viewNodeIDs)\n```\n\n"
         },
         {
-          "tool": "VectorSearch",
+          "tool": "Grep",
           "args": {
-            "query": "SetSliceResolutionMode SliceResolutionMatch2DView toggle FOV spacing match 2D view slice node Python",
-            "top_k": 5
+            "pattern": "threeDWidget\\(|mrmlThreeDViewNode\\(|ThreeDViewNode",
+            "path": "slicer-source/Docs/developer_guide/script_repository"
           },
-          "result_preview": ""
+          "result_preview": "Grep: 30 hit(s) in 4 file(s): slicer-source/Docs/developer_guide/script_repository/gui.md (25), slicer-source/Docs/developer_guide/script_repository/models.md (2), slicer-source/Docs/developer_guide/script_repository/markups.md (2), slicer-source/Docs/developer_guide/script_repository/screencapture.md (1)"
+        },
+        {
+          "tool": "ReadFile",
+          "args": {
+            "path": "slicer-source/Docs/developer_guide/script_repository/markups.md",
+            "query": "SetViewNodeIDs|ViewNodeIDs|viewNodeID"
+          },
+          "result_preview": "## Markups\n\n### Save markups to file\n\nAny markup node can be saved as a [markups json file](/developer_guide/modules/markups.md#markups):\n\n```python\nmarkupsNode = slicer.util.getNode('F')\nslicer.util.saveNode(markupsNode, \"/path/to/MyMarkups.mkp.json\")\n```\n\nGenerally the markups json file format is recommended for saving all properties of a markups node, but for exporting only control point information (name, position, and basic state) a [control points table can be exported in standard csv file format](/developer_guide/modules/markups.md#markups-control-points-table-file-format-csv-tsv):\n\n```python\nslicer.modules.markups.logic().ExportControlPointsToCSV(markupsNode, \"/path/to/MyControlPoints.csv\")\n```\n\n### Load markups from file\n\nAny markup node can be loaded from a [markups json file](/developer_guide/modules/markups.md#markups):\n\n```python\nmarkupsNode = slicer.util.loadMarkups(\"/path/to/MyMarkups.mkp.json\")\n```\n\nControl points can be loaded from [control points table csv file](/developer_guide/modules/markups.md#markups-control-points-table-file-format-csv-tsv):\n\n```python\nmarkupsNode = slicer.mrmlScene.AddNewNodeByClass(\"vtkMRMLMarkupsCurveNode\")\nslicer.modules.markups.logic().ImportControlPointsFromCSV(markupsNode, \"/path/to/MyControlPoints.csv\")\n```\n\n### Load markups point list from file\n\nMarkups point list can be loaded from legacy [fcsv file format](/developer_guide/modules/markups.md#markups-fiducial-point-list-file-format-fcsv). Note that this file format is no longer recommended, as it is not a standard csv file format and can only store a small fraction of information that is in a markups node.\n\n```python\nslicer.util.loadMarkups(\"/path/to/list/F.fcsv\")\n```\n\n### Adding control points Programmatically\n\nMarkups control points can be added to the currently active point list from the python console by using the following module logic command:\n\n```python\nslicer.modules.markups.logic().AddControlPoint()\n```\n\nThe command with no arguments will place a new contro..."
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "mrmlViewNode\\(\\)|GetID\\(\\)|layoutName.*View 1",
+            "path": "slicer-source/Docs/developer_guide/script_repository/gui.md"
+          },
+          "result_preview": "Grep: 14 hit(s) in 1 file(s): slicer-source/Docs/developer_guide/script_repository/gui.md (14)"
+        },
+        {
+          "tool": "Grep",
+          "args": {
+            "pattern": "GetLayoutName.*View 1|layoutName.*1|threeDWidget.*mrmlViewNode",
+            "path": "slicer-source/Docs/developer_guide/script_repository"
+          },
+          "result_preview": "Grep: 4 hit(s) in 1 file(s): slicer-source/Docs/developer_guide/script_repository/gui.md (4)"
         }
       ],
-      "reasoning_chars": 1931,
-      "reasoning_preview": "[Round 1]\nLet me search for the relevant API examples to understand how to toggle FOV/Spacing match 2D for the Red slice view.\n\n[Round 2]\nI found the key API information. From the vtkMRMLSliceNode.cxx source, I can see:\n\n1. `SetSliceResolutionMode(int mode)` - sets the resolution mode\n2. The enum values are:\n   - `vtkMRMLSliceNode::SliceResolutionMatch2DView` (default value shown in constructor)\n   - `vtkMRMLSliceNode::SliceResolutionMatchVolumes`\n   - `vtkMRMLSliceNode::SliceFOVMatch2DViewSpacingMatchVolumes`\n   - `vtkMRMLSliceNode::SliceFOVMatchVolumesSpacingMatch2DView`\n\nThe operation asks to \"Toggle on FOV/Spacing match 2D for the Red view\". This means we need to set the SliceResolutionMode of the Red slice node to `SliceResolutionMatch2DView`.\n\nLet me look at the GUI script repository for more complete examples of how to get the slice node.\n\n[Round 3]\nI see the file has many sections. Let me search for the gui.md section related to slice views and resolution mode settings.\n\n[Round 4]\nNow I have all the information I need. Let me summarize:\n\n1. The `vtkMRMLSliceNode` has a `SetSliceResolutionMode(int mode)` method.\n2. The relevant enum values are:\n   - `vtkMRMLSliceNode.SliceResolutionMatch2DView` - FOV/Spacing match 2D view\n   - `vtkMRMLSliceNode.SliceResolutionMatchVolumes` - match volumes\n   - `vtkMRMLSliceNode.SliceFOVMatch2DViewSpacingMatchVolumes` - mixed\n   - `vtkMRMLSliceNode.SliceFOVMatchVolumesSpacingMatch2DView` - mixed\n\n3. To access the Red slice node, I can use:\n   - `slicer.mrmlScene.GetNodeByID(\"vtkMRMLSliceNodeRed\")` - from the gui.md example (line 1136-1143)\n   - Or `slicer.util.getNode('vtkMRMLSliceNodeRed')`\n\nThe operation \"Toggle on FOV/Spacing match 2D for the Red view\" means we want to set the slice resolution mode to `SliceResolutionMatch2DView` for the Red slice view. Since it says \"toggle\", we should check the current mode and toggle it.\n\nLet me create a clean template."
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": true,
+          "query_paths": [
+            "slicer-ui-analysis"
+          ],
+          "result_files": [
+            "slicer-ui-analysis/.",
+            "slicer-ui-analysis/Modules__Loadable__VolumeRendering__Resources__UI__qSlicerVolumeRenderingModuleWidget.ui.md",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Colors__Widgets__Resources__UI__qMRMLColorLegendDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Models__Widgets__Resources__UI__qMRMLModelDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Markups__Widgets__Resources__UI__qMRMLMarkupsDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Segmentations__Widgets__Resources__UI__qMRMLSegmentationDisplayNodeWidget.ui.md"
+          ],
+          "matched_lines_preview": [
+            "- Search text: ViewCheckableNodeComboBox | qMRMLDisplayNodeViewComboBox",
+            "- API footprints: `AddViewNodeID`, `GetID`",
+            "- Search text: Select views in which to show this node. All unchecked shows in all 3D and 2D views. | DisplayNodeViewComboBox | qMRMLDisplayNodeViewComboBox",
+            "- Search text: DisplayNodeViewComboBox | qMRMLDisplayNodeViewComboBox"
+          ],
+          "connected_slots": [],
+          "api_footprints": [
+            "AddViewNodeID",
+            "GetID"
+          ],
+          "implementation_candidates": []
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Libs/MRML/Core/vtkMRMLMarkupsDisplayNode.cxx",
+            "slicer-source/Libs/MRML/Core/vtkMRMLMarkupsFiducialDisplayNode.cxx",
+            "slicer-source/Libs/MRML/Core/vtkMRMLMarkupsFiducialDisplayNode.h",
+            "slicer-source/Libs/MRML/Core/vtkMRMLAbstractViewNode.h",
+            "slicer-source/Docs/developer_guide/script_repository",
+            "slicer-source/Docs/developer_guide/script_repository/models.md",
+            "slicer-source/Docs/developer_guide/script_repository/markups.md",
+            "slicer-source/Docs/developer_guide/script_repository/screencapture.md"
+          ],
+          "source_type_counts": {
+            "doc_example": 14,
+            "mrml_definition": 4,
+            "ui_analysis": 6
+          }
+        },
+        "searches": {
+          "vector_queries": [
+            "markups display view visibility AddViewNodeID vtkMRMLMarkupsDisplayNode view 1 red slice"
+          ],
+          "grep_patterns": [
+            "AddViewNodeID|SetActiveListID|qMRMLDisplayNodeViewComboBox",
+            "threeDWidget\\(|mrmlThreeDViewNode\\(|ThreeDViewNode",
+            "mrmlViewNode\\(\\)|GetID\\(\\)|layoutName.*View 1",
+            "GetLayoutName.*View 1|layoutName.*1|threeDWidget.*mrmlViewNode"
+          ],
+          "read_paths": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Docs/developer_guide/script_repository/markups.md"
+          ]
+        }
+      },
+      "reasoning_chars": 5696,
+      "reasoning_preview": "[Round 1]\nThe user wants me to generate a Python code template for configuring display settings of a mandibular curve to show in View 1 and Red. Let me search the knowledge base to find relevant API examples.\n\nLet me start by searching for markups display view related APIs in the UI analysis.\n\n[Round 2]\nThe VectorSearch found a good example in the Slicer script repository (gui.md) that shows how to display a node in specific views using `SetViewNodeIDs`. Let me look at that example more closely, as well as the markups display node widget analysis.\n\nFrom VectorSearch result [2]:\n```python\ndisplayableNode = getNode(\"L\")\nviewNodeIDs = [\n  slicer.app.layoutManager().sliceWidget(viewName).mrmlSliceNode().GetID()\n  for viewName in [\"Red+\", \"Green+\", \"Yellow+\"]\n]\ndisplayableNode.GetDisplayNode().SetViewNodeIDs(viewNodeIDs)\n```\n\nThis is exactly what I need. The operation \"Configure display settings of the mandibular curve to show in View 1 and Red\" means I need to:\n1. Find the markups curve node named \"mandibular curve\" (fuzzy match)\n2. Get the view node IDs for \"View 1\" (3D view) and \"Red\" (Red slice view)\n3. Set the display node's view node IDs to only those views\n\nLet me also check the UI analysis for more context on how the markups display node view combo box works.\n\nFrom the grep results, I can see that the markups display node widget has a `qMRMLDisplayNodeViewComboBox` that uses `setMRMLDisplayNode` and the API footprints include `AddViewNodeID` and `GetID`.\n\nThe key API is `SetViewNodeIDs` on the display node, which is a `vtkMRMLDisplayNode` method. Let me verify this method exists.\n\nActually, looking at the example more carefully:\n- `displayableNode.GetDisplayNode()` gets the display node\n- `.SetViewNodeIDs(viewNodeIDs)` sets which views show this node\n\nFor the view names:\n- \"View 1\" could be a 3D view. In Slicer, the default 3D view is named \"View 1\" or just \"1\".\n- \"Red\" is the Red slice view.\n\nLet me verify the view names. In Slicer's layout manager:\n- For slice views: \"Red\", \"Green\", \"Yellow\"\n- For 3D views: \"View 1\" or \"1\" depending on version\n\nLooking at the example, it uses `slicer.app.layoutManager().sliceWidget(viewName).mrmlSliceNode().GetID()` for slice views.\n\nFor 3D views, it would be `slicer.app.layoutManager().threeDWidget(viewName).mrmlThreeDViewNode().GetID()`.\n\nLet me check what the proper method is for 3D view.\n\n[Round 3]\nNow I have the key information. Let me look at the markups script repository to find how to get a 3D view node by name/layout name. The threeDWidget(0) approach uses index, but I need the layout name \"View 1\".\n\nLet me check how to get a 3D view node by name/id.\n\n[Round 4]\nNow I have everything I need. Let me also look at the example more closely for 3D view - I need to find the 3D view named \"View 1\". The threeDWidget(0) gives the first 3D view. But I need it by layout name \"View 1\" or just use the index approach.\n\nActually, looking at the example from the VectorSearch result [2]:\n```python\ndisplayableNode = g",
+      "generated_code_preview": "\"\"\"\nConfigure display settings of a markups curve named \"mandibular curve\"\nto show only in \"View 1\" (3D view) and \"Red\" (Red slice view).\n\"\"\"\n\n# Find the mandibular curve markups node by fuzzy name matching\ncurveNode = None\nfor node in slicer.mrmlScene.GetNodesByClass(\"vtkMRMLMarkupsCurveNode\"):\n    if \"mandibular\" in node.GetName().lower() and \"curve\" in node.GetName().lower():\n        curveNode = node\n        break\n\nif curveNode is None:\n    # Try a broader search if no curve-specific node found\n    for node in slicer.mrmlScene.GetNodesByClass(\"vtkMRMLMarkupsNode\"):\n        if \"mandibular\" in node.GetName().lower() and \"curve\" in node.GetName().lower():\n            curveNode = node\n            break\n\nif curveNode is None:\n    raise RuntimeError(\"Markups curve node containing 'mandibular' and 'curve' not found.\")\n\n# Get the display node\ndisplayNode = curveNode.GetDisplayNode()\nif displayNode is None:\n    raise RuntimeError(\"Display node not found for the curve node.\")\n\n# Collect view node IDs for \"View 1\" (3D view) and \"Red\" (Red slice view)\nlayoutManager = slicer.app.layoutManager()\nviewNodeIDs = []\n\n# Add the 3D view \"View 1\" (first 3D view widget)\nthreeDViewNode = layoutManager.threeDWidget(0).mrmlViewNode()\nviewNodeIDs.append(threeDViewNode.GetID())\n\n# Add the Red slice view\nredSliceNode = layoutManager.sliceWidget(\"Red\").mrmlSliceNode()\nviewNodeIDs.append(redSliceNode.GetID())\n\n# Restrict the display node to show only in the specified views\ndisplayNode.SetViewNodeIDs(viewNodeIDs)"
     },
     {
-      "step": 9,
-      "key": "cb_step_9_2",
-      "description": "Toggle on slice intersection visibility (crosshair) in toolbar",
+      "step": 15,
+      "key": "cb_step_15_5",
+      "description": "Toggle off slice visibility in 3D view for the Red view",
       "keywords": [
-        "crosshair"
+        "node_display"
       ],
-      "category": "crosshair",
+      "category": "node_display",
+      "final_state_intent": {
+        "mode": "set",
+        "state": false,
+        "confidence": "high",
+        "source": "toggle off"
+      },
+      "classification": {
+        "op_type": "slicer_op",
+        "evidence_type": "slicer_core",
+        "evidence_id": "node_display",
+        "confidence": "high",
+        "interaction_kind": "none",
+        "node_class": null,
+        "slicer_op_category": "node_display"
+      },
+      "search_policy": {
+        "preferred_root": "slicer-ui-analysis",
+        "requires_ui_first_when_ui_labeled": true,
+        "category_hints": [
+          "GetDisplayNode",
+          "SetVisibility",
+          "AddViewNodeID"
+        ]
+      },
       "status": "done",
-      "total_time_s": 36.64,
-      "code_chars": 877,
+      "total_time_s": 16.3,
+      "code_chars": 140,
       "tool_rounds": 2,
       "api_calls": 3,
       "error": null,
@@ -333,7 +1313,7 @@
         {
           "round": 1,
           "phase": "search",
-          "message": "[Search] Round 1: |   VectorSearch: \"vtkMRMLCrosshairNode SetCrosshairMode ShowIntersection crosshair visibility toggle\" |   Grep: \"vtkMRMLCrosshairNode\" \u2192 slicer-source/Docs/developer_guide/script_repository"
+          "message": "[Search] Round 1: |   VectorSearch: \"slice visibility in 3D view toggle off slice display node\" |   Grep: \"SetVisibility.*slice.*3D|slice.*visibility.*3D\" \u2192 slicer-ui-analysis"
         },
         {
           "round": 2,
@@ -342,6 +1322,8 @@
         }
       ],
       "prompt_build_s": 0.0,
+      "prompt_user_preview": "Generate a Python code template for this 3D Slicer operation:\nToggle off slice visibility in 3D view for the Red view\nSuggested API terms to search for: GetDisplayNode, SetVisibility, AddViewNodeID\nAPI keyword hints: node_display\nInterpreted state intent: set the requested UI/API state to False. Do not invert the current state.\n\nSearch the knowledge base for relevant examples first, using slicer-ui-analysis first for UI-labeled controls/actions, then output ONLY the ```python code block. Generate a final-state operation, not a toggle, unless the description explicitly requests toggling. Do not switch the active Slicer module for UI-location context; only use slicer.util.selectModule when the operation explicitly asks to switch/open/select a module.",
+      "prompt_includes_ui_analysis": true,
       "executor_ready": true,
       "tool_count": 3,
       "last_progress": {
@@ -349,10 +1331,10 @@
         "phase": "read",
         "message": "[Read] Round 2: |   ReadFile: slicer-source/Docs/developer_guide/script_repository/gui.md"
       },
-      "tool_loop_s": 34.76,
-      "total_tokens": 23008,
-      "total_api_time_s": 32.808,
-      "total_tool_time_s": 1.299,
+      "tool_loop_s": 11.8,
+      "total_tokens": 28421,
+      "total_api_time_s": 7.848,
+      "total_tool_time_s": 2.601,
       "tool_names_called": [
         "VectorSearch",
         "Grep",
@@ -362,87 +1344,179 @@
         {
           "round": 1,
           "phase": "search",
-          "api_time_s": 12.807,
-          "tool_time_s": 0.75,
-          "round_time_s": 13.558,
+          "api_time_s": 2.2,
+          "tool_time_s": 1.951,
+          "round_time_s": 4.15,
           "tools": [
             "VectorSearch",
             "Grep"
           ],
-          "tokens": 1605
+          "tokens": 2227
         },
         {
           "round": 2,
           "phase": "read",
-          "api_time_s": 10.549,
-          "tool_time_s": 0.549,
-          "round_time_s": 11.099,
+          "api_time_s": 3.349,
+          "tool_time_s": 0.65,
+          "round_time_s": 4.0,
           "tools": [
             "ReadFile"
           ],
-          "tokens": 9481
+          "tokens": 12762
         },
         {
           "round": 3,
           "phase": "generate",
-          "api_time_s": 9.451,
+          "api_time_s": 2.299,
           "tool_time_s": 0.0,
-          "round_time_s": 9.452,
+          "round_time_s": 2.3,
           "tools": [],
-          "tokens": 11922
+          "tokens": 13432
         }
       ],
       "tool_calls_history": [
         {
           "tool": "VectorSearch",
           "args": {
-            "query": "vtkMRMLCrosshairNode SetCrosshairMode ShowIntersection crosshair visibility toggle",
+            "query": "slice visibility in 3D view toggle off slice display node",
             "top_k": 10
           },
-          "result_preview": ""
+          "result_preview": "VectorSearch: 10 result(s)\n## Relevant code snippets from knowledge base:\n\n[1] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 682-686) [doc_example] similarity:0.756 boosted:0.983\n```markdown\n### Hide slice view annotations\n\nThis script can hide node name, patient information displayed in corners of slice views (managed by DataProbe module).\n\n```python\n```\n\n[2] slicer-source/Docs/developer_guide/script_repository/volumes.md (lines 424-429) [doc_example] similarity:0.725 boosted:0.942\n```markdown\n# Show in slice views and set its window/level\nslicer.util.setSliceViewerLayers(background=volumeNode)\nvolumeNode.GetScalarVolumeDisplayNode().AutoWindowLevelOff()\nvolumeNode.GetScalarVolumeDisplayNode().SetWindowLevel(110,130)\n```\n```\n\n[3] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 687-690) [doc_example] similarity:0.714 boosted:0.928\n```markdown\n# Disable slice annotations immediately\nsliceAnnotations = slicer.modules.DataProbeInstance.infoWidget.sliceAnnotations\nsliceAnnotations.sliceViewAnnotationsEnabled=False\nsliceAnnotations.updateSliceViewFromGUI()\n```\n\n[4] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 925-927) [doc_example] similarity:0.697 boosted:0.907\n```markdown\n### Show a slice view outside the view layout\n\n```python\n```\n\n[5] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 428-433) [doc_example] similarity:0.695 boosted:0.904\n```markdown\n# hide what is not needed\nsliceController.pinButton().hide()\n#sliceController.viewLabel().hide()\nsliceController.fitToWindowToolButton().hide()\nsliceController.sliceOffsetSlider().hide()\n```\n\n[6] slicer-source/Docs/developer_guide/script_repository/gui.md (lines 797-807) [doc_example] similarity:0.695 boosted:0.904\n```markdown\n### Show slice views in 3D window\n\nEquivalent to clicking 'eye' icon in the slice view controller.\n\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sl..."
         },
         {
           "tool": "Grep",
           "args": {
-            "pattern": "vtkMRMLCrosshairNode",
-            "path": "slicer-source/Docs/developer_guide/script_repository"
+            "pattern": "SetVisibility.*slice.*3D|slice.*visibility.*3D",
+            "path": "slicer-ui-analysis"
           },
-          "result_preview": "ERROR: ripgrep (rg) is not installed. Please install ripgrep and ensure it is in your PATH. Download: https://github.com/BurntSushi/ripgrep#installation"
+          "result_preview": "Grep: 25 hit(s) in 5 file(s): slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md (13), slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md (4), slicer-ui-analysis/Modules__Loadable__Transforms__Widgets__Resources__UI__qMRMLTransformDisplayNodeWidget.ui.md (4), slicer-ui-analysis/Base__QTGUI__Resources__UI__qSlicerSettingsViewsPanel.ui.md (3), slicer-ui-analysis/Modules__Loadable__Segmentations__Widgets__Resources__UI__qMRMLSegmentationDisplayNodeWidget.ui.md (1)"
         },
         {
           "tool": "ReadFile",
           "args": {
             "path": "slicer-source/Docs/developer_guide/script_repository/gui.md",
-            "query": "crosshair"
+            "query": "Show slice views in 3D window"
           },
-          "result_preview": "### Get current mouse coordinates in a slice view\n\nYou can get 3D (RAS) coordinates of the current mouse cursor from the crosshair singleton node as shown in the example below:\n\n```python\ndef onMouseMoved(observer,eventid):\n  ras=[0,0,0]\n  crosshairNode.GetCursorPositionRAS(ras)\n  print(ras)\n\ncrosshairNode=slicer.util.getNode(\"Crosshair\")\ncrosshairNode.AddObserver(slicer.vtkMRMLCrosshairNode.CursorPositionModifiedEvent, onMouseMoved)\n```\n\n\n\n... [other sections omitted] ...\n\n### Display crosshair at a 3D position\n\n```python\nposition_RAS = [23.4, 5.6, 78.9]\ncrosshairNode = slicer.util.getNode(\"Crosshair\")\n\n\n... [other sections omitted] ...\n\n# Set crosshair position\ncrosshairNode.SetCrosshairRAS(position_RAS)\n\n\n... [other sections omitted] ...\n\n# Make the crosshair visible\ncrosshairNode.SetCrosshairMode(slicer.vtkMRMLCrosshairNode.ShowBasic)\n```\n\n:::{note}\n\nCrosshair node stores two positions: Cursor position is the current position of the mouse pointer in a slice or 3D view (modules should only read this position). Crosshair position is the location of the visible crosshair in views (modules can read or write this position).\n\n:::\n\n\n\n... [other sections omitted] ...\n\n### Change the crosshair color\n\n```python\n\n\n... [other sections omitted] ...\n\n# Get the crosshair node\ncrosshairNode = slicer.util.getNode(\"Crosshair\")\n\n\n... [other sections omitted] ...\n\n# Set the crosshair color to Red\ncrosshairNode.SetCrosshairColor(1.0, 0.0, 0.0)\n```\n\n\n... [other sections omitted] ...\n\n### Display mouse pointer coordinates in alternative coordinate system\n\nThe Data probe only shows coordinate values in the world coordinate system. You can make the world coordinate system mean anything you want (e.g., MNI) by applying a transform to the volume that transforms it into that space. See more details in [here ](https://discourse.slicer.org/t/setting-an-mni-origo-to-a-volume/16164/4).\n\n```python\ndef onMouseMoved(observer,eventid):\n  mniToWorldTransformNode = getNode(\"LinearTransform_3\")  # re..."
+          "result_preview": "### Show slice views in 3D window\n\nEquivalent to clicking 'eye' icon in the slice view controller.\n\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sliceViewName).sliceController()\n  controller.setSliceVisible(True)\n```\n\n"
         }
       ],
-      "reasoning_chars": 2519,
-      "reasoning_preview": "[Round 1]\nLet me search for the relevant API examples for crosshair intersection visibility in 3D Slicer.\n\n[Round 2]\nI now have enough information from the vector search results. Let me look at the key findings:\n\n1. The crosshair node can be obtained via `slicer.util.getNode(\"Crosshair\")` or `slicer.mrmlScene.GetFirstNodeByClass(\"vtkMRMLCrosshairNode\")`\n\n2. To make the crosshair visible with intersection lines: `crosshairNode.SetCrosshairMode(slicer.vtkMRMLCrosshairNode.ShowIntersection)`\n\n3. The relevant enum values from the header:\n   - `NoCrosshair = 0`\n   - `ShowBasic`\n   - `ShowIntersection`\n   - `ShowHashmarks`\n   - `ShowAll`\n   - `ShowSmallBasic`\n   - `ShowSmallIntersection`\n\n4. The operation is \"Toggle on slice intersection visibility (crosshair) in toolbar\" - so we need to toggle between NoCrosshair and ShowIntersection (or ShowBasic/ShowIntersection depending on what \"intersection visibility\" means... but the user specifically says \"slice intersection visibility (crosshair)\", so it's ShowIntersection mode).\n\nLet me also check if there's a specific section about slice intersections from result #9 - it mentions `sliceDisplayNode.SetIntersectingSlicesVisibility(1)` which is a different API for the same visual effect but through the display node instead of the crosshair node.\n\nFor the toolbar operation, the crosshair node approach is the right one. The operation is:\n- Toggle: if currently no crosshair, show intersection; if showing intersection, turn off.\n\nLet me read the relevant section from the gui.md to make sure I have the full context.\n\n[Round 3]\nI now have all the information I need. The user wants a code template to toggle on slice intersection visibility (crosshair) in the toolbar. Let me synthesize what I know:\n\n1. Get the crosshair node: `slicer.util.getNode(\"Crosshair\")` or `slicer.mrmlScene.GetFirstNodeByClass(\"vtkMRMLCrosshairNode\")`\n2. Set crosshair mode to show intersections: `crosshairNode.SetCrosshairMode(slicer.vtkMRMLCrosshairNode.ShowIntersection)`\n3. Set crosshair mode to off: `crosshairNode.SetCrosshairMode(slicer.vtkMRMLCrosshairNode.NoCrosshair)`\n4. The enum values from the header:\n   - `NoCrosshair = 0`\n   - `ShowBasic`\n   - `ShowIntersection`\n   - `ShowHashmarks`\n   - `ShowAll`\n   - `ShowSmallBasic`\n   - `ShowSmallIntersection`\n\nFor toggling the slice intersection visibility, we need to:\n- Check current mode\n- If it's not ShowIntersection, set it to ShowIntersection\n- If it is ShowIntersection, set it to NoCrosshair\n\nLet me generate the code."
-    },
-    {
-      "step": 12,
-      "key": "cb_step_12_3",
-      "description": "Switch to Markups module and configure display to show curve in both View 1 and Red view",
-      "keywords": [
-        "markups",
-        "display",
-        "view",
-        "SetAllMarkupsVisible"
-      ],
-      "category": "markups_display",
-      "status": "failed",
-      "total_time_s": null,
-      "code_chars": 0,
-      "tool_rounds": null,
-      "api_calls": null,
-      "error": "Step 12 FAILED: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>",
-      "progress_events": [],
-      "prompt_build_s": 0.0,
-      "executor_ready": true,
-      "tool_count": 3,
-      "tool_loop_s": 40.3
+      "evidence_audit": {
+        "ui_analysis": {
+          "used": true,
+          "query_paths": [
+            "slicer-ui-analysis"
+          ],
+          "result_files": [
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLSliceControllerWidget.ui.md",
+            "slicer-ui-analysis/.",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Transforms__Widgets__Resources__UI__qMRMLTransformDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Base__QTGUI__Resources__UI__qSlicerSettingsViewsPanel.ui.md",
+            "slicer-ui-analysis/Modules__Loadable__Segmentations__Widgets__Resources__UI__qMRMLSegmentationDisplayNodeWidget.ui.md",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md-59-  - `Libs/MRML/Widgets/qMRMLDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md-128-  - `Libs/MRML/Widgets/qMRMLDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Libs__MRML__Widgets__Resources__UI__qMRMLDisplayNodeWidget.ui.md-150-  - `Libs/MRML/Widgets/qMRMLDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Modules__Loadable__Transforms__Widgets__Resources__UI__qMRMLTransformDisplayNodeWidget.ui.md-806-  - `Modules/Loadable/Transforms/Widgets/qMRMLTransformDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Modules__Loadable__Transforms__Widgets__Resources__UI__qMRMLTransformDisplayNodeWidget.ui.md-1351-  - `Modules/Loadable/Transforms/Widgets/qMRMLTransformDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Modules__Loadable__Transforms__Widgets__Resources__UI__qMRMLTransformDisplayNodeWidget.ui.md-1398-  - `Modules/Loadable/Transforms/Widgets/qMRMLTransformDisplayNodeWidget.cxx",
+            "slicer-ui-analysis/Modules__Loadable__Segmentations__Widgets__Resources__UI__qMRMLSegmentationDisplayNodeWidget.ui.md-22-  - `Modules/Loadable/Segmentations/Widgets/qMRMLSegmentationDisplayNodeWidget.cxx"
+          ],
+          "matched_lines_preview": [
+            "## action: actionShow_in_3D",
+            "- Confidence: `linked_to_api`",
+            "- Search text: Show in 3D | Toggle slice visibility in 3D view | actionShow_in_3D",
+            "- Text: Show in 3D",
+            "- Tooltip: Toggle slice visibility in 3D view",
+            "- Implementation candidates: `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget.h`, `Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h`",
+            "- Matched implementation lines:",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:174: QObject::connect(this->actionShow_in_3D, SIGNAL(toggled(bool)), q, SLOT(setSliceVisible(bool)));`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:263: this->SliceVisibilityButton->setDefaultAction(this->actionShow_in_3D);`",
+            "- `Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx:751: this->actionShow_in_3D->setChecked(sliceNode->GetSliceVisible());`",
+            "- Connected slots/functions: `setSliceVisible`",
+            "- API footprints: `EndSliceNodeInteraction`, `GetSliceVisible`, `GetWidgetNormalLockedToCamera`, `SetSliceVisible`, `StartSliceNodeInteraction`, `vtkMRMLSliceNode::SliceVisibleFlag`",
+            "- Key UI properties: {\"checkable\": \"true\"}",
+            "- Search text: Toggle slice visibility in the 3D view. | SliceVisibilityButton | QToolButton",
+            "- Tooltip: Toggle slice visibility in the 3D view.",
+            "- API footprints: `GetClipping`, `GetPointer`, `GetSelectable`, `GetSelected`, `GetSliceIntersectionOpacity`, `GetSliceIntersectionThickness`, `GetVisibility`, `GetVisibility2D`, `GetVisibility3D`, `SetVisibility`, `SetVisibility2D`",
+            "- API footprints: `GetClipping`, `GetPointer`, `GetSliceIntersectionOpacity`, `GetSliceIntersectionThickness`, `GetVisibility2D`, `GetVisibility3D`, `SetVisibility2D`",
+            "- API footprints: `GetPointer`, `GetSliceIntersectionOpacity`, `GetSliceIntersectionThickness`, `GetVisibility2D`, `GetVisibility3D`, `SetSliceIntersectionThickness`",
+            "- API footprints: `GetEditorSliceIntersectionVisibility`, `GetVisibility`, `GetVisibility2D`, `GetVisibility3D`, `SetEditorSliceIntersectionVisibility`, `SetVisibility2D`",
+            "- API footprints: `GetTranslationHandleComponentVisibilitySlice`, `SetTranslationHandleComponentVisibility3D`, `SetTranslationHandleComponentVisibilitySlice`",
+            "- API footprints: `GetScaleHandleComponentVisibilitySlice`, `SetScaleHandleComponentVisibility3D`, `SetScaleHandleComponentVisibilitySlice`",
+            "## widget: SliceEdgeVisibility3DCheckBox",
+            "- Search text: Show colored frame around the slice when displayed in 3D views. | SliceEdgeVisibility3DCheckBox | ctkCheckBox",
+            "- `Base/QTGUI/qSlicerSettingsViewsPanel.cxx:120: this->SliceEdgeVisibility3DCheckBox,`",
+            "- Connected slots/functions: `onSegmentVisibility3DChanged`, `onSegmentVisibilitySliceFillChanged`, `onSegmentVisibilitySliceOutlineChanged`, `onVisibility3DChanged`, `onVisibilityChanged`, `onVisibilitySliceFillChanged`, `onVisibilitySliceOutlineChanged`"
+          ],
+          "connected_slots": [
+            "setSliceVisible",
+            "onSegmentVisibility3DChanged",
+            "onSegmentVisibilitySliceFillChanged",
+            "onSegmentVisibilitySliceOutlineChanged",
+            "onVisibility3DChanged",
+            "onVisibilityChanged",
+            "onVisibilitySliceFillChanged",
+            "onVisibilitySliceOutlineChanged"
+          ],
+          "api_footprints": [
+            "EndSliceNodeInteraction",
+            "GetSliceVisible",
+            "GetWidgetNormalLockedToCamera",
+            "SetSliceVisible",
+            "StartSliceNodeInteraction",
+            "vtkMRMLSliceNode::SliceVisibleFlag",
+            "GetClipping",
+            "GetPointer",
+            "GetSelectable",
+            "GetSelected",
+            "GetSliceIntersectionOpacity",
+            "GetSliceIntersectionThickness",
+            "GetVisibility",
+            "GetVisibility2D",
+            "GetVisibility3D",
+            "SetVisibility",
+            "SetVisibility2D",
+            "SetSliceIntersectionThickness",
+            "GetEditorSliceIntersectionVisibility",
+            "SetEditorSliceIntersectionVisibility",
+            "GetTranslationHandleComponentVisibilitySlice",
+            "SetTranslationHandleComponentVisibility3D",
+            "SetTranslationHandleComponentVisibilitySlice",
+            "GetScaleHandleComponentVisibilitySlice",
+            "SetScaleHandleComponentVisibility3D",
+            "SetScaleHandleComponentVisibilitySlice"
+          ],
+          "implementation_candidates": [
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.cxx",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget.h",
+            "Libs/MRML/Widgets/qMRMLSliceControllerWidget_p.h"
+          ]
+        },
+        "source_verification": {
+          "non_ui_result_files": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md",
+            "slicer-source/Docs/developer_guide/script_repository/volumes.md"
+          ],
+          "source_type_counts": {
+            "doc_example": 10,
+            "ui_analysis": 6
+          }
+        },
+        "searches": {
+          "vector_queries": [
+            "slice visibility in 3D view toggle off slice display node"
+          ],
+          "grep_patterns": [
+            "SetVisibility.*slice.*3D|slice.*visibility.*3D"
+          ],
+          "read_paths": [
+            "slicer-source/Docs/developer_guide/script_repository/gui.md"
+          ]
+        }
+      },
+      "reasoning_chars": 1436,
+      "reasoning_preview": "[Round 1]\nLet me search for the relevant API to toggle off slice visibility in 3D view for the Red view. I'll start with the UI analysis to find the relevant control.\n\n[Round 2]\nFrom the search results, I found the relevant information:\n\n1. The UI analysis shows \"actionShow_in_3D\" which is the \"Show in 3D\" action that toggles slice visibility in the 3D view. It connects to `setSliceVisible(bool)`.\n\n2. The script repository has an example \"Show slice views in 3D window\" at line 797:\n```python\nlayoutManager = slicer.app.layoutManager()\nfor sliceViewName in layoutManager.sliceViewNames():\n  controller = layoutManager.sliceWidget(sliceViewName).sliceController()\n  controller.setSliceVisible(True)\n```\n\nSo for the Red view specifically, I can use:\n```python\nlayoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(False)\n```\n\nThis is the clean API. Let me also verify the `setSliceVisible` method by checking the implementation.\n\n[Round 3]\nI have all the information I need. The API is straightforward:\n\n```python\nlayoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(False)\n```\n\nThis matches the UI action \"Show in 3D\" which is the eye icon in the slice view controller. The `setSliceVisible(False)` will turn off the slice visibility in the 3D view for the Red slice view.",
+      "generated_code_preview": "layoutManager = slicer.app.layoutManager()\ncontroller = layoutManager.sliceWidget(\"Red\").sliceController()\ncontroller.setSliceVisible(False)"
     }
   ]
 }

@@ -7,8 +7,8 @@ if node is None:
 
 # Validate user input
 numPoints = node.GetNumberOfControlPoints()
-if numPoints < 3:
-    raise RuntimeError("Need at least 3 control points, got %d. Please add more." % numPoints)
+if numPoints < 2:
+    raise RuntimeError("Need at least 2 control points, got %d. Please add more." % numPoints)
 
 # Store the placed node on the extension parameter node for later steps
 from BoneReconstructionPlanner import BoneReconstructionPlannerLogic

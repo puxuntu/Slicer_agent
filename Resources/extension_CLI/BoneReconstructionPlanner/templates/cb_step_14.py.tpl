@@ -1,6 +1,6 @@
-# --- BoneReconstructionPlanner: 14. Restore the BoneReconstructionPlanner custom layout registered by the extension. This is a layout/view operation. ---
-from BoneReconstructionPlanner import addBRPLayout
+# --- BoneReconstructionPlanner: 14. Change the layout to "BoneReconstructionPlanner". ---
+from BoneReconstructionPlanner import setBRPLayout
 
-addBRPLayout()
+setBRPLayout()
 
 print("[BoneReconstructionPlanner] Step 'cb_step_14' completed.")

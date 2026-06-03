@@ -1,29 +1,41 @@
-# Switch to the Markups module
-slicer.util.selectModule("Markups")
+"""
+Configure display settings of a markups curve named "mandibular curve"
+to show only in "View 1" (3D view) and "Red" (Red slice view).
+"""
 
-# Configure Advanced Display settings for the mandibular curve markups node
-# to show in View 1 (3D) and Red (slice) views
-
-# Find the markups node by fuzzy name matching
-markupsNode = None
-for node in slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsNode"):
-    if "mandibular" in node.GetName().lower() or "curve" in node.GetName().lower():
-        markupsNode = node
+# Find the mandibular curve markups node by fuzzy name matching
+curveNode = None
+for node in slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsCurveNode"):
+    if "mandibular" in node.GetName().lower() and "curve" in node.GetName().lower():
+        curveNode = node
         break
 
-if markupsNode is None:
-    raise RuntimeError("Mandibular curve markups node not found. "
-                       "Please create or rename a markups node containing 'mandibular' or 'curve' in its name.")
+if curveNode is None:
+    # Try a broader search if no curve-specific node found
+    for node in slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsNode"):
+        if "mandibular" in node.GetName().lower() and "curve" in node.GetName().lower():
+            curveNode = node
+            break
 
-# Ensure display nodes exist
-if not markupsNode.GetDisplayNode():
-    markupsNode.CreateDefaultDisplayNodes()
+if curveNode is None:
+    raise RuntimeError("Markups curve node containing 'mandibular' and 'curve' not found.")
 
-displayNode = markupsNode.GetDisplayNode()
+# Get the display node
+displayNode = curveNode.GetDisplayNode()
+if displayNode is None:
+    raise RuntimeError("Display node not found for the curve node.")
 
-# Clear any previous view restrictions (default: shown in all views)
-displayNode.RemoveAllViewNodeIDs()
+# Collect view node IDs for "View 1" (3D view) and "Red" (Red slice view)
+layoutManager = slicer.app.layoutManager()
+viewNodeIDs = []
 
-# Add view node IDs to restrict display to View 1 and Red slice only
-displayNode.AddViewNodeID("vtkMRMLViewNode1")      # View 1 (3D)
-displayNode.AddViewNodeID("vtkMRMLSliceNodeRed")   # Red (2D slice)
+# Add the 3D view "View 1" (first 3D view widget)
+threeDViewNode = layoutManager.threeDWidget(0).mrmlViewNode()
+viewNodeIDs.append(threeDViewNode.GetID())
+
+# Add the Red slice view
+redSliceNode = layoutManager.sliceWidget("Red").mrmlSliceNode()
+viewNodeIDs.append(redSliceNode.GetID())
+
+# Restrict the display node to show only in the specified views
+displayNode.SetViewNodeIDs(viewNodeIDs)

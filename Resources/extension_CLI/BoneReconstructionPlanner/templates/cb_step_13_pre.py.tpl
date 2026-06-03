@@ -21,5 +21,5 @@ if interactionNode is not None:
     interactionNode.SwitchToPersistentPlaceMode()
 _bonereconstructionplanner_cb_step_13_id = node.GetID()
 
-print("[BoneReconstructionPlanner] Please Click and draw a curve along the mandible in the Red slice view, placing control points along the bone contour")
+print("[BoneReconstructionPlanner] Please Click and draw on the Red view to create a curve along the mandible")
 print("When finished, press the 'Done' button in the workflow panel.")

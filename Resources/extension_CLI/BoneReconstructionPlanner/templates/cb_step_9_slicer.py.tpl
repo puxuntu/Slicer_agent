@@ -1,15 +1,19 @@
-# Get the crosshair node and set it to ShowIntersection mode
-crosshairNode = slicer.util.getNode("Crosshair")
-crosshairNode.SetCrosshairMode(slicer.vtkMRMLCrosshairNode.ShowIntersection)
+# Turn on slice intersection visibility, interaction mode, Translate, and Rotate
 
-# Get all slice display nodes and enable slice intersection visibility, interaction, translate, and rotate
-sliceDisplayNodes = slicer.util.getNodesByClass("vtkMRMLSliceDisplayNode")
-for sliceDisplayNode in sliceDisplayNodes:
-    sliceDisplayNode.SetIntersectingSlicesVisibility(True)
-    sliceDisplayNode.SetIntersectingSlicesInteractive(True)
-    sliceDisplayNode.SetIntersectingSlicesTranslationEnabled(True)
-    sliceDisplayNode.SetIntersectingSlicesRotationEnabled(True)
+appLogic = slicer.app.applicationLogic()
 
-# Set interaction mode to Translate and Rotate (ViewTransform mode)
-interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-interactionNode.SwitchToViewTransformMode()
+# Enable slice intersection visibility
+appLogic.SetIntersectingSlicesEnabled(
+    slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility, True)
+
+# Enable slice intersection interaction mode
+appLogic.SetIntersectingSlicesEnabled(
+    slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive, True)
+
+# Enable Translate handles
+appLogic.SetIntersectingSlicesEnabled(
+    slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation, True)
+
+# Enable Rotate handles
+appLogic.SetIntersectingSlicesEnabled(
+    slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation, True)

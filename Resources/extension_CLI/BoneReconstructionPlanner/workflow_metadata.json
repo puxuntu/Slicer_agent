@@ -2775,110 +2775,6 @@
     }
   },
   "parameter_method_dependencies": {
-    "setRedSliceForBoxModelsDisplayNodes": {
-      "parameter_roles": [
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ"
-      ],
-      "transitive_methods": []
-    },
-    "createCylindersFromFiducialListAndFibulaSurgicalGuideBase": {
-      "parameter_roles": [
-        "fibulaScrewHoleCylinderRadius"
-      ],
-      "transitive_methods": [
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID"
-      ]
-    },
-    "makeBooleanOperationsToFibulaSurgicalGuideBase": {
-      "parameter_roles": [
-        "dentalImplantsPlanningAndFibulaDrillGuides"
-      ],
-      "transitive_methods": [
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID"
-      ]
-    },
-    "makeModels": {
-      "parameter_roles": [
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "getParentFolderItemID"
-      ]
-    },
-    "hardVSPUpdate": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "fibulaSegmentsMeasurementMode",
-        "fixCutGoesThroughTheMandibleTwice",
-        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleSideToRemove",
-        "rightSideLegFibula",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "addMandiblePlaneObservers",
-        "createAndUpdateDynamicModelerNodes",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
-        "createFibulaSegmentsLengthsLines",
-        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
-        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
-        "getAxes1ToAxes2RegistrationTransformMatrix",
-        "getAxes1ToAxes2RotationMatrix",
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getAxes1ToWorldRotationMatrix",
-        "getInverseMandibleReconstructionFolderItemID",
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "onGenerateFibulaPlanesTimerTimeout",
-        "removeMandiblePlaneObservers",
-        "reorderMandiblePlanes",
-        "resetPlan",
-        "setRedSliceForBoneModelsDisplayNodes",
-        "tranformFibulaPiecesToMandible",
-        "tranformMandiblePiecesToFibula",
-        "transformFibulaPlanes",
-        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
-        "updateFibulaPieces",
-        "updateInverseMandiblePieces"
-      ]
-    },
-    "section_LoadSampleData": {
-      "parameter_roles": [
-        "scalarVolumeChangedThroughParameterNode"
-      ],
-      "transitive_methods": []
-    },
     "createFibulaSegmentsLengthsLines": {
       "parameter_roles": [
         "fibulaSegmentsMeasurementMode"
@@ -2887,155 +2783,37 @@
         "getParentFolderItemID"
       ]
     },
-    "exit": {
+    "addCutPlane": {
       "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
+        "colorIndex"
       ],
       "transitive_methods": [
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "updateGUIFromParameterNode"
+        "getMandiblePlanesFolderItemID",
+        "getParentFolderItemID"
       ]
     },
-    "createMiterBoxesFromFibulaPlanes": {
+    "onPlaneModifiedTimer": {
       "parameter_roles": [
-        "biggerMiterBoxDistanceToFibula",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
+        "makeAllMandiblePlanesRotateTogether",
+        "updateOnMandiblePlanesMovement"
+      ],
+      "transitive_methods": []
+    },
+    "transformFibulaPlanes": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
         "rightSideLegFibula",
-        "securityMarginOfFibulaPieces",
         "useMoreExactVersionOfPositioningAlgorithm"
       ],
       "transitive_methods": [
         "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
         "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "setRedSliceForBoxModelsDisplayNodes"
-      ]
-    },
-    "create3DModelOfTheReconstruction": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "fibulaSegmentsMeasurementMode",
-        "fixCutGoesThroughTheMandibleTwice",
-        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleSideToRemove",
-        "rightSideLegFibula",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "addMandiblePlaneObservers",
-        "createAndUpdateDynamicModelerNodes",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
         "createFibulaSegmentsLengthsLines",
-        "exportScaledFibulaPiecesForNeomandibleReconstructionToFolder",
-        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
-        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
         "getAxes1ToAxes2RegistrationTransformMatrix",
-        "getAxes1ToAxes2RotationMatrix",
         "getAxes1ToWorldChangeOfFrameMatrix",
         "getAxes1ToWorldRotationMatrix",
-        "getInverseMandibleReconstructionFolderItemID",
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "onGenerateFibulaPlanesTimerTimeout",
-        "removeMandiblePlaneObservers",
-        "reorderMandiblePlanes",
-        "resetPlan",
-        "setRedSliceForBoneModelsDisplayNodes",
-        "tranformFibulaPiecesToMandible",
-        "tranformMandiblePiecesToFibula",
-        "transformFibulaPlanes",
-        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
-        "updateFibulaPieces",
-        "updateInverseMandiblePieces"
-      ]
-    },
-    "createAndUpdateDynamicModelerNodes": {
-      "parameter_roles": [
-        "fixCutGoesThroughTheMandibleTwice",
-        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "getInverseMandibleReconstructionFolderItemID",
         "getMandiblePlanesFolderItemID",
         "getMandibleReconstructionFolderItemID",
         "getParentFolderItemID"
@@ -3084,148 +2862,14 @@
         "updateInverseMandiblePieces"
       ]
     },
-    "onSceneStartClose": {
+    "onFixCutGoesThroughTheMandibleTwiceCheckBox": {
       "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "setParameterNode",
-        "updateGUIFromParameterNode"
-      ]
-    },
-    "section_SimulateAndImproveMandibleReconstruction": {
-      "parameter_roles": [
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact"
-      ],
-      "transitive_methods": []
-    },
-    "createCustomPlate": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "fibulaSegmentsMeasurementMode",
         "fixCutGoesThroughTheMandibleTwice",
-        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleSideToRemove",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "addMandiblePlaneObservers",
-        "create3DModelOfTheReconstruction",
-        "createAlmostQuarterArcFromPointsAndCenter",
-        "createAndUpdateDynamicModelerNodes",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
-        "createFibulaSegmentsLengthsLines",
-        "createLineFromPointsAndDistanceBetweenPoints",
-        "exportScaledFibulaPiecesForNeomandibleReconstructionToFolder",
-        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
-        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
-        "getAxes1ToAxes2RegistrationTransformMatrix",
-        "getAxes1ToAxes2RotationMatrix",
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getAxes1ToWorldRotationMatrix",
-        "getInverseMandibleReconstructionFolderItemID",
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "onGenerateFibulaPlanesTimerTimeout",
-        "pointsOverlap",
-        "removeMandiblePlaneObservers",
-        "reorderMandiblePlanes",
-        "resetPlan",
-        "setRedSliceForBoneModelsDisplayNodes",
-        "tranformFibulaPiecesToMandible",
-        "tranformMandiblePiecesToFibula",
-        "transformFibulaPlanes",
-        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
-        "updateFibulaPieces",
-        "updateInverseMandiblePieces"
-      ]
-    },
-    "setOriginalMandibleVisility": {
-      "parameter_roles": [
-        "useNonDecimatedBoneModelsForPreview"
+        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged"
       ],
       "transitive_methods": []
     },
-    "addCutPlane": {
-      "parameter_roles": [
-        "colorIndex"
-      ],
-      "transitive_methods": [
-        "getMandiblePlanesFolderItemID",
-        "getParentFolderItemID"
-      ]
-    },
-    "initializeParameterNode": {
+    "updateParameterNodeFromGUI": {
       "parameter_roles": [
         "additionalBetweenSpaceOfFibulaPlanes",
         "biggerMiterBoxDistanceToFibula",
@@ -3241,7 +2885,6 @@
         "fibulaSegmentsMeasurementMode",
         "initialSpace",
         "kindOfMandibleResection",
-        "lockVSP",
         "makeAllDentalImplanCylindersParallel",
         "makeAllMandiblePlanesRotateTogether",
         "mandiblePlanesPositioningForMaximumBoneContact",
@@ -3260,6 +2903,7 @@
         "sawBoxSlotLength",
         "sawBoxSlotWall",
         "sawBoxSlotWidth",
+        "scalarVolumeChangedThroughParameterNode",
         "securityMarginOfFibulaPieces",
         "showBiggerSawBoxesInteractionHandles",
         "showFibulaSegmentsLengths",
@@ -3271,65 +2915,9 @@
         "useMoreExactVersionOfPositioningAlgorithm",
         "useNonDecimatedBoneModelsForPreview"
       ],
-      "transitive_methods": [
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "setParameterNode",
-        "updateGUIFromParameterNode"
-      ]
-    },
-    "makeBooleanOperationsToMandibleSurgicalGuideBase": {
-      "parameter_roles": [
-        "kindOfMandibleResection",
-        "mandibleSideToRemove"
-      ],
-      "transitive_methods": [
-        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes"
-      ]
-    },
-    "runTest": {
-      "parameter_roles": [
-        "checkSecurityMarginOnMiterBoxCreation",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "scalarVolumeChangedThroughParameterNode"
-      ],
-      "transitive_methods": [
-        "section_AddFibulaLineAndCenterIt",
-        "section_AddMandiblePlanes",
-        "section_AddMandibularCurve",
-        "section_EnterBRP",
-        "section_GetLogic",
-        "section_GetWidget",
-        "section_LoadSampleData",
-        "section_MakeModels",
-        "section_SimulateAndImproveMandibleReconstruction",
-        "section_createAndUpdateSawBoxesFromMandiblePlanes",
-        "section_createMiterBoxesFromCorrespondingLine",
-        "setUp"
-      ]
-    },
-    "onPlaneModifiedTimer": {
-      "parameter_roles": [
-        "makeAllMandiblePlanesRotateTogether",
-        "updateOnMandiblePlanesMovement"
-      ],
       "transitive_methods": []
     },
-    "enter": {
+    "onSceneEndClose": {
       "parameter_roles": [
         "additionalBetweenSpaceOfFibulaPlanes",
         "biggerMiterBoxDistanceToFibula",
@@ -3384,157 +2972,6 @@
         "setOriginalMandibleVisility",
         "setParameterNode",
         "updateGUIFromParameterNode"
-      ]
-    },
-    "setup": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "initializeParameterNode",
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "setParameterNode",
-        "updateGUIFromParameterNode"
-      ]
-    },
-    "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection": {
-      "parameter_roles": [
-        "kindOfMandibleResection",
-        "mandibleSideToRemove"
-      ],
-      "transitive_methods": [
-        "getMandiblePlanesFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes"
-      ]
-    },
-    "addFibulaLine": {
-      "parameter_roles": [
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ"
-      ],
-      "transitive_methods": [
-        "getParentFolderItemID"
-      ]
-    },
-    "updateGUIFromParameterNode": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility"
-      ]
-    },
-    "lockVSP": {
-      "parameter_roles": [
-        "lockVSP"
-      ],
-      "transitive_methods": []
-    },
-    "createCylindersFromFiducialListAndMandibleSurgicalGuideBase": {
-      "parameter_roles": [
-        "mandibleScrewHoleCylinderRadius"
-      ],
-      "transitive_methods": [
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID"
       ]
     },
     "onUpdateFibuladentalImplantsTimerTimeout": {
@@ -3635,259 +3072,7 @@
         "updateInverseMandiblePieces"
       ]
     },
-    "transformFibulaPlanes": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "rightSideLegFibula",
-        "useMoreExactVersionOfPositioningAlgorithm"
-      ],
-      "transitive_methods": [
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
-        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-        "createFibulaSegmentsLengthsLines",
-        "getAxes1ToAxes2RegistrationTransformMatrix",
-        "getAxes1ToWorldChangeOfFrameMatrix",
-        "getAxes1ToWorldRotationMatrix",
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID"
-      ]
-    },
-    "section_MakeModels": {
-      "parameter_roles": [
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ"
-      ],
-      "transitive_methods": []
-    },
-    "setRedSliceForBoneModelsDisplayNodes": {
-      "parameter_roles": [
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ"
-      ],
-      "transitive_methods": []
-    },
-    "onSceneEndClose": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "initializeParameterNode",
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "setParameterNode",
-        "updateGUIFromParameterNode"
-      ]
-    },
-    "updateParameterNodeFromGUI": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "scalarVolumeChangedThroughParameterNode",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": []
-    },
-    "setParameterNode": {
-      "parameter_roles": [
-        "additionalBetweenSpaceOfFibulaPlanes",
-        "biggerMiterBoxDistanceToFibula",
-        "biggerSawBoxDistanceToMandible",
-        "checkSecurityMarginOnMiterBoxCreation",
-        "clearanceFitPrintingTolerance",
-        "customTitaniumPlateDesing",
-        "dentalImplantCylinderHeight",
-        "dentalImplantCylinderRadius",
-        "dentalImplantDrillGuideWall",
-        "dentalImplantsPlanningAndFibulaDrillGuides",
-        "fibulaScrewHoleCylinderRadius",
-        "fibulaSegmentsMeasurementMode",
-        "initialSpace",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllDentalImplanCylindersParallel",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleScrewHoleCylinderRadius",
-        "mandibleSideToRemove",
-        "miterBoxSlotHeight",
-        "miterBoxSlotLength",
-        "miterBoxSlotWall",
-        "miterBoxSlotWidth",
-        "plateCrossSectionalBevelRadiusPorcentage",
-        "plateCrossSectionalLength",
-        "plateCrossSectionalWidth",
-        "plateTipsBevelRadius",
-        "rightSideLegFibula",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "securityMarginOfFibulaPieces",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible",
-        "updateOnDentalImplantPlanesMovement",
-        "updateOnMandiblePlanesMovement",
-        "useMoreExactVersionOfPositioningAlgorithm",
-        "useNonDecimatedBoneModelsForPreview"
-      ],
-      "transitive_methods": [
-        "setBiggerSawBoxesInteractionHandlesVisibility",
-        "setFibulaSegmentsLengthsVisibility",
-        "setMandiblePlanesInteractionHandlesVisibility",
-        "setMandiblePlanesVisibility",
-        "setOriginalMandibleVisility",
-        "updateGUIFromParameterNode"
-      ]
-    },
-    "onFixCutGoesThroughTheMandibleTwiceCheckBox": {
-      "parameter_roles": [
-        "fixCutGoesThroughTheMandibleTwice",
-        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged"
-      ],
-      "transitive_methods": []
-    },
-    "setDefaultParameters": {
-      "parameter_roles": [
-        "fibulaSegmentsMeasurementMode",
-        "kindOfMandibleResection",
-        "lockVSP",
-        "makeAllMandiblePlanesRotateTogether",
-        "mandiblePlanesPositioningForMaximumBoneContact",
-        "mandibleSideToRemove",
-        "scalarVolumeChangedThroughParameterNode",
-        "showBiggerSawBoxesInteractionHandles",
-        "showFibulaSegmentsLengths",
-        "showMandiblePlanes",
-        "showMandiblePlanesInteractionHandles",
-        "showOriginalMandible"
-      ],
-      "transitive_methods": []
-    },
-    "createSawBoxesFromFirstAndLastMandiblePlanes": {
-      "parameter_roles": [
-        "biggerSawBoxDistanceToMandible",
-        "clearanceFitPrintingTolerance",
-        "fibulaCentroidX",
-        "fibulaCentroidY",
-        "fibulaCentroidZ",
-        "kindOfMandibleResection",
-        "mandibleCentroidX",
-        "mandibleCentroidY",
-        "mandibleCentroidZ",
-        "mandibleSideToRemove",
-        "sawBoxSlotHeight",
-        "sawBoxSlotLength",
-        "sawBoxSlotWall",
-        "sawBoxSlotWidth",
-        "showBiggerSawBoxesInteractionHandles"
-      ],
-      "transitive_methods": [
-        "getMandiblePlanesFolderItemID",
-        "getMandibleReconstructionFolderItemID",
-        "getParentFolderItemID",
-        "getRightAndLeftMandibleResectionPlanes",
-        "setRedSliceForBoxModelsDisplayNodes"
-      ]
-    },
-    "updateFibulaPieces": {
+    "makeBooleanOperationsToMandibleSurgicalGuideBase": {
       "parameter_roles": [
         "kindOfMandibleResection",
         "mandibleSideToRemove"
@@ -3895,8 +3080,72 @@
       "transitive_methods": [
         "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
         "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
         "getParentFolderItemID",
         "getRightAndLeftMandibleResectionPlanes"
+      ]
+    },
+    "updateGUIFromParameterNode": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility"
+      ]
+    },
+    "makeBooleanOperationsToFibulaSurgicalGuideBase": {
+      "parameter_roles": [
+        "dentalImplantsPlanningAndFibulaDrillGuides"
+      ],
+      "transitive_methods": [
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID"
       ]
     },
     "createCylindersFromFiducialListAndNeomandiblePieces": {
@@ -3955,18 +3204,769 @@
       ],
       "transitive_methods": []
     },
+    "setParameterNode": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "createCustomPlate": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "fibulaSegmentsMeasurementMode",
+        "fixCutGoesThroughTheMandibleTwice",
+        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleSideToRemove",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "addMandiblePlaneObservers",
+        "create3DModelOfTheReconstruction",
+        "createAlmostQuarterArcFromPointsAndCenter",
+        "createAndUpdateDynamicModelerNodes",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
+        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
+        "createFibulaSegmentsLengthsLines",
+        "createLineFromPointsAndDistanceBetweenPoints",
+        "exportScaledFibulaPiecesForNeomandibleReconstructionToFolder",
+        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
+        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
+        "getAxes1ToAxes2RegistrationTransformMatrix",
+        "getAxes1ToAxes2RotationMatrix",
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getAxes1ToWorldRotationMatrix",
+        "getInverseMandibleReconstructionFolderItemID",
+        "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "onGenerateFibulaPlanesTimerTimeout",
+        "pointsOverlap",
+        "removeMandiblePlaneObservers",
+        "reorderMandiblePlanes",
+        "resetPlan",
+        "setRedSliceForBoneModelsDisplayNodes",
+        "tranformFibulaPiecesToMandible",
+        "tranformMandiblePiecesToFibula",
+        "transformFibulaPlanes",
+        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
+        "updateFibulaPieces",
+        "updateInverseMandiblePieces"
+      ]
+    },
+    "hardVSPUpdate": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "fibulaSegmentsMeasurementMode",
+        "fixCutGoesThroughTheMandibleTwice",
+        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleSideToRemove",
+        "rightSideLegFibula",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "addMandiblePlaneObservers",
+        "createAndUpdateDynamicModelerNodes",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
+        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
+        "createFibulaSegmentsLengthsLines",
+        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
+        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
+        "getAxes1ToAxes2RegistrationTransformMatrix",
+        "getAxes1ToAxes2RotationMatrix",
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getAxes1ToWorldRotationMatrix",
+        "getInverseMandibleReconstructionFolderItemID",
+        "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "onGenerateFibulaPlanesTimerTimeout",
+        "removeMandiblePlaneObservers",
+        "reorderMandiblePlanes",
+        "resetPlan",
+        "setRedSliceForBoneModelsDisplayNodes",
+        "tranformFibulaPiecesToMandible",
+        "tranformMandiblePiecesToFibula",
+        "transformFibulaPlanes",
+        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
+        "updateFibulaPieces",
+        "updateInverseMandiblePieces"
+      ]
+    },
+    "create3DModelOfTheReconstruction": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "fibulaSegmentsMeasurementMode",
+        "fixCutGoesThroughTheMandibleTwice",
+        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleSideToRemove",
+        "rightSideLegFibula",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "addMandiblePlaneObservers",
+        "createAndUpdateDynamicModelerNodes",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
+        "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
+        "createFibulaSegmentsLengthsLines",
+        "exportScaledFibulaPiecesForNeomandibleReconstructionToFolder",
+        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
+        "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
+        "getAxes1ToAxes2RegistrationTransformMatrix",
+        "getAxes1ToAxes2RotationMatrix",
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getAxes1ToWorldRotationMatrix",
+        "getInverseMandibleReconstructionFolderItemID",
+        "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "onGenerateFibulaPlanesTimerTimeout",
+        "removeMandiblePlaneObservers",
+        "reorderMandiblePlanes",
+        "resetPlan",
+        "setRedSliceForBoneModelsDisplayNodes",
+        "tranformFibulaPiecesToMandible",
+        "tranformMandiblePiecesToFibula",
+        "transformFibulaPlanes",
+        "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
+        "updateFibulaPieces",
+        "updateInverseMandiblePieces"
+      ]
+    },
+    "section_MakeModels": {
+      "parameter_roles": [
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ"
+      ],
+      "transitive_methods": []
+    },
+    "setRedSliceForBoneModelsDisplayNodes": {
+      "parameter_roles": [
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ"
+      ],
+      "transitive_methods": []
+    },
+    "enter": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "initializeParameterNode",
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "setParameterNode",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "createCylindersFromFiducialListAndMandibleSurgicalGuideBase": {
+      "parameter_roles": [
+        "mandibleScrewHoleCylinderRadius"
+      ],
+      "transitive_methods": [
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID"
+      ]
+    },
+    "runTest": {
+      "parameter_roles": [
+        "checkSecurityMarginOnMiterBoxCreation",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "scalarVolumeChangedThroughParameterNode"
+      ],
+      "transitive_methods": [
+        "section_AddFibulaLineAndCenterIt",
+        "section_AddMandiblePlanes",
+        "section_AddMandibularCurve",
+        "section_EnterBRP",
+        "section_GetLogic",
+        "section_GetWidget",
+        "section_LoadSampleData",
+        "section_MakeModels",
+        "section_SimulateAndImproveMandibleReconstruction",
+        "section_createAndUpdateSawBoxesFromMandiblePlanes",
+        "section_createMiterBoxesFromCorrespondingLine",
+        "setUp"
+      ]
+    },
+    "setup": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "initializeParameterNode",
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "setParameterNode",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection": {
+      "parameter_roles": [
+        "kindOfMandibleResection",
+        "mandibleSideToRemove"
+      ],
+      "transitive_methods": [
+        "getMandiblePlanesFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes"
+      ]
+    },
+    "setDefaultParameters": {
+      "parameter_roles": [
+        "fibulaSegmentsMeasurementMode",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleSideToRemove",
+        "scalarVolumeChangedThroughParameterNode",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible"
+      ],
+      "transitive_methods": []
+    },
+    "lockVSP": {
+      "parameter_roles": [
+        "lockVSP"
+      ],
+      "transitive_methods": []
+    },
+    "exit": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "section_SimulateAndImproveMandibleReconstruction": {
+      "parameter_roles": [
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact"
+      ],
+      "transitive_methods": []
+    },
+    "createAndUpdateDynamicModelerNodes": {
+      "parameter_roles": [
+        "fixCutGoesThroughTheMandibleTwice",
+        "fixCutGoesThroughTheMandibleTwiceCheckBoxChanged",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "getInverseMandibleReconstructionFolderItemID",
+        "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID"
+      ]
+    },
+    "onSceneStartClose": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "setParameterNode",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "section_LoadSampleData": {
+      "parameter_roles": [
+        "scalarVolumeChangedThroughParameterNode"
+      ],
+      "transitive_methods": []
+    },
+    "createCylindersFromFiducialListAndFibulaSurgicalGuideBase": {
+      "parameter_roles": [
+        "fibulaScrewHoleCylinderRadius"
+      ],
+      "transitive_methods": [
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID"
+      ]
+    },
+    "createMiterBoxesFromFibulaPlanes": {
+      "parameter_roles": [
+        "biggerMiterBoxDistanceToFibula",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "rightSideLegFibula",
+        "securityMarginOfFibulaPieces",
+        "useMoreExactVersionOfPositioningAlgorithm"
+      ],
+      "transitive_methods": [
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
+        "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
+        "getAxes1ToWorldChangeOfFrameMatrix",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID",
+        "setRedSliceForBoxModelsDisplayNodes"
+      ]
+    },
+    "setOriginalMandibleVisility": {
+      "parameter_roles": [
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": []
+    },
     "onDentalImplantPlaneMoved": {
       "parameter_roles": [
         "makeAllDentalImplanCylindersParallel",
         "updateOnDentalImplantPlanesMovement"
       ],
       "transitive_methods": []
+    },
+    "createSawBoxesFromFirstAndLastMandiblePlanes": {
+      "parameter_roles": [
+        "biggerSawBoxDistanceToMandible",
+        "clearanceFitPrintingTolerance",
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "kindOfMandibleResection",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "mandibleSideToRemove",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "showBiggerSawBoxesInteractionHandles"
+      ],
+      "transitive_methods": [
+        "getMandiblePlanesFolderItemID",
+        "getMandibleReconstructionFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes",
+        "setRedSliceForBoxModelsDisplayNodes"
+      ]
+    },
+    "initializeParameterNode": {
+      "parameter_roles": [
+        "additionalBetweenSpaceOfFibulaPlanes",
+        "biggerMiterBoxDistanceToFibula",
+        "biggerSawBoxDistanceToMandible",
+        "checkSecurityMarginOnMiterBoxCreation",
+        "clearanceFitPrintingTolerance",
+        "customTitaniumPlateDesing",
+        "dentalImplantCylinderHeight",
+        "dentalImplantCylinderRadius",
+        "dentalImplantDrillGuideWall",
+        "dentalImplantsPlanningAndFibulaDrillGuides",
+        "fibulaScrewHoleCylinderRadius",
+        "fibulaSegmentsMeasurementMode",
+        "initialSpace",
+        "kindOfMandibleResection",
+        "lockVSP",
+        "makeAllDentalImplanCylindersParallel",
+        "makeAllMandiblePlanesRotateTogether",
+        "mandiblePlanesPositioningForMaximumBoneContact",
+        "mandibleScrewHoleCylinderRadius",
+        "mandibleSideToRemove",
+        "miterBoxSlotHeight",
+        "miterBoxSlotLength",
+        "miterBoxSlotWall",
+        "miterBoxSlotWidth",
+        "plateCrossSectionalBevelRadiusPorcentage",
+        "plateCrossSectionalLength",
+        "plateCrossSectionalWidth",
+        "plateTipsBevelRadius",
+        "rightSideLegFibula",
+        "sawBoxSlotHeight",
+        "sawBoxSlotLength",
+        "sawBoxSlotWall",
+        "sawBoxSlotWidth",
+        "securityMarginOfFibulaPieces",
+        "showBiggerSawBoxesInteractionHandles",
+        "showFibulaSegmentsLengths",
+        "showMandiblePlanes",
+        "showMandiblePlanesInteractionHandles",
+        "showOriginalMandible",
+        "updateOnDentalImplantPlanesMovement",
+        "updateOnMandiblePlanesMovement",
+        "useMoreExactVersionOfPositioningAlgorithm",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "setBiggerSawBoxesInteractionHandlesVisibility",
+        "setFibulaSegmentsLengthsVisibility",
+        "setMandiblePlanesInteractionHandlesVisibility",
+        "setMandiblePlanesVisibility",
+        "setOriginalMandibleVisility",
+        "setParameterNode",
+        "updateGUIFromParameterNode"
+      ]
+    },
+    "makeModels": {
+      "parameter_roles": [
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ",
+        "useNonDecimatedBoneModelsForPreview"
+      ],
+      "transitive_methods": [
+        "getParentFolderItemID"
+      ]
+    },
+    "setRedSliceForBoxModelsDisplayNodes": {
+      "parameter_roles": [
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ"
+      ],
+      "transitive_methods": []
+    },
+    "updateFibulaPieces": {
+      "parameter_roles": [
+        "kindOfMandibleResection",
+        "mandibleSideToRemove"
+      ],
+      "transitive_methods": [
+        "filterOutUnconnectedModelPiecesAccordingToKindOfMandibleResection",
+        "getMandiblePlanesFolderItemID",
+        "getParentFolderItemID",
+        "getRightAndLeftMandibleResectionPlanes"
+      ]
+    },
+    "addFibulaLine": {
+      "parameter_roles": [
+        "fibulaCentroidX",
+        "fibulaCentroidY",
+        "fibulaCentroidZ",
+        "mandibleCentroidX",
+        "mandibleCentroidY",
+        "mandibleCentroidZ"
+      ],
+      "transitive_methods": [
+        "getParentFolderItemID"
+      ]
     }
   },
   "choice_bindings": {
     "cb_step_1": {
       "parameter_name": "rightSideLegFibula",
-      "choice_parameter_name": "right_side_leg",
+      "choice_parameter_name": "rightSideLeg",
       "role": "rightSideLegFibula",
       "accesses": [
         "parameter_read",
@@ -4000,7 +4000,7 @@
     },
     "cb_step_2": {
       "parameter_name": "mandibularSegmentation",
-      "choice_parameter_name": "mandibular_segmentation_node",
+      "choice_parameter_name": "mandibularSegmentation",
       "role": "mandibularSegmentation",
       "accesses": [
         "node_reference_write",
@@ -4023,7 +4023,7 @@
     },
     "cb_step_3": {
       "parameter_name": "fibulaSegmentation",
-      "choice_parameter_name": "fibula_segmentation_node",
+      "choice_parameter_name": "fibulaSegmentation",
       "role": "fibulaSegmentation",
       "accesses": [
         "node_reference_write",
@@ -4045,7 +4045,7 @@
     },
     "cb_step_4": {
       "parameter_name": "currentScalarVolume",
-      "choice_parameter_name": "mandible_volume_node",
+      "choice_parameter_name": "currentScalarVolume",
       "role": "currentScalarVolume",
       "accesses": [
         "node_reference_read",
@@ -4128,10 +4128,12 @@
       "op_types": [
         "user_choice"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4140,10 +4142,12 @@
       "op_types": [
         "user_choice"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4152,10 +4156,12 @@
       "op_types": [
         "user_choice"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4164,10 +4170,12 @@
       "op_types": [
         "user_choice"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4176,10 +4184,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4188,10 +4198,14 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [
+        "layout_activate"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4200,10 +4214,14 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [
+        "view_display_scope"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4212,10 +4230,12 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4224,10 +4244,15 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [
+        "slice_intersection_interaction",
+        "slice_intersection_visibility"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4236,10 +4261,12 @@
       "op_types": [
         "user_interaction"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": true,
       "interaction_kinds": [
         "view_adjustment"
@@ -4250,10 +4277,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4262,10 +4291,14 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [
+        "view_display_scope"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4274,10 +4307,12 @@
       "op_types": [
         "user_interaction"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": true,
       "interaction_kinds": [
         "markup_placement"
@@ -4288,10 +4323,14 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [
+        "layout_activate"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": true,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4300,10 +4339,14 @@
       "op_types": [
         "slicer_op"
       ],
+      "operation_intents": [
+        "view_display_scope"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4312,10 +4355,12 @@
       "op_types": [
         "user_choice"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4324,10 +4369,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4336,10 +4383,12 @@
       "op_types": [
         "user_interaction"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": true,
       "interaction_kinds": [
         "markup_placement"
@@ -4350,10 +4399,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4362,10 +4413,12 @@
       "op_types": [
         "user_interaction"
       ],
+      "operation_intents": [],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": true,
+      "allow_module_switch": false,
       "produces_interaction_state": true,
       "interaction_kinds": [
         "markup_placement"
@@ -4376,10 +4429,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     },
@@ -4388,10 +4443,12 @@
       "op_types": [
         "extension_op"
       ],
+      "operation_intents": [],
       "invokes_extension_method": true,
       "invokes_extension_function": false,
       "invokes_slicer_api": false,
       "implementation_uses_slicer_api": false,
+      "allow_module_switch": false,
       "produces_interaction_state": false,
       "interaction_kinds": []
     }
@@ -4489,7 +4546,7 @@
   "repeat_groups": {
     "repeat_cb_step_16_cb_step_17_cb_step_18": {
       "group_id": "repeat_cb_step_16_cb_step_17_cb_step_18",
-      "count_parameter": "num_cut_planes",
+      "count_parameter": "numberOfCutPlanes",
       "count_step": "cb_step_16",
       "start_step": "cb_step_17",
       "interaction_step": "cb_step_18"
@@ -4504,11 +4561,11 @@
   "api_evidence": {
     "templates/cb_step_6_slicer.py.tpl": {
       "api_chains": [
-        "slicer.app.layoutManager",
         "slicer.app.layoutManager().setLayout",
+        "slicer.app.layoutManager",
         "slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView",
-        "slicer.app",
-        "slicer.vtkMRMLLayoutNode"
+        "slicer.vtkMRMLLayoutNode",
+        "slicer.app"
       ],
       "probe_status": "passed"
     },
@@ -4526,41 +4583,46 @@
       "api_chains": [
         "slicer.mrmlScene.GetNodeByID",
         "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').SetSliceResolutionMode",
-        "slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView",
         "slicer.mrmlScene",
+        "slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView",
         "slicer.vtkMRMLSliceNode"
       ],
       "probe_status": "passed"
     },
     "templates/cb_step_9_slicer.py.tpl": {
       "api_chains": [
-        "slicer.util.getNode",
-        "slicer.util.getNode('Crosshair').SetCrosshairMode",
-        "slicer.util.getNodesByClass",
-        "slicer.mrmlScene.GetNodeByID",
-        "slicer.mrmlScene.GetNodeByID('vtkMRMLInteractionNodeSingleton').SwitchToViewTransformMode",
-        "slicer.vtkMRMLCrosshairNode.ShowIntersection",
-        "slicer.util",
-        "slicer.vtkMRMLCrosshairNode",
-        "slicer.mrmlScene"
+        "slicer.app.applicationLogic",
+        "slicer.app.applicationLogic().SetIntersectingSlicesEnabled",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation",
+        "slicer.app",
+        "slicer.vtkMRMLApplicationLogic"
       ],
       "probe_status": "passed"
     },
     "templates/cb_step_12_slicer.py.tpl": {
       "api_chains": [
-        "slicer.util.selectModule",
         "slicer.mrmlScene.GetNodesByClass",
-        "slicer.util",
-        "slicer.mrmlScene"
+        "slicer.app.layoutManager",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode().GetID",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode().GetID",
+        "slicer.app.layoutManager().threeDWidget",
+        "slicer.app.layoutManager().sliceWidget",
+        "slicer.mrmlScene",
+        "slicer.app"
       ],
       "probe_status": "passed"
     },
     "templates/cb_step_15_slicer.py.tpl": {
       "api_chains": [
         "slicer.app.layoutManager",
-        "slicer.app.layoutManager().sliceWidget",
         "slicer.app.layoutManager().sliceWidget('Red').sliceController",
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible",
+        "slicer.app.layoutManager().sliceWidget",
         "slicer.app"
       ],
       "probe_status": "passed"
@@ -4628,16 +4690,22 @@
     },
     "templates/cb_step_21.py.tpl": {
       "api_chains": [
+        "slicer.mrmlScene.GetSubjectHierarchyNode",
+        "slicer.mrmlScene.GetSubjectHierarchyNode().GetSceneItemID",
+        "slicer.mrmlScene.GetSubjectHierarchyNode().CreateFolderItem",
         "slicer.mrmlScene.GetNodesByClass",
+        "slicer.mrmlScene.AddNewNodeByClass",
         "slicer.mrmlScene"
       ],
       "probe_status": "passed"
     },
     "templates/cb_step_22.py.tpl": {
       "api_chains": [
+        "slicer.mrmlScene.GetSubjectHierarchyNode",
+        "slicer.mrmlScene.GetSubjectHierarchyNode().GetSceneItemID",
+        "slicer.mrmlScene.GetSubjectHierarchyNode().GetItemByName",
+        "slicer.mrmlScene.GetSubjectHierarchyNode().CreateFolderItem",
         "slicer.mrmlScene.GetNodesByClass",
-        "slicer.mrmlScene.GetNodesByClass('vtkMRMLModelNode').GetNumberOfItems",
-        "slicer.mrmlScene.GetNodesByClass('vtkMRMLModelNode').GetItemAsObject",
         "slicer.mrmlScene"
       ],
       "probe_status": "passed"
@@ -4677,7 +4745,6 @@
         "vtkMRMLLayoutNode"
       ],
       "api_chains": [
-        "layoutManager.setLayout",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().setLayout",
@@ -4685,14 +4752,14 @@
         "slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView"
       ],
       "operation_descriptions": [
-        "Change layout to Conventional"
+        "Change the layout to Conventional"
       ],
       "slicer_op_categories": [
         "layout_slice_view"
       ],
       "slicer_api_keywords": [
         "layout",
-        "conventional"
+        "Conventional"
       ]
     },
     "cb_step_7_1": {
@@ -4715,13 +4782,13 @@
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
       ],
       "operation_descriptions": [
-        "Toggle on slice visibility in 3D view for the Red slice view"
+        "Toggle on slice visibility in 3D view for the Red view"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "node_display"
       ],
       "slicer_api_keywords": [
-        "layout_slice_view"
+        "node_display"
       ]
     },
     "cb_step_8_2": {
@@ -4735,7 +4802,7 @@
         "vtkMRMLSliceNodeRed"
       ],
       "api_chains": [
-        "sliceNode.SetSliceResolutionMode",
+        "redSliceNode.SetSliceResolutionMode",
         "slicer.mrmlScene",
         "slicer.mrmlScene.GetNodeByID",
         "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').SetSliceResolutionMode",
@@ -4743,7 +4810,7 @@
         "slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView"
       ],
       "operation_descriptions": [
-        "Toggle on FOV/Spacing match 2D for the Red slice view"
+        "Toggle on FOV/Spacing match 2D for the Red view"
       ],
       "slicer_op_categories": [
         "layout_slice_view"
@@ -4755,126 +4822,97 @@
     "cb_step_9_3": {
       "source": "stage5T",
       "accepted_footprints": [
-        "SetCrosshairMode",
-        "SetIntersectingSlicesInteractive",
-        "SetIntersectingSlicesRotationEnabled",
-        "SetIntersectingSlicesTranslationEnabled",
-        "SetIntersectingSlicesVisibility",
-        "ShowIntersection",
-        "getNode",
-        "getNodesByClass",
-        "util",
-        "vtkMRMLCrosshairNode",
-        "vtkMRMLSliceDisplayNode"
+        "IntersectingSlicesInteractive",
+        "IntersectingSlicesRotation",
+        "IntersectingSlicesTranslation",
+        "IntersectingSlicesVisibility",
+        "SetIntersectingSlicesEnabled",
+        "app",
+        "applicationLogic",
+        "vtkMRMLApplicationLogic"
       ],
       "api_chains": [
-        "crosshairNode.SetCrosshairMode",
-        "sliceDisplayNode.SetIntersectingSlicesInteractive",
-        "sliceDisplayNode.SetIntersectingSlicesRotationEnabled",
-        "sliceDisplayNode.SetIntersectingSlicesTranslationEnabled",
-        "sliceDisplayNode.SetIntersectingSlicesVisibility",
-        "slicer.util",
-        "slicer.util.getNode",
-        "slicer.util.getNode('Crosshair').SetCrosshairMode",
-        "slicer.util.getNodesByClass",
-        "slicer.vtkMRMLCrosshairNode",
-        "slicer.vtkMRMLCrosshairNode.ShowIntersection"
+        "appLogic.SetIntersectingSlicesEnabled",
+        "slicer.app",
+        "slicer.app.applicationLogic",
+        "slicer.app.applicationLogic().SetIntersectingSlicesEnabled",
+        "slicer.vtkMRMLApplicationLogic",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility"
       ],
       "operation_descriptions": [
-        "Toggle on slice intersection visibility (crosshair) and set interaction mode to Translate and Rotate"
+        "Turn on slice intersection visibility, set interaction mode, and enable Translate and Rotate"
       ],
       "slicer_op_categories": [
         "crosshair"
       ],
       "slicer_api_keywords": [
-        "crosshair"
+        "slice intersection",
+        "visibility",
+        "interaction",
+        "Translate",
+        "Rotate"
       ]
     },
-    "cb_step_9_4": {
+    "cb_step_12_4": {
       "source": "stage5T",
       "accepted_footprints": [
-        "GetNodeByID",
-        "SwitchToViewTransformMode",
-        "mrmlScene",
-        "vtkMRMLInteractionNodeSingleton"
-      ],
-      "api_chains": [
-        "interactionNode.SwitchToViewTransformMode",
-        "slicer.mrmlScene",
-        "slicer.mrmlScene.GetNodeByID",
-        "slicer.mrmlScene.GetNodeByID('vtkMRMLInteractionNodeSingleton').SwitchToViewTransformMode"
-      ],
-      "operation_descriptions": [
-        "Set interaction mode to Translate and Rotate in the toolbar"
-      ],
-      "slicer_op_categories": [
-        "generic_slicer_api"
-      ],
-      "slicer_api_keywords": [
-        "interaction mode",
-        "translate",
-        "rotate"
-      ]
-    },
-    "cb_step_12_5": {
-      "source": "stage5T",
-      "accepted_footprints": [
-        "selectModule",
-        "util"
-      ],
-      "api_chains": [
-        "slicer.util",
-        "slicer.util.selectModule"
-      ],
-      "operation_descriptions": [
-        "Switch to Markups module"
-      ],
-      "slicer_op_categories": [
-        "module_switching"
-      ],
-      "slicer_api_keywords": [
-        "markups module",
-        "switch module"
-      ]
-    },
-    "cb_step_12_6": {
-      "source": "stage5T",
-      "accepted_footprints": [
-        "AddViewNodeID",
-        "CreateDefaultDisplayNodes",
         "GetDisplayNode",
+        "GetID",
         "GetName",
         "GetNodesByClass",
-        "RemoveAllViewNodeIDs",
+        "SetViewNodeIDs",
+        "app",
+        "append",
+        "layoutManager",
         "lower",
         "mrmlScene",
-        "vtkMRMLMarkupsNode",
-        "vtkMRMLSliceNodeRed",
-        "vtkMRMLViewNode1"
+        "mrmlSliceNode",
+        "mrmlViewNode",
+        "sliceWidget",
+        "threeDWidget",
+        "vtkMRMLMarkupsCurveNode",
+        "vtkMRMLMarkupsNode"
       ],
       "api_chains": [
-        "displayNode.AddViewNodeID",
-        "displayNode.RemoveAllViewNodeIDs",
-        "markupsNode.CreateDefaultDisplayNodes",
-        "markupsNode.GetDisplayNode",
+        "curveNode.GetDisplayNode",
+        "displayNode.SetViewNodeIDs",
+        "layoutManager.sliceWidget",
+        "layoutManager.sliceWidget('Red').mrmlSliceNode",
+        "layoutManager.threeDWidget",
+        "layoutManager.threeDWidget(0).mrmlViewNode",
         "node.GetName",
         "node.GetName().lower",
+        "redSliceNode.GetID",
+        "slicer.app",
+        "slicer.app.layoutManager",
+        "slicer.app.layoutManager().sliceWidget",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode().GetID",
+        "slicer.app.layoutManager().threeDWidget",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode().GetID",
         "slicer.mrmlScene",
-        "slicer.mrmlScene.GetNodesByClass"
+        "slicer.mrmlScene.GetNodesByClass",
+        "threeDViewNode.GetID",
+        "viewNodeIDs.append"
       ],
       "operation_descriptions": [
-        "Configure Advanced Display settings for the mandibular curve markups node to show in View 1 and Red"
+        "Configure display settings of the mandibular curve to show in View 1 and Red"
       ],
       "slicer_op_categories": [
         "markups_display"
       ],
       "slicer_api_keywords": [
-        "markups display",
+        "markups",
+        "display",
         "view",
-        "display advanced"
+        "visibility"
       ]
     },
-    "cb_step_15_7": {
+    "cb_step_15_5": {
       "source": "stage5T",
       "accepted_footprints": [
         "app",
@@ -4884,9 +4922,9 @@
         "sliceWidget"
       ],
       "api_chains": [
+        "controller.setSliceVisible",
         "layoutManager.sliceWidget",
-        "sliceController.setSliceVisible",
-        "sliceWidget.sliceController",
+        "layoutManager.sliceWidget('Red').sliceController",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().sliceWidget",
@@ -4894,13 +4932,13 @@
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
       ],
       "operation_descriptions": [
-        "Toggle off slice visibility in 3D view for the Red slice view"
+        "Toggle off slice visibility in 3D view for the Red view"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "node_display"
       ],
       "slicer_api_keywords": [
-        "layout_slice_view"
+        "node_display"
       ]
     }
   },
@@ -4910,41 +4948,10 @@
       "addFibulaLine",
       "addMandibularCurve",
       "centerFibulaLine",
-      "create3DModelOfTheReconstruction",
-      "createAndUpdateDynamicModelerNodes",
-      "createCustomPlate",
-      "createCylindersFromFiducialListAndFibulaSurgicalGuideBase",
-      "createCylindersFromFiducialListAndMandibleSurgicalGuideBase",
-      "createCylindersFromFiducialListAndNeomandiblePieces",
-      "createDentalImplantCylindersFiducialList",
-      "createFibulaAxisFromFibulaLineAndRightSideLegChecked",
-      "createFibulaAxisFromFibulaLineAndRightSideLegChecked_2",
-      "createFibulaCylindersFiducialList",
-      "createFibulaPlanesFromMandiblePlanesAndFibulaAxis",
-      "createFibulaSegmentsLengthsLines",
-      "createMiterBoxesFromFibulaPlanes",
       "createPlateCurve",
-      "createSawBoxesFromFirstAndLastMandiblePlanes",
       "generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible",
-      "hardVSPUpdate",
-      "lockVSP",
-      "makeBooleanOperationsToFibulaSurgicalGuideBase",
-      "makeBooleanOperationsToMandibleSurgicalGuideBase",
       "makeModels",
-      "mandiblePlanesPositioningForMaximumBoneContact",
-      "onGenerateFibulaPlanesTimerTimeout",
-      "pointsOverlap",
-      "reorderMandiblePlanes",
-      "resetPlan",
-      "setDefaultParameters",
-      "setRedSliceForBoneModelsDisplayNodes",
-      "setRedSliceForBoxModelsDisplayNodes",
-      "tranformFibulaPiecesToMandible",
-      "tranformMandiblePiecesToFibula",
-      "transformFibulaPlanes",
-      "transformMandiblePlanesZRotationToBeTheSameAsInputPlane",
-      "updateFibulaPieces",
-      "updateInverseMandiblePieces"
+      "setRedSliceForBoneModelsDisplayNodes"
     ],
     "module_functions": [
       "addBRPLayout",
@@ -4952,7 +4959,18 @@
       "registerSampleData",
       "setBRPLayout",
       "setFolderItemVisibility"
-    ]
+    ],
+    "module_function_effects": {
+      "addBRPLayout": [
+        "layout_register"
+      ],
+      "createListFromFolderID": [],
+      "registerSampleData": [],
+      "setBRPLayout": [
+        "layout_activate"
+      ],
+      "setFolderItemVisibility": []
+    }
   },
   "interaction_policies": {
     "cb_step_18": {
@@ -4990,18 +5008,10 @@
     "extension_functions": [
       {
         "template": "templates/cb_step_14.py.tpl",
-        "function": "addBRPLayout"
+        "function": "setBRPLayout"
       }
     ],
-    "destructive_contracts": [
-      {
-        "template": "templates/cb_step_12_slicer.py.tpl",
-        "ops": [
-          "displayNode.RemoveAllViewNodeIDs"
-        ],
-        "scope": "display_view_scope_reset"
-      }
-    ]
+    "destructive_contracts": []
   },
   "final_api_evidence": {
     "templates/cb_step_6_slicer.py.tpl": {
@@ -5014,7 +5024,6 @@
         "vtkMRMLLayoutNode"
       ],
       "api_chains": [
-        "layoutManager.setLayout",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().setLayout",
@@ -5022,14 +5031,14 @@
         "slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView"
       ],
       "operation_descriptions": [
-        "Change layout to Conventional"
+        "Change the layout to Conventional"
       ],
       "slicer_op_categories": [
         "layout_slice_view"
       ],
       "slicer_api_keywords": [
         "layout",
-        "conventional"
+        "Conventional"
       ]
     },
     "templates/cb_step_7_slicer.py.tpl": {
@@ -5052,13 +5061,13 @@
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
       ],
       "operation_descriptions": [
-        "Toggle on slice visibility in 3D view for the Red slice view"
+        "Toggle on slice visibility in 3D view for the Red view"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "node_display"
       ],
       "slicer_api_keywords": [
-        "layout_slice_view"
+        "node_display"
       ]
     },
     "templates/cb_step_8_slicer.py.tpl": {
@@ -5072,7 +5081,7 @@
         "vtkMRMLSliceNodeRed"
       ],
       "api_chains": [
-        "sliceNode.SetSliceResolutionMode",
+        "redSliceNode.SetSliceResolutionMode",
         "slicer.mrmlScene",
         "slicer.mrmlScene.GetNodeByID",
         "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').SetSliceResolutionMode",
@@ -5080,7 +5089,7 @@
         "slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView"
       ],
       "operation_descriptions": [
-        "Toggle on FOV/Spacing match 2D for the Red slice view"
+        "Toggle on FOV/Spacing match 2D for the Red view"
       ],
       "slicer_op_categories": [
         "layout_slice_view"
@@ -5092,97 +5101,94 @@
     "templates/cb_step_9_slicer.py.tpl": {
       "source": "stage5T",
       "accepted_footprints": [
-        "SetCrosshairMode",
-        "SetIntersectingSlicesInteractive",
-        "SetIntersectingSlicesRotationEnabled",
-        "SetIntersectingSlicesTranslationEnabled",
-        "SetIntersectingSlicesVisibility",
-        "ShowIntersection",
-        "getNode",
-        "getNodesByClass",
-        "util",
-        "vtkMRMLCrosshairNode",
-        "vtkMRMLSliceDisplayNode",
-        "GetNodeByID",
-        "SwitchToViewTransformMode",
-        "mrmlScene",
-        "vtkMRMLInteractionNodeSingleton"
+        "IntersectingSlicesInteractive",
+        "IntersectingSlicesRotation",
+        "IntersectingSlicesTranslation",
+        "IntersectingSlicesVisibility",
+        "SetIntersectingSlicesEnabled",
+        "app",
+        "applicationLogic",
+        "vtkMRMLApplicationLogic"
       ],
       "api_chains": [
-        "crosshairNode.SetCrosshairMode",
-        "sliceDisplayNode.SetIntersectingSlicesInteractive",
-        "sliceDisplayNode.SetIntersectingSlicesRotationEnabled",
-        "sliceDisplayNode.SetIntersectingSlicesTranslationEnabled",
-        "sliceDisplayNode.SetIntersectingSlicesVisibility",
-        "slicer.util",
-        "slicer.util.getNode",
-        "slicer.util.getNode('Crosshair').SetCrosshairMode",
-        "slicer.util.getNodesByClass",
-        "slicer.vtkMRMLCrosshairNode",
-        "slicer.vtkMRMLCrosshairNode.ShowIntersection",
-        "interactionNode.SwitchToViewTransformMode",
-        "slicer.mrmlScene",
-        "slicer.mrmlScene.GetNodeByID",
-        "slicer.mrmlScene.GetNodeByID('vtkMRMLInteractionNodeSingleton').SwitchToViewTransformMode"
+        "appLogic.SetIntersectingSlicesEnabled",
+        "slicer.app",
+        "slicer.app.applicationLogic",
+        "slicer.app.applicationLogic().SetIntersectingSlicesEnabled",
+        "slicer.vtkMRMLApplicationLogic",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation",
+        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility"
       ],
       "operation_descriptions": [
-        "Toggle on slice intersection visibility (crosshair) and set interaction mode to Translate and Rotate",
-        "Set interaction mode to Translate and Rotate in the toolbar"
+        "Turn on slice intersection visibility, set interaction mode, and enable Translate and Rotate"
       ],
       "slicer_op_categories": [
-        "crosshair",
-        "generic_slicer_api"
+        "crosshair"
       ],
       "slicer_api_keywords": [
-        "crosshair",
-        "interaction mode",
-        "translate",
-        "rotate"
+        "slice intersection",
+        "visibility",
+        "interaction",
+        "Translate",
+        "Rotate"
       ]
     },
     "templates/cb_step_12_slicer.py.tpl": {
       "source": "stage5T",
       "accepted_footprints": [
-        "selectModule",
-        "util",
-        "AddViewNodeID",
-        "CreateDefaultDisplayNodes",
         "GetDisplayNode",
+        "GetID",
         "GetName",
         "GetNodesByClass",
-        "RemoveAllViewNodeIDs",
+        "SetViewNodeIDs",
+        "app",
+        "append",
+        "layoutManager",
         "lower",
         "mrmlScene",
-        "vtkMRMLMarkupsNode",
-        "vtkMRMLSliceNodeRed",
-        "vtkMRMLViewNode1"
+        "mrmlSliceNode",
+        "mrmlViewNode",
+        "sliceWidget",
+        "threeDWidget",
+        "vtkMRMLMarkupsCurveNode",
+        "vtkMRMLMarkupsNode"
       ],
       "api_chains": [
-        "slicer.util",
-        "slicer.util.selectModule",
-        "displayNode.AddViewNodeID",
-        "displayNode.RemoveAllViewNodeIDs",
-        "markupsNode.CreateDefaultDisplayNodes",
-        "markupsNode.GetDisplayNode",
+        "curveNode.GetDisplayNode",
+        "displayNode.SetViewNodeIDs",
+        "layoutManager.sliceWidget",
+        "layoutManager.sliceWidget('Red').mrmlSliceNode",
+        "layoutManager.threeDWidget",
+        "layoutManager.threeDWidget(0).mrmlViewNode",
         "node.GetName",
         "node.GetName().lower",
+        "redSliceNode.GetID",
+        "slicer.app",
+        "slicer.app.layoutManager",
+        "slicer.app.layoutManager().sliceWidget",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode",
+        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode().GetID",
+        "slicer.app.layoutManager().threeDWidget",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode",
+        "slicer.app.layoutManager().threeDWidget(0).mrmlViewNode().GetID",
         "slicer.mrmlScene",
-        "slicer.mrmlScene.GetNodesByClass"
+        "slicer.mrmlScene.GetNodesByClass",
+        "threeDViewNode.GetID",
+        "viewNodeIDs.append"
       ],
       "operation_descriptions": [
-        "Switch to Markups module",
-        "Configure Advanced Display settings for the mandibular curve markups node to show in View 1 and Red"
+        "Configure display settings of the mandibular curve to show in View 1 and Red"
       ],
       "slicer_op_categories": [
-        "module_switching",
         "markups_display"
       ],
       "slicer_api_keywords": [
-        "markups module",
-        "switch module",
-        "markups display",
+        "markups",
+        "display",
         "view",
-        "display advanced"
+        "visibility"
       ]
     },
     "templates/cb_step_15_slicer.py.tpl": {
@@ -5195,9 +5201,9 @@
         "sliceWidget"
       ],
       "api_chains": [
+        "controller.setSliceVisible",
         "layoutManager.sliceWidget",
-        "sliceController.setSliceVisible",
-        "sliceWidget.sliceController",
+        "layoutManager.sliceWidget('Red').sliceController",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().sliceWidget",
@@ -5205,17 +5211,152 @@
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
       ],
       "operation_descriptions": [
-        "Toggle off slice visibility in 3D view for the Red slice view"
+        "Toggle off slice visibility in 3D view for the Red view"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "node_display"
       ],
       "slicer_api_keywords": [
-        "layout_slice_view"
+        "node_display"
       ]
     }
   },
   "stage5T_api_evidence_note": "stage5T_api_evidence is pre-revision retrieval evidence; final_api_evidence reflects the current validated templates.",
+  "semantic_contracts": {
+    "templates/cb_step_5.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_6_slicer.py.tpl": {
+      "operation_intents": [
+        "layout_activate"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_7_slicer.py.tpl": {
+      "operation_intents": [
+        "view_display_scope"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_8_slicer.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_9_slicer.py.tpl": {
+      "operation_intents": [
+        "slice_intersection_interaction",
+        "slice_intersection_visibility"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_10_pre.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_10_post.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_11.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_12_slicer.py.tpl": {
+      "operation_intents": [
+        "view_display_scope"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_13_pre.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_13_post.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_14.py.tpl": {
+      "operation_intents": [
+        "layout_activate"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_15_slicer.py.tpl": {
+      "operation_intents": [
+        "view_display_scope"
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_17.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_18_pre.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_18_post.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_19.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": [
+        "Parameter 'fibulaCentroidX' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'fibulaCentroidY' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'fibulaCentroidZ' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidX' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidY' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidZ' for logic.addFibulaLine() uses low-confidence typed_read_safe_fallback default '0.0'"
+      ]
+    },
+    "templates/cb_step_20_pre.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_20_post.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_21.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": []
+    },
+    "templates/cb_step_22.py.tpl": {
+      "operation_intents": [],
+      "errors": [],
+      "warnings": [
+        "Parameter 'fibulaCentroidX' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'fibulaCentroidY' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'fibulaCentroidZ' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'initialSpace' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidX' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidY' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'",
+        "Parameter 'mandibleCentroidZ' for logic.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandible() uses low-confidence typed_read_safe_fallback default '0.0'"
+      ]
+    }
+  },
   "final_state_intents": {
     "templates/cb_step_7_slicer.py.tpl": {
       "mode": "set",
