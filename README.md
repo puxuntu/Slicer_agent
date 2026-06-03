@@ -82,17 +82,6 @@ The output is a validated Extension CLI: tool schemas, code templates, a workflo
 
 The online stage handles every user turn. Its design principle is: **ground first, then generate; validate first, then execute; recover automatically on failure.**
 
-The table below summarizes the operation types available at runtime and the clinical scenarios they serve.
-
-| Op Type | What It Does | Best Used For | Human Role |
-|---------|--------------|---------------|------------|
-| **Autonomous Query** | LLM plans, searches KB, generates code, and executes in one end-to-end turn. Self-corrects on failure. | One-off tasks, exploration, ad-hoc segmentation, visualization, data loading, scripting. | Describe the goal and review the result. |
-| **Workflow — Automated Step** | Pre-generated code template runs deterministically. No LLM call at runtime. | Repetitive extension operations: parameter tuning, model fitting, batch processing, file export. | Monitor and confirm if flagged high-risk. |
-| **Workflow — Interactive Step** | System creates markup nodes and enters Slicer placement mode; pauses for user interaction. | Surgical planning landmarks, curve drawing, plane placement, ROI definition, fiducial marking. | Perform 3D interaction directly in the scene; type `done` to continue. |
-| **Workflow — Mixed Step** | Automated setup runs first, then system pauses for user interaction. | Steps that need prep work (e.g., create a node, set display properties) before the user interacts. | Review automated setup, then perform the 3D interaction. |
-| **Workflow — Branch Step** | Conditional path chosen by user or scene state. | Optional steps: skip bone reconstruction if not needed, choose implant type, decide on graft source. | Answer a yes/no or multiple-choice question. |
-| **Workflow — User Choice** | Lightweight LLM resolver or direct user selection picks from existing scene nodes. | Selecting which volume, segmentation, or model to use when multiple candidates exist. | Pick from a list or let the agent resolve by name matching. |
-
 #### Dense Vector Pre-Retrieval (RAG)
 
 Before the LLM ever sees the user prompt, the system performs an intelligent multi-retrieval pass:
