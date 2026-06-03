@@ -1,16 +1,17 @@
 # SlicerAIAgent
 
-> **⚠️ Work in Progress — Rough Prototype**
->
-> This project is actively under development. The current version is a rough prototype for proof-of-concept and rapid iteration. Expect breaking changes, incomplete features, and unpolished UI.
+An AI-powered assistant for [3D Slicer](https://www.slicer.org/) that turns natural language into executable scene manipulation. Clinicians state their intent; the agent grounds it against the Slicer knowledge base, plans the steps, generates safe Python code, and runs it directly inside the application.
 
----
+SlicerAIAgent operates in two complementary modes. The table below summarizes the operation types and the clinical scenarios they serve.
 
-## Motivation
-
-When a clinician opens 3D Slicer, the goal is already clear. But turning that intent into results means navigating a dense UI, hunting through documentation, switching between segmentation tools and 3D views, and manually tuning dozens of parameters. The input data and desired outcome are certain; it is the execution path that is burdensome.
-
-SlicerAIAgent closes this gap by letting clinicians state their goal in plain language and handling the rest end to end: searching the Slicer knowledge base for the right APIs, confirming exact function signatures, generating executable Python code, and running it directly inside Slicer to manipulate the scene. No scripting, no menu diving, no parameter guessing. This points toward a broader shift in medical software — from learning complex interfaces to simply stating intent and letting the agent operate the application on the user's behalf.
+| Op Type | What It Does | Best Used For | Human Role |
+|---------|--------------|---------------|------------|
+| **Autonomous Query** | LLM plans, searches KB, generates code, and executes in one end-to-end turn. Self-corrects on failure. | One-off tasks, exploration, ad-hoc segmentation, visualization, data loading, scripting. | Describe the goal and review the result. |
+| **Workflow — Automated Step** | Pre-generated code template runs deterministically. No LLM call at runtime. | Repetitive extension operations: parameter tuning, model fitting, batch processing, file export. | Monitor and confirm if flagged high-risk. |
+| **Workflow — Interactive Step** | System creates markup nodes and enters Slicer placement mode; pauses for user interaction. | Surgical planning landmarks, curve drawing, plane placement, ROI definition, fiducial marking. | Perform 3D interaction directly in the scene; type `done` to continue. |
+| **Workflow — Mixed Step** | Automated setup runs first, then system pauses for user interaction. | Steps that need prep work (e.g., create a node, set display properties) before the user interacts. | Review automated setup, then perform the 3D interaction. |
+| **Workflow — Branch Step** | Conditional path chosen by user or scene state. | Optional steps: skip bone reconstruction if not needed, choose implant type, decide on graft source. | Answer a yes/no or multiple-choice question. |
+| **Workflow — User Choice** | Lightweight LLM resolver or direct user selection picks from existing scene nodes. | Selecting which volume, segmentation, or model to use when multiple candidates exist. | Pick from a list or let the agent resolve by name matching. |
 
 ---
 
@@ -18,12 +19,9 @@ SlicerAIAgent closes this gap by letting clinicians state their goal in plain la
 
 ### Demo 1 — Multi-Turn Segmentation, Reconstruction, and Plane Cutting
 
-**Turn 1:** load the example CT chest volume
-
-**Turn 2:** segment it with threshold from -200 to 1000, reconstruct the 3D shape
-
-**Turn 3:** cut the 3D shape into two parts with a random plane, and different part shown with different color
-
+**Turn 1:** load the example CT chest volume  
+**Turn 2:** segment it with threshold from -200 to 1000, reconstruct the 3D shape  
+**Turn 3:** cut the 3D shape into two parts with a random plane, and different part shown with different color  
 **Turn 4:** give a random displacement to one part to separate them
 
 https://github.com/user-attachments/assets/8c6b1c14-0ffb-4b37-b80e-98ad92dc9890
@@ -34,10 +32,8 @@ The agent carries out a multi-turn interactive workflow: loading data → thresh
 
 ### Demo 2 — Multi-Turn Anatomical Segmentation
 
-**Turn 1:** load an example CT volume
-
-**Turn 2:** segment the bone
-
+**Turn 1:** load an example CT volume  
+**Turn 2:** segment the bone  
 **Turn 3:** segment the left lung
 
 https://github.com/user-attachments/assets/dfd6c95c-ed83-4381-a8af-5f4cd918bc48
@@ -48,276 +44,151 @@ The agent performs a multi-turn segmentation workflow on a CT chest volume, isol
 
 ---
 
-## Technical Approach
+## Technique Points
 
-SlicerAIAgent is not a simple "prompt → code" wrapper. It implements a **role-composed agent pipeline** that combines dense vector retrieval, autonomous tool calling, structured planning, AST-based security validation, safe execution inside Slicer's own Python interpreter, and automatic self-correction on failure.
+SlicerAIAgent is not a simple prompt-to-code wrapper. It is built around a clear separation between **Offline Stage** (everything that happens before the user types a prompt) and **Online Stage** (everything that happens during the conversation). This split is the key reason the system can remain responsive, deterministic, and safe even when driving complex clinical workflows.
 
-### 1. Role Model
+### Offline Stage — Knowledge Preparation & Code Generation
 
-Every user prompt travels through an agent workflow with explicit internal roles. These roles are encoded in the system prompt, status UI, debug logs, and role trace, but they do not require separate LLM calls for every role.
+The offline stage transforms raw Slicer source code, documentation, and installed extensions into structured, searchable, and executable assets.
+
+#### Dense Vector Index Building
+
+Slicer has thousands of APIs across core modules, scripted extensions, and C++ libraries. Memorizing them in an LLM's weights is brittle and incomplete. Instead, the system builds a local dense-vector index from the Slicer knowledge base:
+
+- **Chunking**: Python and C++ source files are split at AST boundaries (functions and classes); markdown documentation is split by heading. Each chunk is enriched with its signature, docstring, and source-type label to improve natural-language-to-code matching.
+- **Embedding**: A code-specific embedding model encodes every chunk into a 768-dimensional vector using ONNX Runtime (with GPU auto-detection).
+- **Indexing**: Vectors are stored in a FAISS index for fast inner-product (cosine) search. A manifest tracks file fingerprints so the index can be updated incrementally when the knowledge base changes.
+
+Running `python scripts/build_rag.py` rebuilds or refreshes this index. The first run downloads the ~640 MB ONNX model.
+
+#### UI Pre-Analysis
+
+A major challenge in medical imaging software is the gap between what a user says and what the API expects. A user might say "turn on slice intersections," but the executable API is `SetIntersectingSlicesEnabled(True)` on a `vtkMRMLCrosshairNode`. The UI pre-analysis pipeline (`scripts/build_ui_analysis.py`) closes this gap by scanning Slicer's UI definitions and mapping user-facing labels, actions, and tooltips to their nearby implementation and API evidence. At runtime, the agent can search this index to translate a UI description into the correct executable call.
+
+#### Extension CLI Generator
+
+For complex extensions with multi-step workflows (e.g., surgical planning tools), repeatedly asking an LLM to replan at every step is slow, expensive, and non-deterministic. The Extension CLI Generator solves this by pre-compiling extension workflows into validated code templates:
+
+1. **Source Scanning** — Discovers installed extensions from the Extension Manager, additional module paths, or loaded modules.
+2. **Cookbook Parsing** — Reads a human-written markdown cookbook that describes the extension's step-by-step workflow. The cookbook is the *contract*: without it, generation does not proceed.
+3. **Logic Analysis** — The LLM analyzes the extension source code to identify operations, parameters, and dependencies.
+4. **API Probing** — Live code probes run inside Slicer's Python environment to verify actual API signatures and runtime behavior.
+5. **Template Generation** — Two types of templates are produced:
+   - *Extension operations* (`extension_op`): calls into the extension's own Python API.
+   - *Slicer operations* (`slicer_op`): calls into Slicer core APIs, generated via the same autonomous tool-calling loop the main agent uses.
+6. **Validation** — Generated templates are checked with AST parsing and static validation rules.
+7. **Auto-Revision** — If validation fails, the LLM receives the errors and the original analysis context and revises the templates automatically.
+
+The output is a validated Extension CLI: tool schemas, code templates, a workflow graph, and a prompt fragment. Once generated, this CLI can be loaded at runtime and executed deterministically.
+
+---
+
+### Online Stage — Runtime Agent & Workflow Execution
+
+The online stage handles every user turn. Its design principle is: **ground first, then generate; validate first, then execute; recover automatically on failure.**
+
+#### Dense Vector Pre-Retrieval (RAG)
+
+Before the LLM ever sees the user prompt, the system performs an intelligent multi-retrieval pass:
+
+1. **Query Decomposition** — Complex multi-step requests are broken into 2–5 independent sub-queries. Simple requests stay as-is.
+2. **Per-Sub-Query Vector Search** — Each sub-query searches the FAISS index. The top-10 most relevant chunks are retrieved per sub-query.
+3. **Source-Type Weighting** — Results are re-ranked by provenance: official cookbook examples get the highest boost, followed by core Python APIs, then effect implementations and test examples.
+4. **Smart Full-File Inclusion** — If a single markdown file contributes 5 or more chunks, the system replaces all its individual chunks with one synthetic "whole file" chunk to avoid redundant snippet injection.
+5. **Context Injection** — The formatted results are injected into the system prompt as the LLM's first source of truth, with instructions to avoid re-searching the same topics.
+
+If the vector index is missing, this step silently skips and the system falls back to the traditional tool-calling workflow.
+
+#### Autonomous Tool-Calling Loop
+
+After pre-retrieval, the LLM is given search tools (`VectorSearch`, `Grep`, `ReadFile`, `SearchSymbol`) and autonomously decides how to ground the request. The loop works as follows:
+
+- **Search** — The LLM calls `Grep` or `SearchSymbol` to locate APIs, or `VectorSearch` for semantic matches. Multiple tool calls execute in parallel.
+- **Read** — Once promising files are identified, `ReadFile` confirms exact function signatures and usage patterns. For large files, it uses smart slicing: heading-based extraction for markdown, AST boundary extraction for code, and test-method slicing for Python test files.
+- **Generate** — When the LLM has enough evidence, it outputs a structured `agent_plan` JSON block followed by a complete `python` code block. The loop terminates when executable code is detected.
+
+For anatomical segmentation requests, a dedicated `GenerateSegmentationCode` tool produces a ready-to-run VoxTell snippet with GPU detection and model-path resolution.
+
+Conversation history is compressed before persistence: tool results are summarized, vector search drops large formatted context fields, and a FIFO character limit (500K) trims the oldest messages first. This prevents context bloat across long multi-turn sessions.
+
+#### Role-Composed Agent Pipeline
+
+Every user prompt travels through an explicit internal pipeline. These roles are encoded in the system prompt, status UI, debug logs, and role trace, but they do not require separate LLM calls for every role.
 
 | Role | Function |
 |------|----------|
 | **Observer** | Reads the user request and current MRML scene context. |
-| **Retriever** | Uses dense retrieval and search/read tools to ground important Slicer APIs. |
-| **Planner** | Produces a structured `agent_plan` with task summary, overall confidence, risk, and assumptions. |
+| **Retriever** | Uses dense retrieval and search/read tools to ground Slicer APIs. |
+| **Planner** | Produces a structured `agent_plan` with task summary, overall confidence, risk, and assumptions. Each step includes API evidence and may declare machine-checkable scene expectations. |
 | **Programmer** | Produces the complete executable Python block. |
-| **Safety Critic** | Validates the plan and code, blocks unsafe operations, and logs warnings for high-risk actions. |
+| **Safety Critic** | Validates the plan and code, blocks unsafe operations, and flags destructive actions for confirmation. |
 | **Executor** | Runs the code on Slicer's Qt main thread. |
 | **Repairer** | Performs isolated self-correction if validation or execution fails. |
 
-### 2. End-to-End Request Flow
+The Planner's `agent_plan` is a first-class artifact. It includes confidence scores, risk levels, and `expected_scene_change` declarations (e.g., `node_exists`, `node_count_delta`). After execution, the agent verifies these expectations and enters self-correction if the scene does not match.
 
-The request flow below is ordered by runtime execution. Each section names the role or roles it implements, then gives the technical details for that part of the pipeline. Some roles are lightweight and appear through prompt constraints, validation checks, UI state, and debug artifacts rather than separate LLM calls.
-
-#### 2.1 Context Grounding — Observer and Retriever
-
-The Observer reads the user request and current MRML scene context. The Retriever then grounds the request against local Slicer knowledge before final code generation.
-
-##### Dense Vector Pre-Retrieval (RAG)
-
-Before the LLM ever sees the prompt, the system performs an **intelligent multi-retrieval** pass over a local dense vector index built from the Slicer knowledge base (`Resources/Skills/slicer-skill-full/`).
-
-Retrieval is implemented as follows:
-
-1. **Query Decomposition** — The `LLMClient.decomposeQuery()` method analyzes the user request. Simple requests (fewer than 12 words, no commas, at most one "and") are kept as-is. Complex multi-step requests are broken into 2–5 independent sub-queries via a lightweight LLM call. This ensures each sub-task gets its own focused semantic search.
-
-2. **Per-Sub-Query Vector Search** — For each sub-query, `VectorRetriever.search()` runs a pure dense vector search against a FAISS `IndexFlatIP` index. The embedding model is `jinaai/jina-embeddings-v2-base-code` (768-dim) running via ONNX Runtime with GPU provider auto-detection (CUDA, DirectML, ROCm, CoreML, or CPU fallback). Each sub-query retrieves the top-10 most relevant chunks.
-
-3. **Source-Type Weighting** — Retrieved chunks are re-ranked by a source-type multiplier:
-   - `doc_example` × 1.3 (official cookbook examples)
-   - `python_api` × 1.2 (`slicer.util`, core Python API)
-   - `effect_implementation` / `scripted_module` × 1.1
-   - `test_example` × 1.05
-   - `source` × 1.0
-
-4. **Smart Full-File Inclusion** — If a markdown file contributes 5 or more chunks to the concatenated result, the system replaces all individual chunks from that file with a single synthetic "whole file" chunk. This avoids redundant snippet injection when an entire topic file (e.g., `segmentations.md`) is highly relevant.
-
-5. **Context Injection** — The formatted retrieval results, along with a "search coverage" note listing the sub-queries, are injected into the system prompt under the heading `## RELEVANT KNOWLEDGE BASE SNIPPETS`. The LLM is instructed to treat these snippets as its first source of truth and to avoid re-searching the same topics.
-
-If the vector index is missing or not ready, this retrieval mechanism silently skips itself and the system falls back to the traditional pure tool-calling workflow.
-
-##### Autonomous Tool-Calling Loop
-
-After pre-retrieval, the LLM is given **five tools** from the start: `SearchSymbol`, `Grep`, `ReadFile`, `VectorSearch`, and `GenerateSegmentationCode`. The LLM autonomously decides the best path to a solution, so no manual staged orchestration is required.
-
-The tool loop has three main operations:
-
-1. **Search** — The LLM may call `Grep` or `SearchSymbol` to locate relevant APIs across the skill knowledge base. Multiple tool calls are executed in parallel via a `ThreadPoolExecutor`.
-
-2. **Read** — Once promising files are identified, the LLM calls `ReadFile` to confirm exact function signatures and usage patterns. `ReadFile` implements **smart slicing** to keep token usage low:
-   - Files under 500 lines → full content.
-   - Markdown files ≥500 lines → heading-based query matching.
-   - Code files ≥500 lines → AST boundary extraction (complete function/class bodies via tree-sitter) or ±100-line grep-context fallback.
-   - Python test files → test-method slicing (precise `def test_*` / `def TestSection_*` boundaries).
-   - Duplicate read detection warns the LLM if it re-reads the same file with the same query.
-   - Gist dead-end detection flags sections that contain only external gist links with no local executable examples.
-
-3. **Generate** — When the LLM has enough information, it must output two fenced blocks in order: a structured ` ```agent_plan ` JSON block followed by a complete ` ```python ` code block. The tool loop terminates when executable code is detected. If the LLM reaches the maximum tool rounds without generating code, the system appends a force-generate user message that still requires both `agent_plan` and Python code.
-
-For anatomical segmentation requests, the LLM may call `GenerateSegmentationCode` to obtain a ready-to-run VoxTell snippet (including GPU detection and model-path resolution) that is embedded directly into the final executable block.
-
-**Conversation history management:** Full tool results are used within the current turn, but before persisting to `conversation_history`, they are compressed via `_compressToolResultsForHistory()`. ReadFile content is passed through (already sliced at the tool layer), Grep results are kept as-is, and VectorSearch drops the large `formatted_context` field. This prevents context bloat across multi-turn conversations. History is also subject to FIFO character-based trimming (500K character limit), dropping the oldest messages first.
-
-#### 2.2 Plan and Code Generation — Planner and Programmer
-
-Before code execution, the assistant response must include a valid parsed `agent_plan`. The plan contains:
-
-- `task_summary`
-- `overall_confidence`
-- `steps`
-- `risk_level`
-- `requires_confirmation`
-- `unverified_assumptions`
-
-Each step includes an action, API evidence, confidence, and assumptions. Steps may optionally include `expected_scene_change` for machine-checkable scene expectations (e.g., `node_exists`, `node_count_delta`, `property_true`). When present, the agent verifies them after execution and enters self-correction if the scene does not match the plan.
-
-#### 2.3 Validation and Execution — Safety Critic and Executor
-
-Generated code is **auto-executed** without requiring a manual button press.
-
-##### Pre-Validation
-
-- The parsed `agent_plan` must be valid before auto-execution.
-- `CodeValidator` parses the code with the Python `ast` module.
-- It blocks imports from dangerous modules (`os`, `subprocess`, `sys`, `socket`, `urllib`, `ctypes`, `pickle`, etc.).
-- It blocks dangerous function calls (`eval`, `exec`, `compile`, `open`, `getattr`, `globals`, etc.).
-- It detects potentially destructive operations (`RemoveNode`, `Clear`, `Delete`, `saveNode`, etc.) and flags them for confirmation.
-- If plan or code validation fails, the system enters self-correction directly without attempting execution.
-
-##### Execution
-
-- `SafeExecutor.execute()` runs the code in `sys.modules['__main__'].__dict__`, which is the **exact same namespace** as the Slicer Python Console. This means shortcuts like `getNode` (injected by `slicerqt.py`) are automatically available.
-- Execution is scheduled via `qt.QTimer.singleShot(10, ...)` to stay on the Qt main thread, satisfying MRML scene and GUI thread-safety requirements.
-- stdout and stderr are captured with `contextlib.redirect_stdout/stderr`.
-- VTK C++ errors are intercepted by temporarily replacing the global `vtkOutputWindow` with a `vtkFileOutputWindow` pointing to a temp file. After execution, the log is read back, prefixed with `[VTK ERROR]` or `[VTK WARNING]`, and injected into the captured stderr. This allows the self-correction mechanism to react to runtime VTK errors even when no Python exception was raised.
-
-##### Scene Rollback on Failure
-
-- Before execution, the system calls `slicer.mrmlScene.SaveStateForUndo()`.
-- It also snapshots the set of existing node IDs.
-- If execution raises an exception or times out, it calls `slicer.mrmlScene.Undo()` and then deletes any nodes whose IDs did not exist before execution (catching display nodes, storage nodes, and subject-hierarchy items that `Undo()` may miss because their `UndoEnabled` flag is `False`).
-- The original undo flag is restored regardless of outcome.
-
-#### 2.4 Self-Correction and Recovery — Repairer
-
-If execution fails, times out, or produces clear error indicators in stdout/stderr (`traceback`, `exception`, `failed`), the agent automatically enters **self-correction mode**.
-
-The correction loop works as follows:
-
-1. An **isolated retry** is launched in a background thread via `chatWithToolsIsolated()`. This method runs the full tool-calling loop but does **not** read from or write to the main `conversation_history`, and it does **not** increment `turn_number`. Failed attempts therefore never pollute the user's conversation context.
-
-2. The isolated prompt is constructed from:
-   - The original system prompt (with current MRML scene context).
-   - The original user prompt.
-   - The prior tool trajectory from the failed attempt (assistant + tool messages), so the LLM does not fix blind.
-   - The previous `agent_plan`.
-   - The failed code block.
-   - A user message containing the exact error and instructions to fix it.
-
-3. The LLM may use tools again during correction (up to 5 tool rounds) to verify API signatures if the error suggests an incorrect call.
-
-4. If correction succeeds, the corrected `agent_plan` and code are saved, the corrected code replaces the failed code in `conversation_history`, a correction marker is appended, and the new code is auto-executed.
-
-5. This repeats up to **5 attempts total**. If all attempts fail, the agent reports the final error to the user.
-
----
-
-### 3. Streaming & Real-Time Feedback
-
-Because MRML scene access and all UI updates must happen on the Qt main thread, HTTP I/O runs in a background `threading.Thread`, while UI updates are marshaled back via a thread-safe `queue.Queue`.
-
-**Mechanism:**
-
-- A `_streamQueue` is filled by the worker thread with events: `delta`, `complete`, `error`, `correction_complete`, `correction_error`, and `status`.
-- A `QTimer` polls the queue every **50 ms** on the main thread and drains all pending events in a batch.
-- Consecutive streaming deltas (reasoning/content) are batched into a single render pass to avoid calling `setHtml()` hundreds of times per second, which would block the main thread.
-- Tool progress deltas are committed immediately as separate chat entries so the user sees search activity in real time.
-
-**UI elements:**
-- **Thinking timer (⏱)** — Updates every 100 ms while the LLM is working.
-- **Role-aware status label** — Shows the active role and current activity, such as `Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, `Safety Critic: Validating code...`, or `Executor: Executing...`.
-- **Token/cost label** — Displays per-turn cumulative token usage and estimated cost (e.g., `Turn 3 | Cumulative: 4,231 tokens | $0.0123`).
-
-**Debug artifacts** are written under timestamped run folders:
-
-```text
-logs/YYYYMMDD_HHMMSS_turnN/
-```
-
-Common artifacts include:
-- `{turn}_agent_plan.json` — Parsed structured plan.
-- `{turn}_code.txt` — Generated Python code.
-- `{turn}_first_prompt_debug.txt` — First prompt/messages sent to the LLM.
-- `{turn}_last_prompt_debug.txt` — Final prompt/messages before code generation.
-- `{turn}_performance_log.txt` — Detailed timing breakdown for scene context, retrieval, API wait, tool execution, validation, execution, and self-correction.
-- `{turn}_role_trace.json` — Structured role-composed pipeline events.
-- `{turn}_thinking_history.txt` — Reasoning/progress content when available.
-
-Correction artifacts use suffixes such as `{turn}_correction_1_code.txt` and `{turn}_correction_1_agent_plan.json`.
-
----
-
-### 4. Dense Vector Retrieval Backend
-
-The `SkillIndexer.py` module implements a complete dense retrieval pipeline that can be built and updated independently via `scripts/build_rag.py`.
-
-**Chunking (`Chunker`):**
-- Indexes only high-value prefixes: `script_repository/`, `Base/Python/slicer/`, `Modules/Scripted/`, `Modules/Loadable/*/Testing/Python/`, `Libs/MRML/Core/`, etc.
-- Python and C++ files are chunked by AST boundaries (function and class definitions) using tree-sitter.
-- Markdown files are chunked by headings; code blocks under a heading stay with it.
-- Each chunk's **embedding text** is enriched with the function signature, docstring, source-type label, and a type prefix for better natural-language-to-code matching.
-
-**Embedding (`VectorIndex`):**
-- Model: `jinaai/jina-embeddings-v2-base-code` exported to ONNX (~640 MB, downloaded once).
-- Runtime: ONNX Runtime with mean-pooling and L2 normalization.
-- Tokenizer: Lightweight `tokenizers` library (Rust-based, no heavy `transformers` import).
-- Sequence length capped at 1024 tokens.
-- Batch encoding with progress logging and ETA estimation.
-
-**Search (`VectorRetriever`):**
-- Pure dense search via FAISS `IndexFlatIP` (inner product on normalized vectors = cosine similarity).
-- Source-type weighting applied post-search.
-- Returns ranked chunks with file path, line range, similarity score, and boosted score.
-
-**Incremental building (`IndexBuilder`):**
-- Compares file mtime+size fingerprints against a manifest.
-- Re-chunks only changed or new files.
-- Rebuilds the FAISS index from the merged chunk list (unchanged + new).
-- Stores metadata as JSONL and the manifest as JSON under `Resources/Code_RAG/v1/`.
-
----
-
-### 5. Security Model
+#### Security & Safe Execution
 
 Generated code is treated as untrusted until validated. The security layers are:
 
-**Blocked modules:** `os`, `subprocess`, `sys`, `socket`, `urllib`, `ctypes`, `pickle`, `marshal`, `imp`, `importlib._bootstrap`, etc.
+- **Blocked modules**: `os`, `subprocess`, `sys`, `socket`, `urllib`, `ctypes`, `pickle`, `marshal`, etc.
+- **Blocked functions**: `eval`, `exec`, `compile`, `open`, `getattr`, `globals`, `locals`, `__import__`, etc.
+- **Allowed modules**: `slicer`, `vtk`, `qt`, `ctk`, `numpy`, `SimpleITK`, `json`, `re`, `math`, and standard safe libraries.
+- **Runtime constraints**: No file I/O, no network calls, no subprocesses. Execution is bounded by a 30-second cooperative timeout.
 
-**Blocked functions:** `eval`, `exec`, `compile`, `open`, `file`, `input`, `getattr`, `setattr`, `globals`, `locals`, `vars`, `dir`, `__import__`, etc.
+`SafeExecutor.execute()` runs code in `sys.modules['__main__'].__dict__` — the exact same namespace as the Slicer Python Console — so shortcuts like `getNode` are automatically available. Execution is scheduled via `qt.QTimer.singleShot` to stay on the Qt main thread, satisfying MRML scene and GUI thread-safety requirements. stdout and stderr are captured, and VTK C++ errors are intercepted by temporarily redirecting the global `vtkOutputWindow` to a temp file, so the self-correction mechanism can react to runtime VTK errors even when no Python exception was raised.
 
-**Allowed modules:** `slicer`, `vtk`, `qt`, `ctk`, `SampleData`, `numpy`, `SimpleITK`, `sitk`, `json`, `re`, `math`, `random`, `datetime`, `collections`, `itertools`, `io`, `base64`, `hashlib`, `typing`, etc.
+Before execution, the system calls `slicer.mrmlScene.SaveStateForUndo()`. If execution raises an exception or times out, it calls `Undo()` and deletes any nodes whose IDs did not exist before execution (catching display nodes, storage nodes, and subject-hierarchy items that `Undo()` may miss).
 
-**Runtime constraints:**
-- No file I/O (`open()` is blocked).
-- No network calls.
-- No system commands or subprocesses.
-- Execution is bounded by a 30-second cooperative timeout.
-- The MRML scene can be rolled back on failure.
+#### Self-Correction
 
----
+If execution fails, the agent automatically enters self-correction mode:
 
-## Setup & Installation
+1. An **isolated retry** is launched in a background thread. It runs the full tool-calling loop but does **not** read from or write to the main conversation history, and it does **not** increment the turn number. Failed attempts never pollute the user's context.
+2. The isolated prompt includes the original system prompt, the original user prompt, the full prior tool trajectory, the previous `agent_plan`, the failed code, and the exact error message.
+3. The LLM may use tools again during correction (up to 5 tool rounds) to verify API signatures.
+4. If correction succeeds, the corrected plan and code replace the failed versions in history, a correction marker is appended, and the new code is auto-executed.
+5. This repeats up to **5 attempts total**. If all fail, the agent reports the final error to the user.
 
-### 1. Download the Slicer Skill
+#### Guided Workflow Runtime
 
-Follow the download and setup instructions in the [pieper/slicer-skill](https://github.com/pieper/slicer-skill) repository, then place the downloaded skill content under:
+When a validated Extension CLI is active, the system switches from the autonomous LLM loop to a deterministic workflow runtime:
 
-```text
-Resources/Skills/slicer-skill-full/
-```
+- **Turn Routing**: A lightweight router classifies every user prompt. Simple control words (`done`, `proceed`, `skip`, `cancel`) are routed directly to the workflow engine. New autonomous requests that conflict with an active workflow are queued until the workflow finishes.
+- **WorkflowOrchestrator**: A state machine that tracks the current step, completed steps, and node registry. Steps can be:
+  - *Automated* — code runs immediately.
+  - *Interactive* — the system creates markup nodes, enters Slicer placement mode, and waits for the user to place points or draw curves.
+  - *Mixed* — automated setup runs first, then the system pauses for user interaction.
+  - *Branch* — conditional paths based on user choice.
+  - *User Choice* — the LLM or a lightweight resolver selects from scene nodes or predefined options.
+- **InteractionManager**: Handles low-level Slicer 3D coordination: markup node creation, placement mode entry/exit, debounced VTK observers, and validation (e.g., minimum control point counts).
+- **NodeChoiceResolver**: When a workflow step needs to choose between multiple scene nodes (e.g., "which volume to use?"), a narrow LLM call resolves the ambiguity by matching node names against the step's described role.
 
-The agent uses this local folder for documentation search, API lookup, and dense vector retrieval.
+This design means a complex 10-step surgical planning workflow can run with minimal LLM overhead: the planning and code generation happened offline; online execution is fast, deterministic, and interruptible.
 
-### 2. Build the Dense Vector Index (Optional but Recommended)
+#### Streaming & Real-Time Feedback
 
-The vector index enables fast pre-retrieval of relevant knowledge base snippets before each LLM call.
+Because MRML scene access and all UI updates must happen on the Qt main thread, HTTP I/O runs in a background `threading.Thread`, while UI updates are marshaled back via a thread-safe `queue.Queue`:
 
-```bash
-python scripts/build_rag.py
-```
+- A `_streamQueue` is filled by the worker thread with events: `delta`, `complete`, `error`, `correction_complete`, `status`.
+- A `QTimer` polls the queue every 50 ms on the main thread and drains all pending events in a batch.
+- Consecutive streaming deltas are batched into a single render pass to avoid blocking the main thread.
+- Tool progress deltas are committed immediately as separate chat entries so the user sees search activity in real time.
 
-This scans `Resources/Skills/slicer-skill-full/`, chunks changed files, encodes them with the ONNX model, and writes the FAISS index to `Resources/Code_RAG/v1/`. The first run downloads the ~640 MB ONNX model.
+The UI shows a **thinking timer**, a **role-aware status label** (`Observer: Reading request...`, `Retriever: Searching...`, `Planner/Programmer: Generating...`, etc.), and a **per-turn token/cost label**.
 
-### 3. Install the Extension
-
-Add the repository root to Slicer's additional module paths:
-
-1. Open 3D Slicer.
-2. Go to **View → Application Settings → Modules → Additional module paths**.
-3. Add the root of this repository.
-4. Restart Slicer. The module appears under the **AI** category.
-
-### 4. Configure API Key
-
-Enter your API key in the Settings panel of the module UI. Supported providers:
-
-- **Kimi / Moonshot** (default): `https://api.moonshot.cn/v1`, default model `kimi-k2.5`
-- **DeepSeek**: OpenAI-compatible DeepSeek endpoints and model list from the provider selector.
-- **Claude**: native Anthropic Messages API when using `https://api.anthropic.com/v1`; OpenAI-compatible Claude proxies are also supported when their base URL uses OpenAI-compatible chat completions.
-
-Use the **Test** button to verify the configured provider, model, base URL, and API key.
+Debug artifacts are written under timestamped run folders (`logs/YYYYMMDD_HHMMSS_turnN/`) and include the parsed plan, generated code, prompts, performance timing, role trace, and thinking history.
 
 ---
 
-## Related Projects
+## Related Projects & Acknowledgments
 
-* **[slicer-skill](https://github.com/pieper/slicer-skill)** — The foundational Claude skill for 3D Slicer that pioneered the MCP integration and local documentation indexing workflow.
-* **[SlicerClaw](https://github.com/jumbojing/slicerClaw)** — A lightning-fast AI assistant natively integrated into 3D Slicer.
-* **[mcp-slicer](https://github.com/zhaoyouj/mcp-slicer)** — A standalone MCP server for 3D Slicer by @zhaoyouj, installable via `pip` / `uvx`. It uses Slicer's built-in WebServer API as a bridge and can be launched outside of Slicer.
-* **[SlicerDeveloperAgent](https://github.com/muratmaga/SlicerDeveloperAgent)** — A Slicer extension by Murat Maga that embeds an AI coding agent directly inside 3D Slicer using Gemini, letting users prompt, run, and iterate on scripts and modules without leaving the application. See the [Discourse discussion](https://discourse.slicer.org/t/developer-agent-for-slicer/44787) for background.
-* **[NA-MIC Project Week 44 — Claude Scientific Skill for Imaging Data Commons](https://projectweek.na-mic.org/PW44_2026_GranCanaria/Projects/ClaudeScientificSkillForImagingDataCommons/)** — A project that developed a Claude skill for the [Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov/) (IDC), published at [ImagingDataCommons/idc-claude-skill](https://github.com/ImagingDataCommons/idc-claude-skill).
-* **[SlicerChat: Building a Local Chatbot for 3D Slicer](https://arxiv.org/abs/2407.11987)** (Barr, 2024) — Explores integrating a locally-run LLM (Code-Llama Instruct) into 3D Slicer to assist users with the software's steep learning curve, investigating the effects of fine-tuning, model size, and domain knowledge (Python samples, Markdown docs, Discourse forums) on answer quality.
-* **[Talk2View](https://talk2view.com/)** — A platform for conversational interaction with medical imaging data and visualization tools.
-* **[VoxTell](https://github.com/MIC-DKFZ/VoxTell)** — A Slicer extension for text-promptable AI segmentation of anatomical structures, enabling natural-language-driven organ and tissue segmentation.
-* **[jina-embeddings-v2-base-en](https://huggingface.co/jinaai/jina-embeddings-v2-base-en)** — The 768-dim English embedding model from Jina AI used for dense vector retrieval in the knowledge-base pipeline.
+- **[slicer-skill](https://github.com/pieper/slicer-skill)** — The foundational Claude skill for 3D Slicer that pioneered the MCP integration and local documentation indexing workflow.
+- **[SlicerClaw](https://github.com/jumbojing/slicerClaw)** — A lightning-fast AI assistant natively integrated into 3D Slicer.
+- **[mcp-slicer](https://github.com/zhaoyouj/mcp-slicer)** — A standalone MCP server for 3D Slicer by @zhaoyouj, installable via `pip` / `uvx`. It uses Slicer's built-in WebServer API as a bridge and can be launched outside of Slicer.
+- **[SlicerDeveloperAgent](https://github.com/muratmaga/SlicerDeveloperAgent)** — A Slicer extension by Murat Maga that embeds an AI coding agent directly inside 3D Slicer using Gemini, letting users prompt, run, and iterate on scripts and modules without leaving the application. See the [Discourse discussion](https://discourse.slicer.org/t/developer-agent-for-slicer/44787) for background.
+- **[NA-MIC Project Week 44 — Claude Scientific Skill for Imaging Data Commons](https://projectweek.na-mic.org/PW44_2026_GranCanaria/Projects/ClaudeScientificSkillForImagingDataCommons/)** — A project that developed a Claude skill for the [Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov/) (IDC), published at [ImagingDataCommons/idc-claude-skill](https://github.com/ImagingDataCommons/idc-claude-skill).
+- **[SlicerChat: Building a Local Chatbot for 3D Slicer](https://arxiv.org/abs/2407.11987)** (Barr, 2024) — Explores integrating a locally-run LLM (Code-Llama Instruct) into 3D Slicer to assist users with the software's steep learning curve, investigating the effects of fine-tuning, model size, and domain knowledge on answer quality.
+- **[Talk2View](https://talk2view.com/)** — A platform for conversational interaction with medical imaging data and visualization tools.
+- **[VoxTell](https://github.com/MIC-DKFZ/VoxTell)** — A Slicer extension for text-promptable AI segmentation of anatomical structures, enabling natural-language-driven organ and tissue segmentation.
