@@ -59,7 +59,7 @@ https://github.com/user-attachments/assets/59d5265e-e488-413f-84b5-55eb2f8a2da9
 21. Click "Center fibula line using fibula model" button to align the line with the anatomical axis of the fibula.
 22. Click "Update fibula planes over fibula line; update fibula bone pieces and transform them to mandible" to generate the reconstruction and create the fibula cut planes.
 
-https://github.com/user-attachments/assets/f4714688-2969-48fd-aec7-83a44d06bb87
+https://github.com/user-attachments/assets/9b92f27d-2393-41b0-8216-6fc3dcd95a02
 
 ---
 
