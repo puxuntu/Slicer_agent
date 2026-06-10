@@ -387,8 +387,9 @@ class AnalyzerScanMixin:
 
             if button_name and handler_name:
                 logic_methods = handler_logic_map.get(handler_name, [])
+                bare_name = button_name.split(".")[-1] if button_name else ""
                 connections.append({
-                    "button_widget_name": button_name,
+                    "button_widget_name": bare_name,
                     "signal": signal_name,
                     "handler_method": handler_name,
                     "logic_methods": logic_methods,

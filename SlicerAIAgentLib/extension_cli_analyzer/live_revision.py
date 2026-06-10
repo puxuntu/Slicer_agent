@@ -612,6 +612,7 @@ Return ONLY the JSON, no markdown fences.""")
                 templates, generators,
                 logic_analysis=logic_analysis,
                 api_probe_result=fresh_probe_result,
+                extension_name=extension_name,
             )
 
             if validation_result.get("valid"):

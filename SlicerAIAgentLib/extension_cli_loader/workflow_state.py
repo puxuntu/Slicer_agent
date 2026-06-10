@@ -222,10 +222,29 @@ def dispatch_workflow_step(
         "interactive": _handle_interactive_step,
     }
     handler = handlers.get(operation_type) or handlers.get(legacy_step_type)
-    if handler:
-        return handler(ctx)
+    if not handler:
+        return {"error": f"Unknown operation type: {operation_type}"}
+    result = handler(ctx)
 
-    return {"error": f"Unknown operation type: {operation_type}"}
+    # Centralized tagging: any template-derived result with executable code
+    # is marked as generator-pipeline origin so the runtime fast path and the
+    # self-correction classifier can route on it. ``_prelude_globals`` carries
+    # the workflow-metadata dicts the prelude expects in the executor
+    # namespace; the executor registers each key via addGlobal before exec.
+    if isinstance(result, dict) and result.get("code"):
+        result.setdefault("origin", "generated_template")
+        try:
+            prelude_globals = _build_prelude_globals(ctx)
+        except Exception:
+            logger.debug(
+                "Failed to build prelude globals for step %s",
+                workflow_step,
+                exc_info=True,
+            )
+            prelude_globals = {}
+        if prelude_globals:
+            result["_prelude_globals"] = prelude_globals
+    return result
 
 
 # =====================================================================

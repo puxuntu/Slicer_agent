@@ -12,7 +12,7 @@
     "step_type": "user_choice",
     "ui_guidance": {
       "title": "Is the fibula from the right leg?",
-      "instruction": "Choose Yes or No.",
+      "instruction": "Choose one option.",
       "done_label": "Done",
       "choice_label": "Side",
       "input_label": "Side",
@@ -60,7 +60,7 @@
       "default_value": false,
       "ui_guidance": {
         "title": "Is the fibula from the right leg?",
-        "instruction": "Choose Yes or No.",
+        "instruction": "Choose one option.",
         "done_label": "Done",
         "choice_label": "Side",
         "input_label": "Side",
@@ -128,10 +128,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Specify fibula side laterality",
+        "description": "Choose fibula side (right leg)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.rightSideLegFibulaCheckBox",
+        "widget_name": "rightSideLegFibulaCheckBox",
         "ui_parameter_binding": {
           "widget_name": "rightSideLegFibulaCheckBox",
           "widget_class": "QCheckBox",
@@ -155,6 +155,9 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -164,7 +167,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "user_context",
-        "evidence_id": "1",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "rightSideLegFibula",
         "value_property": "checked",
@@ -196,12 +199,12 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Select the mandibular segmentation node",
-      "instruction": "Enter choice.",
+      "title": "Select the mandibular segmentation node from the scene",
+      "instruction": "Select the mandibular segmentation.",
       "done_label": "Done",
-      "choice_label": "Choice",
-      "input_label": "Choice",
-      "object_label": "segmentation",
+      "choice_label": "Mandibular Segmentation",
+      "input_label": "Mandibular Segmentation",
+      "object_label": "choice",
       "repeat": {}
     },
     "op_type": "user_choice",
@@ -224,23 +227,23 @@
     "node_roles": [
       {
         "role_kind": "choice_input",
-        "node_class": null,
+        "node_class": "",
         "parameter_name": "mandibularSegmentation",
         "step_id": "cb_step_2"
       }
     ],
     "choice_descriptor": {
-      "question": "Select the mandibular segmentation node",
+      "question": "Select the mandibular segmentation node from the scene",
       "choices": [],
       "parameter_name": "mandibularSegmentation",
       "default_value": null,
       "ui_guidance": {
-        "title": "Select the mandibular segmentation node",
-        "instruction": "Enter choice.",
+        "title": "Select the mandibular segmentation node from the scene",
+        "instruction": "Select the mandibular segmentation.",
         "done_label": "Done",
-        "choice_label": "Choice",
-        "input_label": "Choice",
-        "object_label": "segmentation",
+        "choice_label": "Mandibular Segmentation",
+        "input_label": "Mandibular Segmentation",
+        "object_label": "choice",
         "repeat": {}
       },
       "binding": {
@@ -284,7 +287,7 @@
       "node_roles": [
         {
           "role_kind": "choice_input",
-          "node_class": null,
+          "node_class": "",
           "parameter_name": "mandibularSegmentation",
           "step_id": "cb_step_2"
         }
@@ -294,10 +297,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Select mandibular segmentation node",
+        "description": "Select mandibular segmentation",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.mandibularSegmentationSelector",
+        "widget_name": "mandibularSegmentationSelector",
         "ui_parameter_binding": {
           "widget_name": "mandibularSegmentationSelector",
           "widget_class": "qMRMLNodeComboBox",
@@ -320,6 +323,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          1
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -329,21 +337,21 @@
         "node_roles": [
           {
             "role_kind": "choice_input",
-            "node_class": null,
+            "node_class": "",
             "parameter_name": "mandibularSegmentation",
             "step_id": "cb_step_2"
           }
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "2",
+        "evidence_id": "",
         "operation_intent": "extension_node_reference_update",
         "parameter_name": "mandibularSegmentation",
         "value_property": "currentNodeID",
-        "question": "Select the mandibular segmentation node",
+        "question": "Select the mandibular segmentation node from the scene",
         "choices": [],
         "default_value": null,
-        "value_kind": "node_id"
+        "value_kind": "node"
       }
     ]
   },
@@ -359,12 +367,12 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Select the fibula segmentation node",
-      "instruction": "Enter choice.",
+      "title": "Select the fibula segmentation node from the scene",
+      "instruction": "Select the fibula segmentation.",
       "done_label": "Done",
-      "choice_label": "Choice",
-      "input_label": "Choice",
-      "object_label": "segmentation",
+      "choice_label": "Fibula Segmentation",
+      "input_label": "Fibula Segmentation",
+      "object_label": "choice",
       "repeat": {}
     },
     "op_type": "user_choice",
@@ -387,23 +395,23 @@
     "node_roles": [
       {
         "role_kind": "choice_input",
-        "node_class": null,
+        "node_class": "",
         "parameter_name": "fibulaSegmentation",
         "step_id": "cb_step_3"
       }
     ],
     "choice_descriptor": {
-      "question": "Select the fibula segmentation node",
+      "question": "Select the fibula segmentation node from the scene",
       "choices": [],
       "parameter_name": "fibulaSegmentation",
       "default_value": null,
       "ui_guidance": {
-        "title": "Select the fibula segmentation node",
-        "instruction": "Enter choice.",
+        "title": "Select the fibula segmentation node from the scene",
+        "instruction": "Select the fibula segmentation.",
         "done_label": "Done",
-        "choice_label": "Choice",
-        "input_label": "Choice",
-        "object_label": "segmentation",
+        "choice_label": "Fibula Segmentation",
+        "input_label": "Fibula Segmentation",
+        "object_label": "choice",
         "repeat": {}
       },
       "binding": {
@@ -446,7 +454,7 @@
       "node_roles": [
         {
           "role_kind": "choice_input",
-          "node_class": null,
+          "node_class": "",
           "parameter_name": "fibulaSegmentation",
           "step_id": "cb_step_3"
         }
@@ -456,10 +464,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Select fibula segmentation node",
+        "description": "Select fibula segmentation",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.fibulaSegmentationSelector",
+        "widget_name": "fibulaSegmentationSelector",
         "ui_parameter_binding": {
           "widget_name": "fibulaSegmentationSelector",
           "widget_class": "qMRMLNodeComboBox",
@@ -482,6 +490,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          2
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -491,21 +504,21 @@
         "node_roles": [
           {
             "role_kind": "choice_input",
-            "node_class": null,
+            "node_class": "",
             "parameter_name": "fibulaSegmentation",
             "step_id": "cb_step_3"
           }
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "3",
+        "evidence_id": "",
         "operation_intent": "extension_node_reference_update",
         "parameter_name": "fibulaSegmentation",
         "value_property": "currentNodeID",
-        "question": "Select the fibula segmentation node",
+        "question": "Select the fibula segmentation node from the scene",
         "choices": [],
         "default_value": null,
-        "value_kind": "node_id"
+        "value_kind": "node"
       }
     ]
   },
@@ -521,12 +534,12 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Select the mandible scalar volume node",
-      "instruction": "Enter choice.",
+      "title": "Select the mandible scalar volume node from the scene",
+      "instruction": "Select the mandible scalar volume.",
       "done_label": "Done",
-      "choice_label": "Choice",
-      "input_label": "Choice",
-      "object_label": "volume",
+      "choice_label": "Mandible Volume",
+      "input_label": "Mandible Volume",
+      "object_label": "choice",
       "repeat": {}
     },
     "op_type": "user_choice",
@@ -549,23 +562,23 @@
     "node_roles": [
       {
         "role_kind": "choice_input",
-        "node_class": null,
+        "node_class": "",
         "parameter_name": "currentScalarVolume",
         "step_id": "cb_step_4"
       }
     ],
     "choice_descriptor": {
-      "question": "Select the mandible scalar volume node",
+      "question": "Select the mandible scalar volume node from the scene",
       "choices": [],
       "parameter_name": "currentScalarVolume",
       "default_value": null,
       "ui_guidance": {
-        "title": "Select the mandible scalar volume node",
-        "instruction": "Enter choice.",
+        "title": "Select the mandible scalar volume node from the scene",
+        "instruction": "Select the mandible scalar volume.",
         "done_label": "Done",
-        "choice_label": "Choice",
-        "input_label": "Choice",
-        "object_label": "volume",
+        "choice_label": "Mandible Volume",
+        "input_label": "Mandible Volume",
+        "object_label": "choice",
         "repeat": {}
       },
       "binding": {
@@ -624,7 +637,7 @@
       "node_roles": [
         {
           "role_kind": "choice_input",
-          "node_class": null,
+          "node_class": "",
           "parameter_name": "currentScalarVolume",
           "step_id": "cb_step_4"
         }
@@ -634,10 +647,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Select mandible scalar volume node",
+        "description": "Select mandible scalar volume",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.scalarVolumeSelector",
+        "widget_name": "scalarVolumeSelector",
         "ui_parameter_binding": {
           "widget_name": "scalarVolumeSelector",
           "widget_class": "qMRMLNodeComboBox",
@@ -660,6 +673,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          3
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -669,21 +687,21 @@
         "node_roles": [
           {
             "role_kind": "choice_input",
-            "node_class": null,
+            "node_class": "",
             "parameter_name": "currentScalarVolume",
             "step_id": "cb_step_4"
           }
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "4",
+        "evidence_id": "",
         "operation_intent": "extension_node_reference_update",
         "parameter_name": "currentScalarVolume",
         "value_property": "currentNodeID",
-        "question": "Select the mandible scalar volume node",
+        "question": "Select the mandible scalar volume node from the scene",
         "choices": [],
         "default_value": null,
-        "value_kind": "node_id"
+        "value_kind": "node"
       }
     ]
   },
@@ -731,7 +749,7 @@
         "description": "Create bone models from segmentations",
         "extension_method_hint": "makeModels",
         "extension_function_hint": null,
-        "widget_name": "self.ui.makeModelsButton",
+        "widget_name": "makeModelsButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
@@ -740,6 +758,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          4
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -747,7 +770,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "5"
+        "evidence_id": ""
       }
     ]
   },
@@ -764,7 +787,7 @@
     "step_type": "slicer_op",
     "ui_guidance": {
       "title": "Update layout",
-      "instruction": "Set layout to Conventional.",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -790,15 +813,15 @@
         "slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView"
       ],
       "operation_descriptions": [
-        "Set layout to Conventional"
+        "Change layout to Conventional"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "generic_slicer_api"
       ],
       "slicer_api_keywords": [
-        "setLayout",
-        "Conventional",
-        "layoutManager"
+        "layout",
+        "conventional",
+        "setLayout"
       ]
     },
     "operation_model": {
@@ -822,22 +845,27 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Set layout to Conventional",
+        "description": "Change layout to Conventional",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "layout_slice_view",
+        "slicer_op_category": "generic_slicer_api",
         "slicer_api_keywords": [
-          "setLayout",
-          "Conventional",
-          "layoutManager"
+          "layout",
+          "conventional",
+          "setLayout"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          5
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -847,7 +875,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "6",
+        "evidence_id": "",
         "operation_intent": "layout_activate"
       }
     ]
@@ -864,7 +892,7 @@
     "operation_type": "slicer_op",
     "step_type": "slicer_op",
     "ui_guidance": {
-      "title": "Toggle slice visibility in 3D for Red view",
+      "title": "Toggle slice visibility in 3D for R view",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -876,33 +904,31 @@
     "api_evidence": {
       "source": "stage5T",
       "accepted_footprints": [
-        "app",
-        "layoutManager",
-        "setSliceVisible",
-        "sliceController",
-        "sliceWidget"
+        "GetNodeByID",
+        "GetSliceVisible",
+        "SetSliceVisible",
+        "mrmlScene",
+        "vtkMRMLSliceNodeRed"
       ],
       "api_chains": [
-        "layoutManager.sliceWidget",
-        "redWidget.sliceController",
-        "redWidget.sliceController().setSliceVisible",
-        "slicer.app",
-        "slicer.app.layoutManager",
-        "slicer.app.layoutManager().sliceWidget",
-        "slicer.app.layoutManager().sliceWidget('Red').sliceController",
-        "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
+        "sliceNode.GetSliceVisible",
+        "sliceNode.SetSliceVisible",
+        "slicer.mrmlScene",
+        "slicer.mrmlScene.GetNodeByID",
+        "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetSliceVisible",
+        "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').SetSliceVisible"
       ],
       "operation_descriptions": [
-        "Show slice in 3D view for Red slice"
+        "Toggle slice visibility in 3D view for Red view"
       ],
       "slicer_op_categories": [
-        "generic_slicer_api"
+        "layout_slice_view"
       ],
       "slicer_api_keywords": [
-        "sliceNode",
-        "SetSliceVisible",
-        "True",
-        "Red"
+        "slice node",
+        "slice visibility",
+        "3D view",
+        "SetSliceVisibility"
       ]
     },
     "operation_model": {
@@ -926,23 +952,28 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Show slice in 3D view for Red slice",
+        "description": "Toggle slice visibility in 3D view for Red view",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "generic_slicer_api",
+        "slicer_op_category": "layout_slice_view",
         "slicer_api_keywords": [
-          "sliceNode",
-          "SetSliceVisible",
-          "True",
-          "Red"
+          "slice node",
+          "slice visibility",
+          "3D view",
+          "SetSliceVisibility"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          6
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -952,7 +983,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "7",
+        "evidence_id": "",
         "operation_intent": "view_display_scope"
       }
     ]
@@ -969,7 +1000,7 @@
     "operation_type": "slicer_op",
     "step_type": "slicer_op",
     "ui_guidance": {
-      "title": "Toggle FOV/Spacing match 2D for Red view",
+      "title": "Toggle FOV, Spacing match 2D for R view",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -981,33 +1012,37 @@
     "api_evidence": {
       "source": "stage5T",
       "accepted_footprints": [
+        "GetNodeByID",
+        "GetSliceResolutionMode",
         "SetSliceResolutionMode",
         "SliceResolutionMatch2DView",
-        "app",
-        "layoutManager",
-        "mrmlSliceNode",
-        "sliceWidget"
+        "SliceResolutionMatchVolumes",
+        "mrmlScene",
+        "vtkMRMLSliceNode",
+        "vtkMRMLSliceNodeRed"
       ],
       "api_chains": [
-        "redSliceNode.SetSliceResolutionMode",
-        "slicer.app",
-        "slicer.app.layoutManager",
-        "slicer.app.layoutManager().sliceWidget",
-        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode",
-        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode().SetSliceResolutionMode",
-        "slicer.app.layoutManager().sliceWidget('Red').mrmlSliceNode().SliceResolutionMatch2DView"
+        "sliceNode.GetSliceResolutionMode",
+        "sliceNode.SetSliceResolutionMode",
+        "slicer.mrmlScene",
+        "slicer.mrmlScene.GetNodeByID",
+        "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetSliceResolutionMode",
+        "slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').SetSliceResolutionMode",
+        "slicer.vtkMRMLSliceNode",
+        "slicer.vtkMRMLSliceNode.SliceResolutionMatch2DView",
+        "slicer.vtkMRMLSliceNode.SliceResolutionMatchVolumes"
       ],
       "operation_descriptions": [
-        "Match FOV and spacing to 2D view for Red slice"
+        "Toggle FOV spacing match 2D for Red view"
       ],
       "slicer_op_categories": [
-        "generic_slicer_api"
+        "layout_slice_view"
       ],
       "slicer_api_keywords": [
-        "sliceNode",
-        "SetFieldOfView",
-        "SetSpacing",
-        "match2D"
+        "slice node",
+        "FOV",
+        "spacing",
+        "match 2D"
       ]
     },
     "operation_model": {
@@ -1015,7 +1050,9 @@
       "op_types": [
         "slicer_op"
       ],
-      "operation_intents": [],
+      "operation_intents": [
+        "view_display_scope"
+      ],
       "invokes_extension_method": false,
       "invokes_extension_function": false,
       "invokes_slicer_api": true,
@@ -1029,31 +1066,39 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Match FOV and spacing to 2D view for Red slice",
+        "description": "Toggle FOV spacing match 2D for Red view",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "generic_slicer_api",
+        "slicer_op_category": "layout_slice_view",
         "slicer_api_keywords": [
-          "sliceNode",
-          "SetFieldOfView",
-          "SetSpacing",
-          "match2D"
+          "slice node",
+          "FOV",
+          "spacing",
+          "match 2D"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          7
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
-        "operation_intents": [],
+        "operation_intents": [
+          "view_display_scope"
+        ],
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "8"
+        "evidence_id": "",
+        "operation_intent": "view_display_scope"
       }
     ]
   },
@@ -1069,8 +1114,8 @@
     "operation_type": "slicer_op",
     "step_type": "slicer_op",
     "ui_guidance": {
-      "title": "Configure slice intersection",
-      "instruction": "Enable visibility, set interaction, and enable Translate/Rotate.",
+      "title": "Update slice visibility",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1087,32 +1132,30 @@
         "IntersectingSlicesVisibility",
         "SetIntersectingSlicesEnabled",
         "app",
-        "applicationLogic",
-        "vtkMRMLApplicationLogic"
+        "applicationLogic"
       ],
       "api_chains": [
         "appLogic.SetIntersectingSlicesEnabled",
         "slicer.app",
         "slicer.app.applicationLogic",
-        "slicer.app.applicationLogic().SetIntersectingSlicesEnabled",
-        "slicer.vtkMRMLApplicationLogic",
-        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesInteractive",
-        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesRotation",
-        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesTranslation",
-        "slicer.vtkMRMLApplicationLogic.IntersectingSlicesVisibility"
+        "slicer.app.applicationLogic().IntersectingSlicesInteractive",
+        "slicer.app.applicationLogic().IntersectingSlicesRotation",
+        "slicer.app.applicationLogic().IntersectingSlicesTranslation",
+        "slicer.app.applicationLogic().IntersectingSlicesVisibility",
+        "slicer.app.applicationLogic().SetIntersectingSlicesEnabled"
       ],
       "operation_descriptions": [
-        "Configure slice intersection visibility and interaction modes"
+        "Enable slice intersection visibility and interaction modes (Translate, Rotate)"
       ],
       "slicer_op_categories": [
-        "generic_slicer_api"
+        "crosshair"
       ],
       "slicer_api_keywords": [
-        "sliceIntersectionWidget",
-        "SetVisibility",
-        "SetInteractionEnabled",
-        "SetModeToTranslate",
-        "SetModeToRotate"
+        "vtkMRMLCrosshairNode",
+        "slice intersection",
+        "Translate",
+        "Rotate",
+        "SetInteractiveMode"
       ]
     },
     "operation_model": {
@@ -1137,24 +1180,29 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Configure slice intersection visibility and interaction modes",
+        "description": "Enable slice intersection visibility and interaction modes (Translate, Rotate)",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "generic_slicer_api",
+        "slicer_op_category": "crosshair",
         "slicer_api_keywords": [
-          "sliceIntersectionWidget",
-          "SetVisibility",
-          "SetInteractionEnabled",
-          "SetModeToTranslate",
-          "SetModeToRotate"
+          "vtkMRMLCrosshairNode",
+          "slice intersection",
+          "Translate",
+          "Rotate",
+          "SetInteractiveMode"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          8
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1165,7 +1213,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "9"
+        "evidence_id": ""
       }
     ]
   },
@@ -1182,11 +1230,11 @@
     "step_type": "user_interaction",
     "ui_guidance": {
       "title": "Adjust slice intersection",
-      "instruction": "Translate/rotate intersection cross lines in each view.",
+      "instruction": "Adjust the cross lines in each view.",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
-      "object_label": "intersection",
+      "object_label": "generic",
       "repeat": {}
     },
     "op_type": "user_interaction",
@@ -1212,14 +1260,14 @@
       "interaction_type": "generic",
       "interaction_kind": "view_adjustment",
       "node_class": "",
-      "placement_instructions": "Translate and rotate slice intersection cross lines in each view",
+      "placement_instructions": null,
       "ui_guidance": {
         "title": "Adjust slice intersection",
-        "instruction": "Translate/rotate intersection cross lines in each view.",
+        "instruction": "Adjust the cross lines in each view.",
         "done_label": "Done",
         "choice_label": "",
         "input_label": "",
-        "object_label": "intersection",
+        "object_label": "generic",
         "repeat": {}
       }
     }
@@ -1264,7 +1312,7 @@
       {
         "role_kind": "extension_output",
         "node_class": "vtkMRMLMarkupsCurveNode",
-        "parameter_name": "mandibleCurve",
+        "parameter_name": "",
         "step_id": "cb_step_11"
       }
     ],
@@ -1273,18 +1321,25 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Add mandibular curve markup",
+        "description": "Add mandibular curve",
         "extension_method_hint": "addMandibularCurve",
         "extension_function_hint": null,
-        "widget_name": "self.ui.addMandibularCurveButton",
+        "widget_name": "addMandibularCurveButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "addMandibularCurve"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
-        "node_class": null,
+        "node_class": "vtkMRMLMarkupsCurveNode",
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          10
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1293,13 +1348,13 @@
           {
             "role_kind": "extension_output",
             "node_class": "vtkMRMLMarkupsCurveNode",
-            "parameter_name": "mandibleCurve",
+            "parameter_name": "",
             "step_id": "cb_step_11"
           }
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "11"
+        "evidence_id": ""
       }
     ]
   },
@@ -1316,7 +1371,7 @@
     "step_type": "slicer_op",
     "ui_guidance": {
       "title": "Configure mandibular curve display",
-      "instruction": "Show in View 1 and Red view.",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1328,41 +1383,60 @@
       "source": "stage5T",
       "accepted_footprints": [
         "AddViewNodeID",
-        "GetDisplayNode",
+        "CreateDefaultDisplayNodes",
+        "GetFirstNodeByClass",
+        "GetID",
+        "GetItemAsObject",
+        "GetLayoutName",
+        "GetMarkupsDisplayNode",
         "GetName",
         "GetNodesByClass",
+        "GetNthNodeByClass",
+        "GetNumberOfItems",
+        "GetNumberOfNodesByClass",
         "RemoveAllViewNodeIDs",
         "SetVisibility",
         "SetVisibility2D",
         "lower",
         "mrmlScene",
         "vtkMRMLMarkupsCurveNode",
-        "vtkMRMLSliceNodeRed",
-        "vtkMRMLViewNode1"
+        "vtkMRMLSliceNode",
+        "vtkMRMLViewNode"
       ],
       "api_chains": [
-        "curveNode.GetDisplayNode",
+        "curveNode.CreateDefaultDisplayNodes",
+        "curveNode.GetMarkupsDisplayNode",
         "displayNode.AddViewNodeID",
         "displayNode.RemoveAllViewNodeIDs",
         "displayNode.SetVisibility",
         "displayNode.SetVisibility2D",
         "node.GetName",
         "node.GetName().lower",
+        "redSliceNode.GetID",
+        "sliceNodes.GetItemAsObject",
+        "sliceNodes.GetNumberOfItems",
         "slicer.mrmlScene",
-        "slicer.mrmlScene.GetNodesByClass"
+        "slicer.mrmlScene.GetFirstNodeByClass",
+        "slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLViewNode').GetID",
+        "slicer.mrmlScene.GetNodesByClass",
+        "slicer.mrmlScene.GetNodesByClass('vtkMRMLSliceNode').GetItemAsObject",
+        "slicer.mrmlScene.GetNodesByClass('vtkMRMLSliceNode').GetNumberOfItems",
+        "slicer.mrmlScene.GetNthNodeByClass",
+        "slicer.mrmlScene.GetNumberOfNodesByClass",
+        "sn.GetLayoutName",
+        "viewNode.GetID"
       ],
       "operation_descriptions": [
-        "Set mandibular curve display visibility in Red and View 1"
+        "Configure display of mandibular curve for View 1 and Red view"
       ],
       "slicer_op_categories": [
-        "node_display"
+        "markups_display"
       ],
       "slicer_api_keywords": [
-        "displayNode",
-        "SetVisibility",
-        "AddViewNodeID",
-        "Red",
-        "View1"
+        "vtkMRMLMarkupsCurveNode",
+        "display",
+        "SetDisplayVisibility",
+        "view"
       ]
     },
     "operation_model": {
@@ -1384,24 +1458,28 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Set mandibular curve display visibility in Red and View 1",
+        "description": "Configure display of mandibular curve for View 1 and Red view",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "node_display",
+        "slicer_op_category": "markups_display",
         "slicer_api_keywords": [
-          "displayNode",
-          "SetVisibility",
-          "AddViewNodeID",
-          "Red",
-          "View1"
+          "vtkMRMLMarkupsCurveNode",
+          "display",
+          "SetDisplayVisibility",
+          "view"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": "vtkMRMLMarkupsCurveNode",
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          11
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1409,7 +1487,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "12"
+        "evidence_id": ""
       }
     ],
     "allow_destructive_ops": true,
@@ -1436,7 +1514,7 @@
     "step_type": "user_interaction",
     "ui_guidance": {
       "title": "Draw curve",
-      "instruction": "Draw the curve along the mandible in the Red view.",
+      "instruction": "Draw the curve.",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1463,9 +1541,9 @@
     "node_roles": [
       {
         "role_kind": "interaction_output",
+        "step_id": "cb_step_13",
         "node_class": "vtkMRMLMarkupsCurveNode",
-        "parameter_name": "mandibleCurve",
-        "step_id": "cb_step_13"
+        "parameter_name": ""
       }
     ],
     "pre_template_file": "templates/cb_step_13_pre.py.tpl",
@@ -1474,10 +1552,10 @@
       "interaction_type": "curve",
       "interaction_kind": "markup_placement",
       "node_class": "vtkMRMLMarkupsCurveNode",
-      "placement_instructions": "Click and draw on Red view to create a curve along the mandible",
+      "placement_instructions": "Click along the mandible in the Red view to place curve control points",
       "ui_guidance": {
         "title": "Draw curve",
-        "instruction": "Draw the curve along the mandible in the Red view.",
+        "instruction": "Draw the curve.",
         "done_label": "Done",
         "choice_label": "",
         "input_label": "",
@@ -1489,65 +1567,6 @@
       "created_node_source": "previous_extension_method",
       "placement_starter_step_id": "cb_step_11",
       "placement_binding_reason": "recent_same_node_class_placement_starter",
-      "binding": {
-        "parameter_name": "mandibleCurve",
-        "role": "mandibleCurve",
-        "accesses": [
-          "node_reference_read",
-          "node_reference_write"
-        ],
-        "methods": [
-          "updateGUIFromParameterNode",
-          "updateParameterNodeFromGUI",
-          "onPlanePointAdded",
-          "createAndUpdateDynamicModelerNodes",
-          "reorderMandiblePlanes",
-          "mandiblePlanesPositioningForMaximumBoneContact",
-          "createCylindersFromFiducialListAndNeomandiblePieces",
-          "createSawBoxesFromFirstAndLastMandiblePlanes",
-          "section_AddMandibularCurve",
-          "section_AddMandiblePlanes"
-        ],
-        "method_accesses": {
-          "updateGUIFromParameterNode": [
-            "node_reference_read"
-          ],
-          "updateParameterNodeFromGUI": [
-            "node_reference_write"
-          ],
-          "onPlanePointAdded": [
-            "node_reference_read"
-          ],
-          "createAndUpdateDynamicModelerNodes": [
-            "node_reference_read"
-          ],
-          "reorderMandiblePlanes": [
-            "node_reference_read"
-          ],
-          "mandiblePlanesPositioningForMaximumBoneContact": [
-            "node_reference_read"
-          ],
-          "createCylindersFromFiducialListAndNeomandiblePieces": [
-            "node_reference_read"
-          ],
-          "createSawBoxesFromFirstAndLastMandiblePlanes": [
-            "node_reference_read"
-          ],
-          "section_AddMandibularCurve": [
-            "node_reference_read"
-          ],
-          "section_AddMandiblePlanes": [
-            "node_reference_read"
-          ]
-        },
-        "keywords": [
-          "mandible",
-          "curve",
-          "mandib"
-        ],
-        "node_class": "vtkMRMLMarkupsCurveNode",
-        "value_types": []
-      },
       "placement_policy": {
         "interaction_owner": "previous_extension_method",
         "placement_starter_method": "addMandibularCurve",
@@ -1568,7 +1587,7 @@
     "step_type": "slicer_op",
     "ui_guidance": {
       "title": "Update layout",
-      "instruction": "Set layout to BoneReconstructionPlanner.",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1580,41 +1599,63 @@
       "source": "stage5T",
       "accepted_footprints": [
         "AddLayoutDescription",
-        "BRPLayoutId",
-        "FIBULA_VIEW_SINGLETON_TAG",
-        "GetLayoutDescription",
         "GetLayoutNode",
-        "MANDIBLE_VIEW_SINGLETON_TAG",
+        "QIcon",
+        "actions",
+        "addAction",
         "app",
+        "data",
+        "findChild",
+        "format",
         "layoutLogic",
         "layoutManager",
-        "setLayout"
+        "mainWindow",
+        "menu",
+        "setData",
+        "setIcon",
+        "setLayout",
+        "setToolTip",
+        "util",
+        "widgetForAction"
       ],
       "api_chains": [
+        "'    <layout type=\"vertical\">\\n    <item>\\n      <layout type=\"horizontal\">\\n      <item>\\n        <view class=\"vtkMRMLViewNode\" singletontag=\"{mandibleTag}\">\\n        <property name=\"viewlabel\" action=\"default\">1</property>\\n        </view>\\n      </item>\\n      <item>\\n        <view class=\"vtkMRMLSliceNode\" singletontag=\"Red\">\\n        <property name=\"orientation\" action=\"default\">Axial</property>\\n        <property name=\"viewlabel\" action=\"default\">R</property>\\n        <property name=\"viewcolor\" action=\"default\">#F34A33</property>\\n        </view>\\n      </item>\\n      </layout>\\n    </item>\\n    <item>\\n      <view class=\"vtkMRMLViewNode\" singletontag=\"{fibulaTag}\">\\n      <property name=\"viewlabel\" action=\"default\">2</property>\\n      </view>\\n    </item>\\n    </layout>'.format",
+        "action.data",
         "layoutManager.layoutLogic",
         "layoutManager.layoutLogic().GetLayoutNode",
         "layoutManager.setLayout",
+        "layoutMenu.addAction",
         "layoutNode.AddLayoutDescription",
-        "layoutNode.GetLayoutDescription",
-        "slicer.BRPLayoutId",
-        "slicer.FIBULA_VIEW_SINGLETON_TAG",
-        "slicer.MANDIBLE_VIEW_SINGLETON_TAG",
+        "layoutSwitchAction.setData",
+        "layoutSwitchAction.setIcon",
+        "layoutSwitchAction.setToolTip",
+        "qt.QIcon",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().layoutLogic",
         "slicer.app.layoutManager().layoutLogic().GetLayoutNode",
         "slicer.app.layoutManager().layoutLogic().GetLayoutNode().AddLayoutDescription",
-        "slicer.app.layoutManager().layoutLogic().GetLayoutNode().GetLayoutDescription",
-        "slicer.app.layoutManager().setLayout"
+        "slicer.app.layoutManager().setLayout",
+        "slicer.util",
+        "slicer.util.mainWindow",
+        "slicer.util.mainWindow().findChild",
+        "slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').actions",
+        "slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').widgetForAction",
+        "slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').widgetForAction(slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').actions()[0]).menu",
+        "slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').widgetForAction(slicer.util.mainWindow().findChild('QToolBar', 'ViewToolBar').actions()[0]).menu().actions",
+        "viewToolBar.actions",
+        "viewToolBar.widgetForAction",
+        "viewToolBar.widgetForAction(viewToolBar.actions()[0]).menu"
       ],
       "operation_descriptions": [
-        "Switch to BoneReconstructionPlanner custom layout"
+        "Change layout to BoneReconstructionPlanner"
       ],
       "slicer_op_categories": [
-        "layout_slice_view"
+        "generic_slicer_api"
       ],
       "slicer_api_keywords": [
-        "setBRPLayout"
+        "setBRPLayout",
+        "layout"
       ]
     },
     "operation_model": {
@@ -1638,20 +1679,26 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Switch to BoneReconstructionPlanner custom layout",
+        "description": "Change layout to BoneReconstructionPlanner",
         "extension_method_hint": null,
         "extension_function_hint": "setBRPLayout",
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "layout_slice_view",
+        "slicer_op_category": "generic_slicer_api",
         "slicer_api_keywords": [
-          "setBRPLayout"
+          "setBRPLayout",
+          "layout"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          13
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1661,7 +1708,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "14",
+        "evidence_id": "",
         "operation_intent": "layout_activate"
       }
     ]
@@ -1678,7 +1725,7 @@
     "operation_type": "slicer_op",
     "step_type": "slicer_op",
     "ui_guidance": {
-      "title": "Toggle off slice visibility in 3D for Red view",
+      "title": "Hide slice in 3D for R view",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -1697,9 +1744,9 @@
         "sliceWidget"
       ],
       "api_chains": [
+        "controller.setSliceVisible",
         "layoutManager.sliceWidget",
-        "redWidget.sliceController",
-        "redWidget.sliceController().setSliceVisible",
+        "layoutManager.sliceWidget('Red').sliceController",
         "slicer.app",
         "slicer.app.layoutManager",
         "slicer.app.layoutManager().sliceWidget",
@@ -1707,16 +1754,16 @@
         "slicer.app.layoutManager().sliceWidget('Red').sliceController().setSliceVisible"
       ],
       "operation_descriptions": [
-        "Hide slice in 3D view for Red slice"
+        "Toggle off slice visibility in 3D view for Red view"
       ],
       "slicer_op_categories": [
-        "generic_slicer_api"
+        "layout_slice_view"
       ],
       "slicer_api_keywords": [
-        "sliceNode",
-        "SetSliceVisible",
-        "False",
-        "Red"
+        "slice node",
+        "slice visibility",
+        "3D view",
+        "SetSliceVisibility"
       ]
     },
     "operation_model": {
@@ -1740,23 +1787,28 @@
       {
         "op_type": "slicer_op",
         "operation_type": "slicer_op",
-        "description": "Hide slice in 3D view for Red slice",
+        "description": "Toggle off slice visibility in 3D view for Red view",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
-        "slicer_op_category": "generic_slicer_api",
+        "slicer_op_category": "layout_slice_view",
         "slicer_api_keywords": [
-          "sliceNode",
-          "SetSliceVisible",
-          "False",
-          "Red"
+          "slice node",
+          "slice visibility",
+          "3D view",
+          "SetSliceVisibility"
         ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          14
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1766,7 +1818,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "15",
+        "evidence_id": "",
         "operation_intent": "view_display_scope"
       }
     ]
@@ -1783,7 +1835,7 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Number of cut planes",
+      "title": "How many cut planes do you want?",
       "instruction": "Enter number of cutting planes.",
       "done_label": "Done",
       "choice_label": "Number of cutting planes",
@@ -1793,7 +1845,7 @@
         "summary": "Cutting Plane {current} of {total}",
         "current": null,
         "total_source": "cb_step_16",
-        "group_id": "cut_planes_repeat"
+        "group_id": "cut_plane_loop"
       }
     },
     "op_type": "user_choice",
@@ -1815,9 +1867,9 @@
       "question": "How many cut planes do you want?",
       "choices": [],
       "parameter_name": "numberOfCutPlanes",
-      "default_value": 1,
+      "default_value": null,
       "ui_guidance": {
-        "title": "Number of cut planes",
+        "title": "How many cut planes do you want?",
         "instruction": "Enter number of cutting planes.",
         "done_label": "Done",
         "choice_label": "Number of cutting planes",
@@ -1827,11 +1879,11 @@
           "summary": "Cutting Plane {current} of {total}",
           "current": null,
           "total_source": "cb_step_16",
-          "group_id": "cut_planes_repeat"
+          "group_id": "cut_plane_loop"
         }
       },
       "repeat_group": {
-        "group_id": "cut_planes_repeat",
+        "group_id": "cut_plane_loop",
         "count_parameter": "numberOfCutPlanes",
         "count_step": "cb_step_16",
         "start_step": "cb_step_17",
@@ -1842,7 +1894,7 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Set number of cut planes",
+        "description": "Choose number of mandibular cut planes",
         "extension_method_hint": null,
         "extension_function_hint": null,
         "widget_name": null,
@@ -1854,23 +1906,28 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          15
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
         "operation_intents": [],
         "node_roles": [],
-        "confidence": "high",
+        "confidence": "medium",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "16",
+        "evidence_id": "",
         "question": "How many cut planes do you want?",
         "choices": [],
         "parameter_name": "numberOfCutPlanes",
-        "default_value": 1,
+        "default_value": null,
         "value_kind": "integer"
       }
     ],
     "repeat_group": {
-      "group_id": "cut_planes_repeat",
+      "group_id": "cut_plane_loop",
       "count_parameter": "numberOfCutPlanes",
       "count_step": "cb_step_16",
       "start_step": "cb_step_17",
@@ -1899,7 +1956,7 @@
         "summary": "Cutting Plane {current} of {total}",
         "current": null,
         "total_source": "cb_step_16",
-        "group_id": "cut_planes_repeat"
+        "group_id": "cut_plane_loop"
       }
     },
     "op_type": "extension_op",
@@ -1934,15 +1991,22 @@
         "description": "Add a mandibular cut plane",
         "extension_method_hint": "addCutPlane",
         "extension_function_hint": null,
-        "widget_name": "self.ui.addCutPlaneButton",
+        "widget_name": "addCutPlaneButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "addCutPlane"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
-        "node_class": null,
+        "node_class": "vtkMRMLMarkupsPlaneNode",
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          16
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -1957,18 +2021,18 @@
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "17"
+        "evidence_id": ""
       }
     ],
     "repeat_group": {
-      "group_id": "cut_planes_repeat",
+      "group_id": "cut_plane_loop",
       "count_parameter": "numberOfCutPlanes",
       "count_step": "cb_step_16",
       "start_step": "cb_step_17",
       "interaction_step": "cb_step_18"
     },
     "repeat_block": {
-      "repeat_id": "cut_planes_repeat",
+      "repeat_id": "cut_plane_loop",
       "body_steps": [
         "cb_step_17",
         "cb_step_18"
@@ -1979,7 +2043,7 @@
       "controller": {
         "kind": "count",
         "source_step": "cb_step_16",
-        "prompt": "",
+        "prompt": "Number of cut planes",
         "exit_value": null
       },
       "max_iterations": 100,
@@ -2007,7 +2071,7 @@
     "step_type": "user_interaction",
     "ui_guidance": {
       "title": "Place cutting plane",
-      "instruction": "Place this cutting plane in the mandible view.",
+      "instruction": "Place this cutting plane.",
       "done_label": "Cutting Plane placed",
       "choice_label": "",
       "input_label": "",
@@ -2016,7 +2080,7 @@
         "summary": "Cutting Plane {current} of {total}",
         "current": null,
         "total_source": "cb_step_16",
-        "group_id": "cut_planes_repeat"
+        "group_id": "cut_plane_loop"
       }
     },
     "op_type": "user_interaction",
@@ -2039,9 +2103,9 @@
     "node_roles": [
       {
         "role_kind": "interaction_output",
+        "step_id": "cb_step_18",
         "node_class": "vtkMRMLMarkupsPlaneNode",
-        "parameter_name": "",
-        "step_id": "cb_step_18"
+        "parameter_name": ""
       }
     ],
     "pre_template_file": "templates/cb_step_18_pre.py.tpl",
@@ -2053,7 +2117,7 @@
       "placement_instructions": "Place this plane, then click Done.",
       "ui_guidance": {
         "title": "Place cutting plane",
-        "instruction": "Place this cutting plane in the mandible view.",
+        "instruction": "Place this cutting plane.",
         "done_label": "Cutting Plane placed",
         "choice_label": "",
         "input_label": "",
@@ -2062,7 +2126,7 @@
           "summary": "Cutting Plane {current} of {total}",
           "current": null,
           "total_source": "cb_step_16",
-          "group_id": "cut_planes_repeat"
+          "group_id": "cut_plane_loop"
         }
       },
       "interaction_owner": "previous_extension_method",
@@ -2076,7 +2140,7 @@
         "created_node_source": "previous_extension_method"
       },
       "repeat_group": {
-        "group_id": "cut_planes_repeat",
+        "group_id": "cut_plane_loop",
         "count_parameter": "numberOfCutPlanes",
         "count_step": "cb_step_16",
         "start_step": "cb_step_17",
@@ -2084,14 +2148,14 @@
       }
     },
     "repeat_group": {
-      "group_id": "cut_planes_repeat",
+      "group_id": "cut_plane_loop",
       "count_parameter": "numberOfCutPlanes",
       "count_step": "cb_step_16",
       "start_step": "cb_step_17",
       "interaction_step": "cb_step_18"
     },
     "repeat_block": {
-      "repeat_id": "cut_planes_repeat",
+      "repeat_id": "cut_plane_loop",
       "body_steps": [
         "cb_step_17",
         "cb_step_18"
@@ -2102,7 +2166,7 @@
       "controller": {
         "kind": "count",
         "source_step": "cb_step_16",
-        "prompt": "",
+        "prompt": "Number of cut planes",
         "exit_value": null
       },
       "max_iterations": 100,
@@ -2157,7 +2221,7 @@
       {
         "role_kind": "extension_output",
         "node_class": "vtkMRMLMarkupsLineNode",
-        "parameter_name": "fibulaLine",
+        "parameter_name": "",
         "step_id": "cb_step_19"
       }
     ],
@@ -2166,18 +2230,25 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Add fibula line markup",
+        "description": "Add fibula line",
         "extension_method_hint": "addFibulaLine",
         "extension_function_hint": null,
-        "widget_name": "self.ui.addFibulaLineButton",
+        "widget_name": "addFibulaLineButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "addFibulaLine"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
-        "node_class": null,
+        "node_class": "vtkMRMLMarkupsLineNode",
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          18
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2186,13 +2257,13 @@
           {
             "role_kind": "extension_output",
             "node_class": "vtkMRMLMarkupsLineNode",
-            "parameter_name": "fibulaLine",
+            "parameter_name": "",
             "step_id": "cb_step_19"
           }
         ],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "19"
+        "evidence_id": ""
       }
     ]
   },
@@ -2209,7 +2280,7 @@
     "step_type": "user_interaction",
     "ui_guidance": {
       "title": "Place line",
-      "instruction": "Draw a line over the fibula from distal to proximal in 3D View 2.",
+      "instruction": "Place this line.",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -2236,9 +2307,9 @@
     "node_roles": [
       {
         "role_kind": "interaction_output",
+        "step_id": "cb_step_20",
         "node_class": "vtkMRMLMarkupsLineNode",
-        "parameter_name": "fibulaLine",
-        "step_id": "cb_step_20"
+        "parameter_name": ""
       }
     ],
     "pre_template_file": "templates/cb_step_20_pre.py.tpl",
@@ -2247,10 +2318,10 @@
       "interaction_type": "line",
       "interaction_kind": "markup_placement",
       "node_class": "vtkMRMLMarkupsLineNode",
-      "placement_instructions": "Draw a line over the fibula in 3D View 2, first point distally, last proximally",
+      "placement_instructions": "Place first point distally, last point proximally on the fibula in 3D View 2",
       "ui_guidance": {
         "title": "Place line",
-        "instruction": "Draw a line over the fibula from distal to proximal in 3D View 2.",
+        "instruction": "Place this line.",
         "done_label": "Done",
         "choice_label": "",
         "input_label": "",
@@ -2262,56 +2333,6 @@
       "created_node_source": "previous_extension_method",
       "placement_starter_step_id": "cb_step_19",
       "placement_binding_reason": "recent_same_node_class_placement_starter",
-      "binding": {
-        "parameter_name": "fibulaLine",
-        "role": "fibulaLine",
-        "accesses": [
-          "node_reference_read",
-          "node_reference_write"
-        ],
-        "methods": [
-          "updateGUIFromParameterNode",
-          "updateParameterNodeFromGUI",
-          "onGenerateFibulaPlanesTimerTimeout",
-          "transformFibulaPlanes",
-          "tranformFibulaPiecesToMandible",
-          "createMiterBoxesFromFibulaPlanes",
-          "centerFibulaLine",
-          "section_AddFibulaLineAndCenterIt"
-        ],
-        "method_accesses": {
-          "updateGUIFromParameterNode": [
-            "node_reference_read"
-          ],
-          "updateParameterNodeFromGUI": [
-            "node_reference_write"
-          ],
-          "onGenerateFibulaPlanesTimerTimeout": [
-            "node_reference_read"
-          ],
-          "transformFibulaPlanes": [
-            "node_reference_read"
-          ],
-          "tranformFibulaPiecesToMandible": [
-            "node_reference_read"
-          ],
-          "createMiterBoxesFromFibulaPlanes": [
-            "node_reference_read"
-          ],
-          "centerFibulaLine": [
-            "node_reference_read"
-          ],
-          "section_AddFibulaLineAndCenterIt": [
-            "node_reference_read"
-          ]
-        },
-        "keywords": [
-          "fibula",
-          "line"
-        ],
-        "node_class": "vtkMRMLMarkupsLineNode",
-        "value_types": []
-      },
       "placement_policy": {
         "interaction_owner": "previous_extension_method",
         "placement_starter_method": "addFibulaLine",
@@ -2331,7 +2352,7 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Center fibula line using model",
+      "title": "Center fibula line using fibula model",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -2363,15 +2384,22 @@
         "description": "Center fibula line using fibula model",
         "extension_method_hint": "centerFibulaLine",
         "extension_function_hint": null,
-        "widget_name": "self.ui.centerFibulaLineButton",
+        "widget_name": "centerFibulaLineButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "centerFibulaLine"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          20
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2379,7 +2407,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "21"
+        "evidence_id": ""
       }
     ]
   },
@@ -2425,10 +2453,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Enable automatic mandible planes positioning for maximum bone contact",
+        "description": "Enable automatic mandibular planes positioning for maximum bone contact",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.mandiblePlanesPositioningForMaximumBoneContactCheckBox",
+        "widget_name": "mandiblePlanesPositioningForMaximumBoneContactCheckBox",
         "ui_parameter_binding": {
           "widget_name": "mandiblePlanesPositioningForMaximumBoneContactCheckBox",
           "widget_class": "QCheckBox",
@@ -2451,6 +2479,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          21
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2460,7 +2493,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "22",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "mandiblePlanesPositioningForMaximumBoneContact",
         "value_property": "checked"
@@ -2479,7 +2512,7 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Enable linked rotation of mandible planes",
+      "title": "Make all mandible planes rotate together",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -2509,10 +2542,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Enable make all mandible planes rotate together",
+        "description": "Enable rotate together for mandible planes",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.makeAllMandiblePlanesRotateTogetherCheckBox",
+        "widget_name": "makeAllMandiblePlanesRotateTogetherCheckBox",
         "ui_parameter_binding": {
           "widget_name": "makeAllMandiblePlanesRotateTogetherCheckBox",
           "widget_class": "QCheckBox",
@@ -2535,6 +2568,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          22
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2544,7 +2582,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "23",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "makeAllMandiblePlanesRotateTogether",
         "value_property": "checked"
@@ -2563,8 +2601,8 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Update reconstruction",
-      "instruction": "Generate fibula cut planes and transform to mandible.",
+      "title": "Update fibula planes and bone pieces",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -2572,7 +2610,7 @@
       "repeat": {}
     },
     "op_type": "extension_op",
-    "method_name": "onGenerateFibulaPlanesTimerTimeout",
+    "method_name": "hardVSPUpdate",
     "operation_model": {
       "step_type": "extension_op",
       "op_types": [
@@ -2593,17 +2631,24 @@
         "op_type": "extension_op",
         "operation_type": "extension_op",
         "description": "Generate fibula planes, bone pieces, and transform to mandible",
-        "extension_method_hint": "onGenerateFibulaPlanesTimerTimeout",
+        "extension_method_hint": "hardVSPUpdate",
         "extension_function_hint": null,
-        "widget_name": "self.ui.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandibleButton",
+        "widget_name": "hardVSPUpdateButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "hardVSPUpdate"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          23
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2611,7 +2656,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "24"
+        "evidence_id": ""
       }
     ]
   },
@@ -2627,8 +2672,8 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Show mandible planes",
-      "instruction": "Toggle eye icon in Mandible planes row.",
+      "title": "Show mandibular cut planes",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -2657,10 +2702,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Show mandible cut planes visibility",
+        "description": "Show mandibular cut planes (eye icon)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.showMandiblePlanesToolButton",
+        "widget_name": "showMandiblePlanesToolButton",
         "ui_parameter_binding": {
           "widget_name": "showMandiblePlanesToolButton",
           "widget_class": "QToolButton",
@@ -2684,6 +2729,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          24
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2693,7 +2743,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "25",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "showMandiblePlanes",
         "value_property": "checked"
@@ -2712,8 +2762,8 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Show plane handles",
-      "instruction": "Toggle axes icon in Mandible planes row.",
+      "title": "Show plane interaction handles",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -2742,10 +2792,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Show mandible plane interaction handles",
+        "description": "Show mandible plane interaction handles (axes icon)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.showMandiblePlanesInteractionHandlesToolButton",
+        "widget_name": "showMandiblePlanesInteractionHandlesToolButton",
         "ui_parameter_binding": {
           "widget_name": "showMandiblePlanesInteractionHandlesToolButton",
           "widget_class": "QToolButton",
@@ -2769,6 +2819,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          25
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2778,7 +2833,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "26",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "showMandiblePlanesInteractionHandles",
         "value_property": "checked"
@@ -2797,12 +2852,12 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Enter Initial space (mm)",
+      "title": "Enter the desired value for initial space (mm)",
       "instruction": "Enter value in mm.",
       "done_label": "Done",
-      "choice_label": "Initial space",
-      "input_label": "Initial space",
-      "object_label": "distance",
+      "choice_label": "Initial Space (mm)",
+      "input_label": "Initial Space (mm)",
+      "object_label": "cutting plane",
       "repeat": {}
     },
     "op_type": "user_choice",
@@ -2831,17 +2886,17 @@
       }
     ],
     "choice_descriptor": {
-      "question": "Enter Initial space (mm)",
+      "question": "Enter the desired value for initial space (mm)",
       "choices": [],
       "parameter_name": "initialSpace",
-      "default_value": 0.0,
+      "default_value": null,
       "ui_guidance": {
-        "title": "Enter Initial space (mm)",
+        "title": "Enter the desired value for initial space (mm)",
         "instruction": "Enter value in mm.",
         "done_label": "Done",
-        "choice_label": "Initial space",
-        "input_label": "Initial space",
-        "object_label": "distance",
+        "choice_label": "Initial Space (mm)",
+        "input_label": "Initial Space (mm)",
+        "object_label": "cutting plane",
         "repeat": {}
       },
       "binding": {
@@ -2900,10 +2955,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Set initial space between mandible planes",
+        "description": "Set initial space between cut planes (mm)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.initialSpinBox",
+        "widget_name": "initialSpinBox",
         "ui_parameter_binding": {
           "widget_name": "initialSpinBox",
           "widget_class": "ctkDoubleSpinBox",
@@ -2924,6 +2979,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          26
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -2933,18 +2993,18 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "27",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "initialSpace",
         "value_property": "value",
-        "question": "Enter Initial space (mm)",
+        "question": "Enter the desired value for initial space (mm)",
         "choices": [],
-        "default_value": 0.0,
-        "value_kind": "float"
+        "default_value": null,
+        "value_kind": "decimal"
       }
     ],
     "repeat_block": {
-      "repeat_id": "reconstruction_adjustment_loop",
+      "repeat_id": "tuning_loop",
       "body_steps": [
         "cb_step_27",
         "cb_step_28",
@@ -2955,9 +3015,9 @@
       "terminal_step": "cb_step_30",
       "exit_step": "cb_step_31",
       "controller": {
-        "kind": "while_choice",
+        "kind": "until_choice",
         "source_step": "cb_step_30",
-        "prompt": "Is the reconstruction satisfactory? If not, steps 27-30 will be repeated.",
+        "prompt": "Is the reconstruction satisfactory? (yes to exit loop, no to continue)",
         "exit_value": true
       },
       "max_iterations": 20,
@@ -2965,8 +3025,6 @@
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
           27,
-          28,
-          29,
           30
         ],
         "confidence": "high"
@@ -2985,12 +3043,12 @@
     "operation_type": "user_choice",
     "step_type": "user_choice",
     "ui_guidance": {
-      "title": "Enter Between space (mm)",
+      "title": "Enter the desired value for between space (mm)",
       "instruction": "Enter value in mm.",
       "done_label": "Done",
-      "choice_label": "Between space",
-      "input_label": "Between space",
-      "object_label": "distance",
+      "choice_label": "Between Space (mm)",
+      "input_label": "Between Space (mm)",
+      "object_label": "cutting plane",
       "repeat": {}
     },
     "op_type": "user_choice",
@@ -3019,17 +3077,17 @@
       }
     ],
     "choice_descriptor": {
-      "question": "Enter Between space (mm)",
+      "question": "Enter the desired value for between space (mm)",
       "choices": [],
       "parameter_name": "additionalBetweenSpaceOfFibulaPlanes",
-      "default_value": 0.0,
+      "default_value": null,
       "ui_guidance": {
-        "title": "Enter Between space (mm)",
+        "title": "Enter the desired value for between space (mm)",
         "instruction": "Enter value in mm.",
         "done_label": "Done",
-        "choice_label": "Between space",
-        "input_label": "Between space",
-        "object_label": "distance",
+        "choice_label": "Between Space (mm)",
+        "input_label": "Between Space (mm)",
+        "object_label": "cutting plane",
         "repeat": {}
       },
       "binding": {
@@ -3092,10 +3150,10 @@
       {
         "op_type": "user_choice",
         "operation_type": "user_choice",
-        "description": "Set between space for additional fibula planes",
+        "description": "Set between space between cut planes (mm)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.betweenSpinBox",
+        "widget_name": "betweenSpinBox",
         "ui_parameter_binding": {
           "widget_name": "betweenSpinBox",
           "widget_class": "ctkDoubleSpinBox",
@@ -3117,6 +3175,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          27
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -3126,18 +3189,18 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "28",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "additionalBetweenSpaceOfFibulaPlanes",
         "value_property": "value",
-        "question": "Enter Between space (mm)",
+        "question": "Enter the desired value for between space (mm)",
         "choices": [],
-        "default_value": 0.0,
-        "value_kind": "float"
+        "default_value": null,
+        "value_kind": "decimal"
       }
     ],
     "repeat_block": {
-      "repeat_id": "reconstruction_adjustment_loop",
+      "repeat_id": "tuning_loop",
       "body_steps": [
         "cb_step_27",
         "cb_step_28",
@@ -3148,9 +3211,9 @@
       "terminal_step": "cb_step_30",
       "exit_step": "cb_step_31",
       "controller": {
-        "kind": "while_choice",
+        "kind": "until_choice",
         "source_step": "cb_step_30",
-        "prompt": "Is the reconstruction satisfactory? If not, steps 27-30 will be repeated.",
+        "prompt": "Is the reconstruction satisfactory? (yes to exit loop, no to continue)",
         "exit_value": true
       },
       "max_iterations": 20,
@@ -3158,8 +3221,6 @@
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
           27,
-          28,
-          29,
           30
         ],
         "confidence": "high"
@@ -3178,8 +3239,8 @@
     "operation_type": "user_interaction",
     "step_type": "user_interaction",
     "ui_guidance": {
-      "title": "Adjust cut planes",
-      "instruction": "Drag handles to adjust positions and rotations.",
+      "title": "Adjust cutting plane",
+      "instruction": "Adjust the plane position and orientation.",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -3206,9 +3267,9 @@
     "node_roles": [
       {
         "role_kind": "interaction_output",
+        "step_id": "cb_step_29",
         "node_class": "vtkMRMLMarkupsPlaneNode",
-        "parameter_name": "",
-        "step_id": "cb_step_29"
+        "parameter_name": ""
       }
     ],
     "pre_template_file": "templates/cb_step_29_pre.py.tpl",
@@ -3217,26 +3278,19 @@
       "interaction_type": "plane",
       "interaction_kind": "view_adjustment",
       "node_class": "vtkMRMLMarkupsPlaneNode",
-      "placement_instructions": "Drag plane interaction handles in mandible 3D view to adjust positions and rotations",
+      "placement_instructions": "Drag the handles in the 3D view to adjust plane positions and rotations",
       "ui_guidance": {
-        "title": "Adjust cut planes",
-        "instruction": "Drag handles to adjust positions and rotations.",
+        "title": "Adjust cutting plane",
+        "instruction": "Adjust the plane position and orientation.",
         "done_label": "Done",
         "choice_label": "",
         "input_label": "",
         "object_label": "cutting plane",
         "repeat": {}
-      },
-      "interaction_owner": "runtime_template",
-      "created_node_source": "template",
-      "placement_policy": {
-        "interaction_owner": "runtime_template",
-        "placement_starter_method": "",
-        "created_node_source": "template"
       }
     },
     "repeat_block": {
-      "repeat_id": "reconstruction_adjustment_loop",
+      "repeat_id": "tuning_loop",
       "body_steps": [
         "cb_step_27",
         "cb_step_28",
@@ -3247,9 +3301,9 @@
       "terminal_step": "cb_step_30",
       "exit_step": "cb_step_31",
       "controller": {
-        "kind": "while_choice",
+        "kind": "until_choice",
         "source_step": "cb_step_30",
-        "prompt": "Is the reconstruction satisfactory? If not, steps 27-30 will be repeated.",
+        "prompt": "Is the reconstruction satisfactory? (yes to exit loop, no to continue)",
         "exit_value": true
       },
       "max_iterations": 20,
@@ -3257,8 +3311,6 @@
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
           27,
-          28,
-          29,
           30
         ],
         "confidence": "high"
@@ -3278,7 +3330,7 @@
     "step_type": "extension_op",
     "ui_guidance": {
       "title": "Update reconstruction",
-      "instruction": "Regenerate after adjustments.",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -3286,7 +3338,7 @@
       "repeat": {}
     },
     "op_type": "extension_op",
-    "method_name": "onGenerateFibulaPlanesTimerTimeout",
+    "method_name": "hardVSPUpdate",
     "operation_model": {
       "step_type": "extension_op",
       "op_types": [
@@ -3306,18 +3358,25 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Regenerate fibula planes and reconstruction after adjustment",
-        "extension_method_hint": "onGenerateFibulaPlanesTimerTimeout",
+        "description": "Regenerate fibula planes and transformation (update after adjustments)",
+        "extension_method_hint": "hardVSPUpdate",
         "extension_function_hint": null,
-        "widget_name": "self.ui.generateFibulaPlanesFibulaBonePiecesAndTransformThemToMandibleButton",
+        "widget_name": "hardVSPUpdateButton",
         "ui_parameter_binding": null,
         "target_value": null,
         "target_value_mode": null,
         "slicer_op_category": null,
-        "slicer_api_keywords": [],
+        "slicer_api_keywords": [
+          "hardVSPUpdate"
+        ],
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": true,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          29
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -3325,11 +3384,11 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "30"
+        "evidence_id": ""
       }
     ],
     "repeat_block": {
-      "repeat_id": "reconstruction_adjustment_loop",
+      "repeat_id": "tuning_loop",
       "body_steps": [
         "cb_step_27",
         "cb_step_28",
@@ -3340,9 +3399,9 @@
       "terminal_step": "cb_step_30",
       "exit_step": "cb_step_31",
       "controller": {
-        "kind": "while_choice",
+        "kind": "until_choice",
         "source_step": "cb_step_30",
-        "prompt": "Is the reconstruction satisfactory? If not, steps 27-30 will be repeated.",
+        "prompt": "Is the reconstruction satisfactory? (yes to exit loop, no to continue)",
         "exit_value": true
       },
       "max_iterations": 20,
@@ -3350,8 +3409,6 @@
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
           27,
-          28,
-          29,
           30
         ],
         "confidence": "high"
@@ -3370,8 +3427,8 @@
     "operation_type": "extension_op",
     "step_type": "extension_op",
     "ui_guidance": {
-      "title": "Hide mandible planes",
-      "instruction": "Toggle off eye icon in Mandible planes row.",
+      "title": "Hide mandibular cut planes",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -3400,10 +3457,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Hide mandible cut planes visibility",
+        "description": "Hide mandibular cut planes (eye icon off)",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.showMandiblePlanesToolButton",
+        "widget_name": "showMandiblePlanesToolButton",
         "ui_parameter_binding": {
           "widget_name": "showMandiblePlanesToolButton",
           "widget_class": "QToolButton",
@@ -3427,6 +3484,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          30
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -3436,7 +3498,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "31",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "showMandiblePlanes",
         "value_property": "checked"
@@ -3456,7 +3518,7 @@
     "step_type": "extension_op",
     "ui_guidance": {
       "title": "Hide original mandible model",
-      "instruction": "Uncheck Show original mandible model checkbox.",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -3485,10 +3547,10 @@
       {
         "op_type": "extension_op",
         "operation_type": "extension_op",
-        "description": "Hide original mandible model",
+        "description": "Clear show original mandible model checkbox",
         "extension_method_hint": null,
         "extension_function_hint": null,
-        "widget_name": "self.ui.showOriginalMandibleCheckBox",
+        "widget_name": "showOriginalMandibleCheckBox",
         "ui_parameter_binding": {
           "widget_name": "showOriginalMandibleCheckBox",
           "widget_class": "QCheckBox",
@@ -3511,6 +3573,11 @@
         "interaction_kind": "none",
         "interaction_type": null,
         "node_class": null,
+        "creates_node": false,
+        "requires_place_mode": false,
+        "setup_dependencies": [
+          31
+        ],
         "placement_instructions": null,
         "min_control_points": 0,
         "is_optional": false,
@@ -3520,7 +3587,7 @@
         "node_roles": [],
         "confidence": "high",
         "evidence_type": "llm_semantic_decomposition",
-        "evidence_id": "32",
+        "evidence_id": "",
         "operation_intent": "extension_parameter_update",
         "parameter_name": "showOriginalMandible",
         "value_property": "checked"

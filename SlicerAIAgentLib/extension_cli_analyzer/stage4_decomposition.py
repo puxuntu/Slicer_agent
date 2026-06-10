@@ -57,21 +57,48 @@ class AnalyzerStage4DecompositionMixin:
             if present:
                 evidence["choice_candidates"].append(name)
 
-        interaction_patterns = [
-            ("markup_placement", "curve", "vtkMRMLMarkupsCurveNode", ("draw", "curve")),
-            ("markup_placement", "plane", "vtkMRMLMarkupsPlaneNode", ("plane", "place")),
-            ("markup_placement", "line", "vtkMRMLMarkupsLineNode", ("line", "draw")),
-            ("view_adjustment", "generic", "vtkMRMLCrosshairNode", ("crosshair", "slice intersection", "drag")),
-        ]
-        for kind, interaction_type, node_class, words in interaction_patterns:
-            if any(w in desc_lower for w in words) and any(
-                v in desc_lower for v in ("manual", "manually", "draw", "drag", "click", "place", "position", "adjust")
-            ):
+        # Revision B: previously this was a 4-entry table baking in
+        # `node_class = "vtkMRMLCrosshairNode"` for view_adjustment, which
+        # misled the LLM and downstream dispatch for every drag-handle or
+        # viewport-adjustment interaction that wasn't literally a crosshair.
+        # The table is now split into two general candidate lists keyed on
+        # semantic intent only — `node_class` is left empty for
+        # view_adjustment and the LLM (Stage 4) decides whether to fill it.
+        placement_words = (
+            "draw", "drawn", "place", "placing", "place a", "place the",
+            "click to add", "control point", "control points",
+            "position", "positioning", "create", "creating",
+        )
+        view_adjustment_words = (
+            "crosshair", "slice intersection", "drag", "dragging",
+            "rotate", "rotating", "translate", "translating",
+            "adjust", "adjusting", "handles", "handle",
+            "axis", "axes", "viewport", "view adjust",
+            "switch to", "turn on", "turn off", "enable", "disable",
+            "set interaction", "interaction options",
+        )
+        action_words = (
+            "manual", "manually", "draw", "drag", "click", "place",
+            "position", "adjust", "rotate", "translate", "switch",
+        )
+        if any(w in desc_lower for w in placement_words) and any(
+            v in desc_lower for v in action_words
+        ):
+            evidence["interaction_candidates"].append({
+                "interaction_kind": "markup_placement",
+                "matched_terms": [w for w in placement_words if w in desc_lower],
+            })
+        if any(w in desc_lower for w in view_adjustment_words) and any(
+            v in desc_lower for v in action_words
+        ):
+            # Don't double-suggest if the same description matched placement.
+            existing_kinds = {
+                c.get("interaction_kind") for c in evidence.get("interaction_candidates", [])
+            }
+            if "view_adjustment" not in existing_kinds:
                 evidence["interaction_candidates"].append({
-                    "interaction_kind": kind,
-                    "interaction_type": interaction_type,
-                    "node_class": node_class,
-                    "matched_terms": [w for w in words if w in desc_lower],
+                    "interaction_kind": "view_adjustment",
+                    "matched_terms": [w for w in view_adjustment_words if w in desc_lower],
                 })
 
         slicer_concepts = [
@@ -402,15 +429,25 @@ class AnalyzerStage4DecompositionMixin:
             })
 
         widgets = []
+        seen = set()
         for connection in getattr(self, "_widget_connections", []) or []:
             if not isinstance(connection, dict):
                 continue
             name = _text_or_empty(connection.get("button_widget_name"))
-            if name:
+            if name and name not in seen:
                 widgets.append({
                     "widget_name": name,
                     "logic_methods": connection.get("logic_methods", []),
                 })
+                seen.add(name)
+        ui_widgets = (scan_result or {}).get("ui_widgets", {}) or {}
+        for name in ui_widgets:
+            if name and name not in seen:
+                widgets.append({
+                    "widget_name": name,
+                    "logic_methods": [],
+                })
+                seen.add(name)
         extension_functions = []
         if scan_result and hasattr(self, "_build_extension_callable_inventory"):
             inventory = self._build_extension_callable_inventory(
@@ -514,6 +551,9 @@ class AnalyzerStage4DecompositionMixin:
             "interaction_kind": "none|markup_placement|view_adjustment",
             "interaction_type": null,
             "node_class": null,
+            "creates_node": false,
+            "requires_place_mode": false,
+            "setup_dependencies": [],
             "placement_instructions": null,
             "choice": null,
             "is_optional": false,
@@ -549,6 +589,39 @@ class AnalyzerStage4DecompositionMixin:
         include a clear prompt and boolean exit_value. Repeat blocks may not overlap.
         Every step requires medium or high confidence. Include exactly one output step
         for every input step, even when most optional semantic fields are null.
+
+        For user_interaction steps, fill in these descriptor fields precisely — they
+        drive template dispatch and KB retrieval downstream:
+        - creates_node: true if the user's interaction creates a NEW MRML node
+          (e.g. drawing a new curve/plane/fiducial). false if the user is
+          interacting with EXISTING geometry or viewport state (e.g. dragging
+          slice intersection handles, rotating an already-placed plane, toggling
+          visibility). When in doubt, false.
+        - requires_place_mode: true only when the user must enter Slicer's
+          persistent place mode (SwitchToPersistentPlaceMode) to add new control
+          points to a fresh Markups node. false for view adjustments, drag-handle
+          interactions, and any case where creates_node is false.
+        - slicer_api_keywords: 3-8 short API hints that a KB search would use to
+          find relevant Slicer code. For markups placement: include the node class
+          and verbs (e.g. ["vtkMRMLMarkupsCurveNode", "place", "SetActiveListID"]).
+          For view adjustments: include the relevant node/widget and verbs
+          (e.g. ["vtkMRMLCrosshairNode", "slice intersection", "SetInteractiveMode"],
+          or ["vtkMRMLMarkupsPlaneNode", "handles", "Translate", "Rotate"]).
+        - setup_dependencies: list of prior step_numbers whose outputs this step's
+          setup depends on (e.g. if this step drags handles on a plane created in
+          step 5, list [5]). Empty list when there is no such dependency.
+
+        Example for a view_adjustment step (drag existing slice intersection handles):
+        "interaction_kind": "view_adjustment", "node_class": null,
+        "creates_node": false, "requires_place_mode": false,
+        "slicer_api_keywords": ["slice intersection", "Translate", "Rotate"],
+        "setup_dependencies": []
+
+        Example for a markup_placement step (draw a new curve):
+        "interaction_kind": "markup_placement", "node_class": "vtkMRMLMarkupsCurveNode",
+        "creates_node": true, "requires_place_mode": true,
+        "slicer_api_keywords": ["vtkMRMLMarkupsCurveNode", "place", "draw"],
+        "setup_dependencies": []
         {repair}
         Candidate context:
         {json.dumps(context, indent=2)}
@@ -632,6 +705,20 @@ class AnalyzerStage4DecompositionMixin:
             node_class = item.get("node_class")
             if node_class is not None and node_class not in allowed_classes:
                 errors.append(f"step {number} references unknown node_class {node_class!r}")
+            # Revision B: validate the new descriptor fields. These are
+            # advisory (consumed by Stage 7 dispatch and Stage 9 semantic
+            # checks), so downgrade type problems to soft rewrites instead
+            # of hard validation errors — the rest of the pipeline still
+            # functions with defaulted values.
+            if "creates_node" in item and not isinstance(item["creates_node"], bool):
+                errors.append(f"step {number} creates_node must be a boolean")
+            if "requires_place_mode" in item and not isinstance(item["requires_place_mode"], bool):
+                errors.append(f"step {number} requires_place_mode must be a boolean")
+            deps = item.get("setup_dependencies")
+            if deps is not None and (not isinstance(deps, list) or any(
+                not isinstance(d, int) for d in deps
+            )):
+                errors.append(f"step {number} setup_dependencies must be a list of step numbers")
             intents = item.get("operation_intents", [])
             if not isinstance(intents, list) or any(
                 intent not in allowed_intents for intent in intents
@@ -775,6 +862,12 @@ class AnalyzerStage4DecompositionMixin:
                 "interaction_kind": semantic.get("interaction_kind") or "none",
                 "interaction_type": semantic.get("interaction_type"),
                 "node_class": semantic.get("node_class"),
+                "creates_node": bool(semantic.get("creates_node", False)),
+                "requires_place_mode": bool(semantic.get("requires_place_mode", False)),
+                "setup_dependencies": [
+                    int(d) for d in (semantic.get("setup_dependencies") or [])
+                    if isinstance(d, (int, float)) and not isinstance(d, bool)
+                ],
                 "placement_instructions": semantic.get("placement_instructions"),
                 "min_control_points": 0,
                 "is_optional": bool(semantic.get("is_optional")),
@@ -1044,18 +1137,31 @@ class AnalyzerStage4DecompositionMixin:
                 node_class, interaction_type = "vtkMRMLMarkupsLineNode", "line"
             elif "point" in text or "fiducial" in text:
                 node_class, interaction_type = "vtkMRMLMarkupsFiducialNode", "fiducial"
-            elif not adjusts_existing and any(word in text for word in ("drag", "adjust", "position", "rotate", "translate")):
-                node_class, interaction_type = "vtkMRMLCrosshairNode", "generic"
-        sub_op["interaction_kind"] = (
+            # Revision B: previously this else-block defaulted
+            # `node_class = "vtkMRMLCrosshairNode"` for any drag/adjust/
+            # rotate/translate action without an explicit markup keyword.
+            # That conflated view_adjustment with crosshair and broke the
+            # Stage 7 dispatch for non-crosshair viewport adjustments.
+            # node_class now stays empty for view_adjustment fallbacks.
+        interaction_kind = (
             interaction.get("interaction_kind")
-            or (
-                "view_adjustment"
-                if adjusts_existing or node_class == "vtkMRMLCrosshairNode"
-                else "markup_placement"
-            )
+            or ("view_adjustment" if adjusts_existing else "markup_placement")
         )
+        sub_op["interaction_kind"] = interaction_kind
         sub_op["interaction_type"] = interaction_type or _derive_interaction_type(node_class)
         sub_op["node_class"] = node_class
+        # Revision B: populate the new descriptor fields so the heuristic
+        # path matches the LLM semantic path's contract.
+        is_markup = self._is_markup_node_class(node_class)
+        sub_op["creates_node"] = bool(
+            interaction_kind == "markup_placement" and is_markup and not adjusts_existing
+        )
+        sub_op["requires_place_mode"] = bool(
+            interaction_kind == "markup_placement"
+            and is_markup
+            and not adjusts_existing
+        )
+        sub_op.setdefault("setup_dependencies", [])
         sub_op["placement_instructions"] = description
         sub_op["evidence_type"] = "viewport_action"
         sub_op["evidence_id"] = sub_op["interaction_type"]
@@ -1182,6 +1288,12 @@ class AnalyzerStage4DecompositionMixin:
                     "slicer_api_keywords": _text_list(so.get("slicer_api_keywords", [])),
                     "interaction_type": _optional_text(so.get("interaction_type")),
                     "node_class": node_class,
+                    "creates_node": bool(so.get("creates_node", False)),
+                    "requires_place_mode": bool(so.get("requires_place_mode", False)),
+                    "setup_dependencies": [
+                        int(d) for d in (so.get("setup_dependencies") or [])
+                        if isinstance(d, (int, float)) and not isinstance(d, bool)
+                    ],
                     "placement_instructions": _optional_text(so.get("placement_instructions")),
                     "min_control_points": so.get("min_control_points", 0),
                     "evidence_type": evidence_type,
@@ -1325,6 +1437,14 @@ class AnalyzerStage4DecompositionMixin:
                     so["interaction_kind"] = interaction.get("interaction_kind", "markup_placement")
                     so["interaction_type"] = interaction.get("interaction_type")
                     so["node_class"] = interaction.get("node_class")
+                    # Revision B: populate the new descriptor fields on the
+                    # heuristic-reclassification path too, so all user_interaction
+                    # sub_ops carry a consistent contract.
+                    kind = so["interaction_kind"]
+                    is_markup = self._is_markup_node_class(so.get("node_class") or "")
+                    so["creates_node"] = bool(kind == "markup_placement" and is_markup)
+                    so["requires_place_mode"] = bool(kind == "markup_placement" and is_markup)
+                    so.setdefault("setup_dependencies", [])
                     so["placement_instructions"] = so.get("placement_instructions") or so.get("description")
                     so["evidence_type"] = "viewport_action"
                     so["confidence"] = "high"
@@ -1427,8 +1547,16 @@ class AnalyzerStage4DecompositionMixin:
                             step_evidence, so.get("node_class", "")
                         )
                     )
-                    if so["interaction_kind"] == "view_adjustment" and not so.get("node_class"):
-                        so["node_class"] = "vtkMRMLCrosshairNode"
+                    # Revision B: previously this block forcibly injected
+                    # `node_class = "vtkMRMLCrosshairNode"` whenever a
+                    # view_adjustment step had empty node_class. That hack
+                    # conflated "no node created" with "crosshair node" and
+                    # broke the Stage 7 dispatch for every drag-existing-handle
+                    # or viewport-adjustment interaction. With Revision A
+                    # dispatching on interaction_kind, node_class is allowed
+                    # to be empty for view_adjustment steps, so the injection
+                    # is gone. PR2's retrieval-grounded generator will pick
+                    # the right node class (or none) from KB search results.
                 elif so["op_type"] == "user_choice":
                     so["evidence_type"] = "user_context"
                 elif so["op_type"] == "unknown_op":

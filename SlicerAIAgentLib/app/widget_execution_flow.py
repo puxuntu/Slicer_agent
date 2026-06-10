@@ -596,6 +596,23 @@ class WidgetExecutionFlowMixin:
                     if not error_for_correction and output_has_errors:
                         # success=True but output contains clear failure keywords
                         error_for_correction = "\n".join(feedback_lines) or output
+
+                    # Revision D: triage by failure type. If the failing code
+                    # came from a generated CLI template AND the error is
+                    # syntax/name-level (i.e. a generator-side bug), skip the
+                    # LLM repair loop — it can't see the generator, so it
+                    # would burn ~100s looking for a fix that has to come
+                    # from regenerating the CLI. Fall through to repair on
+                    # runtime/scene errors or any ambiguity.
+                    step_info_for_triage = getattr(self, '_currentWorkflowStepInfo', None) or {}
+                    if self._shouldSkipSelfCorrectionForGeneratedTemplate(
+                        step_info_for_triage, error_for_correction,
+                    ):
+                        self._handleGeneratedTemplateGeneratorBug(
+                            step_info_for_triage, error_for_correction,
+                        )
+                        return
+
                     self._recordRoleEvent("Repairer", "correction_requested", {
                         "attempt": attempt + 1,
                         "reason": error_for_correction[:1000] if error_for_correction else "",
@@ -645,5 +662,182 @@ class WidgetExecutionFlowMixin:
                 else:
                     self._setReadyStatus()
 
+        # Apply per-step prelude globals (workflow metadata as Python objects)
+        # so the new compact prelude can reference _workflow_choices etc.
+        # without round-tripping them through source text.
+        self._applyPreludeGlobals()
+
         # Execute asynchronously
         self.logic.executeCodeAsync(self.currentCode, onExecutionComplete)
+
+    def _applyPreludeGlobals(self):
+        """Inject the current workflow step's _prelude_globals into __main__.
+
+        The dispatch result attaches ``_prelude_globals`` (a dict of Python
+        objects: choices/bindings/defaults/required_bindings) when the new
+        compact prelude would otherwise reference them as undefined names.
+        This registers each key on the executor's __main__ namespace before
+        exec, then schedules cleanup so stale metadata from step N doesn't
+        leak into step N+1.
+        """
+        try:
+            executor = getattr(self.logic, 'executor', None)
+            if executor is None or not hasattr(executor, 'addGlobal'):
+                return
+        except Exception:
+            return
+
+        step_info = getattr(self, '_currentWorkflowStepInfo', None) or {}
+        prelude_globals = step_info.get('_prelude_globals') if isinstance(step_info, dict) else None
+        if not isinstance(prelude_globals, dict):
+            prelude_globals = {}
+
+        # Cleanup-on-entry: remove keys injected by the previous step so they
+        # don't leak across steps. Tracked in self._lastInjectedPreludeKeys.
+        previous_keys = getattr(self, '_lastInjectedPreludeKeys', None) or []
+        for key in previous_keys:
+            try:
+                executor.removeGlobal(key)
+            except Exception:
+                pass
+
+        if not prelude_globals:
+            self._lastInjectedPreludeKeys = []
+            return
+
+        for key, value in prelude_globals.items():
+            try:
+                executor.addGlobal(key, value)
+            except Exception:
+                pass
+        self._lastInjectedPreludeKeys = list(prelude_globals.keys())
+
+    # ================================================================
+    # Revision D: Self-correction triage for generated CLI templates
+    # ================================================================
+
+    # Substrings that signal a runtime/scene error even when the code parses
+    # cleanly. Their presence biases the classifier away from "syntax_or_name".
+    _GENERATED_TEMPLATE_RUNTIME_ERROR_MARKERS = (
+        "[GeneratedWorkflowPrecondition]",
+        "Missing required node reference",
+        "Missing conditional node reference",
+        "RuntimeError",
+        "ValueError",
+        "AttributeError",
+        "TypeError",
+        "vtkMRML",
+        "slicer.mrmlScene",
+        "GetParameterNode",
+        "Node reference",
+    )
+
+    def _classifyExecutionError(self, error_msg: str, code: str) -> str:
+        """Classify an execution error for self-correction triage.
+
+        Returns one of:
+            ``"syntax_or_name"`` — code failed to parse, or execution raised
+                a Python-level ``NameError``/``SyntaxError``. Suggests a
+                generator-side bug for generated-template code.
+            ``"runtime_or_scene"`` — code parsed fine but raised a runtime/
+                scene error (missing node, bad VTK call, etc.). The existing
+                LLM repair path can handle these.
+            ``"other"`` — ambiguous; caller should fall through to existing
+                repair to avoid blocking on uncertain classification.
+        """
+        if not error_msg:
+            return "other"
+        lowered = error_msg.lower()
+        # Strong syntax/name signals — note that NameError's actual message
+        # text is ``name 'X' is not defined`` (no exception type name), so we
+        # also match that pattern directly. This catches the JSON-vs-Python
+        # boolean bug class (``name 'false' is not defined``).
+        import re as _re
+        name_error_pattern = _re.compile(r"name\s+['\\\"][^'\"]+['\\\"]\s+is\s+not\s+defined")
+        syntax_signals = (
+            "syntaxerror" in lowered
+            or "nameerror" in lowered
+            or "indentationerror" in lowered
+            or name_error_pattern.search(lowered) is not None
+        )
+        if syntax_signals:
+            # But runtime errors sometimes mention these names too — confirm
+            # the runtime markers aren't present before classifying as syntax.
+            for marker in self._GENERATED_TEMPLATE_RUNTIME_ERROR_MARKERS:
+                if marker.lower() in lowered:
+                    return "runtime_or_scene"
+            return "syntax_or_name"
+
+        # ast.parse as a secondary signal: code that won't parse at all is
+        # definitely syntax-level. (Generator bugs that produce unparseable
+        # output land here.)
+        if code:
+            try:
+                import ast as _ast
+                _ast.parse(code)
+            except (SyntaxError, IndentationError, ValueError):
+                return "syntax_or_name"
+
+        # Explicit runtime/scene markers
+        for marker in self._GENERATED_TEMPLATE_RUNTIME_ERROR_MARKERS:
+            if marker.lower() in lowered:
+                return "runtime_or_scene"
+
+        return "other"
+
+    def _shouldSkipSelfCorrectionForGeneratedTemplate(
+        self,
+        step_info: dict,
+        error_msg: str,
+    ) -> bool:
+        """Return True iff the failing code came from a generated CLI
+        template AND the error is a generator-side syntax/name bug.
+
+        Conservative: returns False (proceed with existing repair) on any
+        ambiguity, on non-generated-template code, or on runtime/scene errors.
+        """
+        if not isinstance(step_info, dict):
+            return False
+        if step_info.get("origin") != "generated_template":
+            return False
+        code = self.currentCode or ""
+        classification = self._classifyExecutionError(error_msg or "", code)
+        return classification == "syntax_or_name"
+
+    def _handleGeneratedTemplateGeneratorBug(
+        self,
+        step_info: dict,
+        error_msg: str,
+    ):
+        """Surface a structured 'regenerate the CLI' error and cancel the workflow.
+
+        Called when self-correction is skipped for a generated-template syntax
+        error. The LLM repair path can't see the generator, so this would have
+        been wasted effort. Instead we tell the user to regenerate the CLI.
+        """
+        step_id = (step_info or {}).get("step_id", "<unknown>")
+        ext_name = (step_info or {}).get("tool", "<unknown>")
+        # tool name is usually ``<ExtensionName>`` — strip a trailing suffix
+        # if present.
+        message = (
+            f"CLI generator produced invalid code for step '{step_id}'. "
+            f"This is a bug in the generation pipeline, not a runtime scene "
+            f"issue. Original error: {error_msg or 'unknown'}. "
+            f"Please regenerate the {ext_name} CLI."
+        )
+        self.appendToChat("Error", message)
+        self._setReadyStatus()
+        try:
+            self.sendButton.setEnabled(True)
+        except Exception:
+            pass
+        self._recordRoleEvent("Repairer", "generator_bug_detected", {
+            "step_id": step_id,
+            "extension": ext_name,
+            "error": (error_msg or "")[:1000],
+            "skipped_self_correction": True,
+        })
+        try:
+            self._saveRoleTraceToFile()
+        except Exception:
+            pass

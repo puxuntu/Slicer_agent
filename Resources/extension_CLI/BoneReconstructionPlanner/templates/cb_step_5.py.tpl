@@ -1,45 +1,61 @@
 from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
 
+# precondition:begin
 try:
-    logic = _bonereconstructionplanner_logic
-except NameError:
-    logic = BoneReconstructionPlannerLogic()
+    slicer.util.selectModule("BoneReconstructionPlanner")
+except Exception as _module_enter_error:
+    print(f"Warning: could not activate module 'BoneReconstructionPlanner': {_module_enter_error}")
+# precondition:end
 
+try:
+    _bonereconstructionplanner_logic
+except NameError:
+    _bonereconstructionplanner_logic = BoneReconstructionPlannerLogic()
+
+logic = _bonereconstructionplanner_logic
 parameterNode = logic.getParameterNode()
 
-# Ensure required parameter is set with default if not already
-if parameterNode.GetParameter("useNonDecimatedBoneModelsForPreview") == "":
+# Ensure parameterNode is valid
+if parameterNode is None:
+    print("Error: Could not get parameter node for BoneReconstructionPlanner")
+    raise RuntimeError("Parameter node not available")
+
+# --- Set up required segmentation nodes ---
+# fibulaSegmentation
+fibulaSeg = parameterNode.GetNodeReference("fibulaSegmentation")
+if fibulaSeg is None:
+    segNodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
+    for i in range(segNodes.GetNumberOfItems()):
+        n = segNodes.GetItemAsObject(i)
+        if "fibula" in n.GetName().lower():
+            fibulaSeg = n
+            break
+if fibulaSeg is not None:
+    parameterNode.SetNodeReferenceID("fibulaSegmentation", fibulaSeg.GetID())
+else:
+    print("Warning: Could not find fibula segmentation node. Attempting step anyway.")
+
+# mandibularSegmentation
+mandibularSeg = parameterNode.GetNodeReference("mandibularSegmentation")
+if mandibularSeg is None:
+    segNodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
+    for i in range(segNodes.GetNumberOfItems()):
+        n = segNodes.GetItemAsObject(i)
+        if "mandible" in n.GetName().lower():
+            mandibularSeg = n
+            break
+if mandibularSeg is not None:
+    parameterNode.SetNodeReferenceID("mandibularSegmentation", mandibularSeg.GetID())
+else:
+    print("Warning: Could not find mandibular segmentation node. Attempting step anyway.")
+
+# --- Set scalar parameters if not already set ---
+# useNonDecimatedBoneModelsForPreview defaults to "True"
+currentVal = parameterNode.GetParameter("useNonDecimatedBoneModelsForPreview")
+if currentVal == "":
     parameterNode.SetParameter("useNonDecimatedBoneModelsForPreview", "True")
 
-# Ensure fibula segmentation node reference exists
-if parameterNode.GetNodeReference("fibulaSegmentation") is None:
-    nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
-    fibulaSegmentation = None
-    for i in range(nodes.GetNumberOfItems()):
-        n = nodes.GetItemAsObject(i)
-        if "fibula" in n.GetName().lower():
-            fibulaSegmentation = n
-            break
-    if fibulaSegmentation:
-        parameterNode.SetNodeReferenceID("fibulaSegmentation", fibulaSegmentation.GetID())
-    else:
-        raise RuntimeError("No fibula segmentation found in the scene. Run previous step first.")
-
-# Ensure mandibular segmentation node reference exists
-if parameterNode.GetNodeReference("mandibularSegmentation") is None:
-    nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
-    mandibularSegmentation = None
-    for i in range(nodes.GetNumberOfItems()):
-        n = nodes.GetItemAsObject(i)
-        if "mandibular" in n.GetName().lower() or "mandible" in n.GetName().lower():
-            mandibularSegmentation = n
-            break
-    if mandibularSegmentation:
-        parameterNode.SetNodeReferenceID("mandibularSegmentation", mandibularSegmentation.GetID())
-    else:
-        raise RuntimeError("No mandibular segmentation found in the scene. Run previous step first.")
-
+# Call the method
+print("[BoneReconstructionPlanner] Executing makeModels()...")
 logic.makeModels()
-
-_bonereconstructionplanner_logic = logic
-print("[BoneReconstructionPlanner] Step 5 - Models created.")
+print("[BoneReconstructionPlanner] makeModels() completed.")

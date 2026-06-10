@@ -821,6 +821,7 @@ class AnalyzerParameterMetadataMixin:
                 "static_valid": None,
                 "api_probe_valid": None,
                 "contract_valid": None,
+                "prelude_valid": None,
             },
             "api_evidence": {},
         }

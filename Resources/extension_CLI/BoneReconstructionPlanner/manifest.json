@@ -53,6 +53,8 @@
     "static_valid": true,
     "api_probe_valid": true,
     "contract_valid": true,
+    "prelude_valid": true,
+    "prelude_bytes_max": 5408,
     "overall_valid": true
   }
 }

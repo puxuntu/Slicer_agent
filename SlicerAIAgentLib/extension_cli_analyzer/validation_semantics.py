@@ -1,5 +1,8 @@
 from .common import *
 
+_PRECONDITION_BEGIN = "# precondition:begin"
+_PRECONDITION_END = "# precondition:end"
+
 
 class AnalyzerValidationSemanticsMixin:
     @staticmethod
@@ -241,7 +244,7 @@ class AnalyzerValidationSemanticsMixin:
 
         return result
 
-    def _module_switch_allowed_by_contract(self, gen: Dict) -> bool:
+    def _module_switch_allowed_by_contract(self, gen: Dict, code: str = "") -> bool:
         operation_model = gen.get("operation_model") or {}
         if operation_model.get("allow_module_switch"):
             return True
@@ -250,7 +253,68 @@ class AnalyzerValidationSemanticsMixin:
             intents.update(_text_list(so.get("operation_intents", [])))
             if so.get("operation_intent"):
                 intents.add(so["operation_intent"])
-        return "module_switch" in intents
+        if "module_switch" in intents:
+            return True
+        # Precondition exception: a template that imports an extension module
+        # is making a logic-method call, and any slicer.util.selectModule() in
+        # it is for widget-lifecycle setup (so module.enter() has run), not
+        # UI navigation. The original rule targets UI-navigation cookbooks
+        # ("go to module X") which don't import the extension's code.
+        if code and self._template_imports_extension_module(code):
+            return True
+        return False
+
+    @staticmethod
+    def _template_imports_extension_module(code: str) -> bool:
+        """Return True if the template imports a non-standard (extension) module.
+
+        Used to distinguish widget-lifecycle selectModule (allowed) from
+        UI-navigation selectModule (blocked). Standard imports (slicer, vtk,
+        qt, SlicerAIAgentLib, python stdlib) don't count — only imports of
+        third-party / extension modules.
+        """
+        if not code:
+            return False
+        _NON_EXTENSION_IMPORTS = {
+            "slicer", "SlicerAIAgentLib", "vtk", "qt", "ctk", "logging",
+            "os", "sys", "json", "re", "abc", "typing", "functools",
+            "collections", "itertools", "math", "time", "copy",
+            "pathlib", "io", "traceback", "warnings", "numpy",
+        }
+        for m in _re.finditer(r'^\s*from\s+([\w.]+)\s+import\s+', code, _re.MULTILINE):
+            top = m.group(1).split(".")[0]
+            if top not in _NON_EXTENSION_IMPORTS:
+                return True
+        for m in _re.finditer(r'^\s*import\s+([\w.]+)', code, _re.MULTILINE):
+            top = m.group(1).split(".")[0]
+            if top not in _NON_EXTENSION_IMPORTS:
+                return True
+        return False
+
+    @staticmethod
+    def _strip_precondition_regions(code: str) -> str:
+        """Remove emitted precondition blocks from code for operation-level checks.
+
+        Preconditions (widget-lifecycle setup wrapped in `# precondition:begin` /
+        `# precondition:end` marker comments) are not part of the template's
+        Slicer API surface. Operation-level checks (e.g. code_has_slicer_api)
+        should evaluate only the operation itself, not the emitted setup.
+        """
+        if not code or _PRECONDITION_BEGIN not in code:
+            return code
+        out = []
+        in_prec = False
+        for line in code.split("\n"):
+            stripped = line.strip()
+            if stripped == _PRECONDITION_BEGIN:
+                in_prec = True
+                continue
+            if stripped == _PRECONDITION_END:
+                in_prec = False
+                continue
+            if not in_prec:
+                out.append(line)
+        return "\n".join(out)
 
     @staticmethod
     def _extension_methods_called_by_template(code: str) -> List[str]:
@@ -411,6 +475,173 @@ class AnalyzerValidationSemanticsMixin:
                 if arg0.value.startswith("vtkMRMLMarkups"):
                     return True
         return False
+
+    @staticmethod
+    def _template_creates_any_node(code: str) -> bool:
+        """Return True when code creates any MRML node via CreateNodeByClass/AddNewNodeByClass."""
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            return False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func_name = ""
+            if isinstance(node.func, ast.Attribute):
+                func_name = node.func.attr
+            if func_name in ("CreateNodeByClass", "AddNewNodeByClass"):
+                return True
+        return False
+
+    @staticmethod
+    def _template_enters_place_mode(code: str) -> bool:
+        """Return True when code calls SwitchToPersistentPlaceMode / StartPlaceMode / SetCurrentInteractionMode."""
+        return any(
+            call in code
+            for call in (
+                "SwitchToPersistentPlaceMode",
+                "StartPlaceMode",
+                "SetCurrentInteractionMode",
+            )
+        )
+
+    @staticmethod
+    def _template_references_markups_class(code: str) -> bool:
+        """Return True when code references any vtkMRMLMarkups*Node class string."""
+        return bool(_re.search(r"['\"]vtkMRMLMarkups[A-Za-z0-9_]*Node['\"]", code))
+
+    def _validate_interaction_kind_contract(self, code: str, gen: Dict) -> Dict[str, List[str]]:
+        """Revision D: catch the original bug class (view_adjustment descriptor
+        but template creates a Markups node and enters placement mode) at
+        generation time, not at every runtime step.
+
+        Rules (errors block manifest validation):
+          - interaction_kind == "view_adjustment" AND template creates any
+            MRML node → misrouted dispatch.
+          - interaction_kind == "view_adjustment" AND template references a
+            vtkMRMLMarkups*Node string → misrouted dispatch.
+          - creates_node == False (explicit) AND template creates any node
+            → descriptor/template mismatch.
+          - requires_place_mode == False (explicit) AND template enters
+            placement mode → descriptor/template mismatch.
+        """
+        result: Dict[str, List[str]] = {"errors": [], "warnings": []}
+        if not isinstance(gen, dict):
+            return result
+        sub_ops = gen.get("sub_operations") or []
+        # Find the user_interaction sub-op driving this template, if any.
+        interaction_so = None
+        for so in sub_ops:
+            if so.get("op_type") == "user_interaction":
+                interaction_so = so
+                break
+        # If no explicit user_interaction sub-op, fall back to top-level
+        # generator fields (some generators carry interaction metadata there).
+        interaction_kind = (
+            (interaction_so or {}).get("interaction_kind")
+            or gen.get("interaction_kind")
+            or ""
+        )
+        creates_node = (
+            (interaction_so or {}).get("creates_node")
+            if interaction_so is not None
+            else gen.get("creates_node")
+        )
+        requires_place_mode = (
+            (interaction_so or {}).get("requires_place_mode")
+            if interaction_so is not None
+            else gen.get("requires_place_mode")
+        )
+        if not interaction_kind and creates_node is None and requires_place_mode is None:
+            return result  # not an interaction template
+
+        tpl_label = gen.get("template_file") or gen.get("pre_template_file") or gen.get("post_template_file") or "<unknown>"
+        creates_any = self._template_creates_any_node(code)
+        enters_place = self._template_enters_place_mode(code)
+        refs_markups = self._template_references_markups_class(code)
+
+        if interaction_kind == "view_adjustment":
+            if creates_any:
+                result["errors"].append(
+                    f"view_adjustment template '{tpl_label}' creates an MRML node; "
+                    "dispatch misrouted a viewport/handle-drag interaction into node creation"
+                )
+            if refs_markups:
+                result["errors"].append(
+                    f"view_adjustment template '{tpl_label}' references a vtkMRMLMarkups*Node; "
+                    "dispatch misrouted a viewport/handle-drag interaction into Markups placement"
+                )
+            if enters_place:
+                result["errors"].append(
+                    f"view_adjustment template '{tpl_label}' enters placement mode; "
+                    "this hijacks the mouse for viewport/handle-drag interactions"
+                )
+        # creates_node/requires_place_mode checks fire only when the descriptor
+        # explicitly said False — missing values (None) are advisory, not contracts.
+        if creates_node is False and creates_any:
+            result["errors"].append(
+                f"Template '{tpl_label}' creates a node but the step descriptor "
+                "declared creates_node=false"
+            )
+        if requires_place_mode is False and enters_place:
+            result["errors"].append(
+                f"Template '{tpl_label}' enters placement mode but the step descriptor "
+                "declared requires_place_mode=false"
+            )
+        return result
+
+    def _validate_module_enter_precondition(self, code: str, gen: Dict) -> Dict[str, List[str]]:
+        """Catch templates that call extension logic methods without ensuring
+        the module is active. Extension methods assume module.enter() has run
+        (parameter node init, observers, UI bindings); without
+        slicer.util.selectModule(), the widget lifecycle never fires and the
+        method silently misbehaves (missing UI, missing observers, etc.).
+
+        Detection: the template imports an extension module (anything outside
+        the standard Slicer/python import set) AND does not contain a
+        slicer.util.selectModule() call. The check is intentionally general —
+        it does not encode any specific module name.
+        """
+        result: Dict[str, List[str]] = {"errors": [], "warnings": []}
+        if not isinstance(gen, dict) or not isinstance(code, str) or not code:
+            return result
+
+        _NON_EXTENSION_IMPORTS = {
+            "slicer", "SlicerAIAgentLib", "vtk", "qt", "ctk", "logging",
+            "os", "sys", "json", "re", "abc", "typing", "functools",
+            "collections", "itertools", "math", "time", "copy",
+            "pathlib", "io", "traceback", "warnings", "numpy",
+        }
+        extension_modules = set()
+        for m in _re.finditer(r'^\s*from\s+([\w.]+)\s+import\s+', code, _re.MULTILINE):
+            top = m.group(1).split(".")[0]
+            if top not in _NON_EXTENSION_IMPORTS:
+                extension_modules.add(top)
+        for m in _re.finditer(r'^\s*import\s+([\w.]+)', code, _re.MULTILINE):
+            top = m.group(1).split(".")[0]
+            if top not in _NON_EXTENSION_IMPORTS:
+                extension_modules.add(top)
+
+        if not extension_modules:
+            return result  # no extension import — not a logic-calling template
+
+        if "slicer.util.selectModule(" in code:
+            return result  # precondition present
+
+        tpl_label = (
+            gen.get("template_file")
+            or gen.get("pre_template_file")
+            or gen.get("post_template_file")
+            or "<unknown>"
+        )
+        imported = ", ".join(sorted(extension_modules))
+        result["errors"].append(
+            f"Template '{tpl_label}' imports extension module(s) {imported} "
+            "but does not call slicer.util.selectModule() to ensure the module is active; "
+            "extension logic methods require module.enter() to have run (parameter node init, "
+            "observers, UI bindings)"
+        )
+        return result
 
     @staticmethod
     def _find_template_placeholders(template_str: str) -> List[Dict[str, Any]]:
@@ -630,10 +861,26 @@ class AnalyzerValidationSemanticsMixin:
             lower = name.lower()
             if "name" in lower:
                 return '"SampleNode"'
-            if "radius" in lower or "size" in lower:
+            if "radius" in lower or "size" in lower or "distance" in lower:
                 return "1.5"
             if "path" in lower:
                 return '"/tmp/sample"'
+            # Boolean-like placeholders — emit True so the assembled code parses
+            # even when the template expects a bool/checked value.
+            if any(k in lower for k in (
+                "checked", "enabled", "visible", "active", "flag",
+                "show_", "_show", "use_", "_use", "is_", "_is",
+            )):
+                return "True"
+            # Integer counts/indices
+            if any(k in lower for k in ("count", "number", "index", "num_")):
+                return "1"
+            # Choice/selection values
+            if any(k in lower for k in ("choice", "selection", "option", "value", "selected")):
+                return '"sample"'
+            # MRML node IDs
+            if lower.endswith("_id") or lower.endswith("id") and "node" in lower:
+                return '"vtkMRMLSampleNode1"'
             return '""'
 
         result = []

@@ -404,6 +404,7 @@ class ExtensionCLIAnalyzer(
             validation_result = self._stage9_validate(
                 templates, generators, logic_analysis=logic_analysis,
                 api_probe_result=probe_result,
+                extension_name=extension_name,
             )
             result["stages_completed"].append(9)
             result["validation_result"] = validation_result

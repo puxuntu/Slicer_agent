@@ -471,7 +471,8 @@ class AnalyzerValidationContractsMixin:
         role = context.get("role")
         raw_code = raw_code if raw_code is not None else code
         sub_ops = gen.get("sub_operations", []) or []
-        api_chains = self._extract_api_chains(code)
+        operation_code = self._strip_precondition_regions(code)
+        api_chains = self._extract_api_chains(operation_code)
         code_has_slicer_api = bool(api_chains)
         invalid_aliases = self._invalid_slicer_api_aliases(code)
         if invalid_aliases:
@@ -514,7 +515,7 @@ class AnalyzerValidationContractsMixin:
                     "Template uses Slicer API calls but operation_model.invokes_slicer_api is false"
                 )
 
-        if self._template_calls_select_module(code) and not self._module_switch_allowed_by_contract(gen):
+        if self._template_calls_select_module(code) and not self._module_switch_allowed_by_contract(gen, code):
             result["errors"].append(
                 "Template switches the active Slicer module without an explicit module_switching contract; "
                 "module/panel phrases in cookbook steps are UI-location context and should be implemented "
@@ -524,6 +525,18 @@ class AnalyzerValidationContractsMixin:
         semantic_contract = self._validate_slicer_operation_semantics(code, gen)
         result["errors"].extend(semantic_contract["errors"])
         result["warnings"].extend(semantic_contract["warnings"])
+
+        # Revision D: interaction_kind contract — catch view_adjustment
+        # templates that misroute into Markups node creation or placement mode.
+        interaction_contract = self._validate_interaction_kind_contract(code, gen)
+        result["errors"].extend(interaction_contract["errors"])
+        result["warnings"].extend(interaction_contract["warnings"])
+
+        # Module-enter precondition contract — catch templates that call
+        # extension logic methods without ensuring the module widget is alive.
+        module_enter_contract = self._validate_module_enter_precondition(code, gen)
+        result["errors"].extend(module_enter_contract["errors"])
+        result["warnings"].extend(module_enter_contract["warnings"])
 
         # ── Sub-operation coverage check ──
         # Verify every non-optional, code-generating sub-operation has a code

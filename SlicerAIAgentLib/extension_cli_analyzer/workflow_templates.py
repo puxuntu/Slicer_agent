@@ -183,7 +183,26 @@ class AnalyzerWorkflowTemplatesMixin:
 
             elif step_type == "interactive":
                 node_class = step.get("node_class", "")
-                is_non_markup_interaction = bool(node_class) and not self._is_markup_node_class(node_class)
+                # Revision A: dispatch on interaction_kind (semantic intent)
+                # rather than node_class (data shape). Previously the guard
+                # `bool(node_class) and not _is_markup_node_class(node_class)`
+                # required a non-empty node_class to reach the view-adjustment
+                # branch, so view_adjustment steps with empty node_class fell
+                # into _generate_pre_interaction_template which always creates
+                # a Markups node and enters placement mode — hijacking the
+                # mouse for any drag-existing-handle or viewport-adjustment
+                # interaction.
+                interaction_kind = (step.get("interaction_kind") or "").strip()
+                # Infer interaction_kind conservatively from node_class when
+                # Stage 4 didn't set it (preserves legacy behavior for steps
+                # classified before Revision B's descriptor enrichment).
+                if not interaction_kind:
+                    if self._is_markup_node_class(node_class):
+                        interaction_kind = "markup_placement"
+                    elif node_class:
+                        interaction_kind = "view_adjustment"
+                    step["interaction_kind"] = interaction_kind
+
                 starter_binding = self._find_recent_placement_starter_for_interaction(
                     steps, step_index
                 )
@@ -191,7 +210,7 @@ class AnalyzerWorkflowTemplatesMixin:
                     step.get("placement_starter_method")
                     or starter_binding.get("method")
                 )
-                if prev_starter_method and self._is_markup_node_class(node_class):
+                if prev_starter_method and interaction_kind == "markup_placement":
                     step["interaction_owner"] = "previous_extension_method"
                     step["placement_starter_method"] = prev_starter_method
                     step["created_node_source"] = "previous_extension_method"
@@ -199,27 +218,33 @@ class AnalyzerWorkflowTemplatesMixin:
                         step["placement_starter_step_id"] = starter_binding.get("step_id", "")
                         step["placement_binding_reason"] = starter_binding.get("reason", "")
 
+                is_view_adjustment = interaction_kind == "view_adjustment"
+
                 # Pre-interaction template
-                if prev_starter_method and self._is_markup_node_class(node_class):
+                if interaction_kind == "markup_placement" and prev_starter_method:
                     pre_tpl = self._generate_existing_placement_pre_template(
                         extension_name, step, prev_starter_method,
                     )
-                elif is_non_markup_interaction:
+                elif is_view_adjustment:
                     pre_tpl = self._generate_view_adjustment_pre_template(
                         extension_name, step,
                     )
                 else:
-                    if self._is_markup_node_class(node_class):
-                        step["interaction_owner"] = "runtime_template"
-                        step["created_node_source"] = "template"
+                    # markup_placement without prev_starter_method, or
+                    # unknown/missing interaction_kind falling back to the
+                    # legacy markups-creation default.
+                    if interaction_kind == "markup_placement" or not interaction_kind:
+                        if self._is_markup_node_class(node_class) or not node_class:
+                            step.setdefault("interaction_owner", "runtime_template")
+                            step.setdefault("created_node_source", "template")
                     pre_tpl = self._generate_pre_interaction_template(
                         extension_name, step, logic_class_name, module_name,
                     )
                 templates[f"templates/{step_id}_pre.py.tpl"] = pre_tpl
                 step["pre_template"] = f"templates/{step_id}_pre.py.tpl"
 
-                # Post-interaction template
-                if is_non_markup_interaction:
+                # Post-interaction template — mirror the same dispatch.
+                if is_view_adjustment:
                     post_tpl = self._generate_view_adjustment_post_template(
                         extension_name, step,
                     )
@@ -315,8 +340,23 @@ class AnalyzerWorkflowTemplatesMixin:
                 if interaction_sub_ops:
                     iso = interaction_sub_ops[0]
                     node_class = iso.get("node_class") or step.get("node_class", "")
+                    # Revision A (mixed-step mirror): dispatch on interaction_kind
+                    # rather than requiring a non-empty node_class. Same fix as
+                    # the interactive branch above.
+                    interaction_kind = (iso.get("interaction_kind") or step.get("interaction_kind") or "").strip()
+                    if not interaction_kind:
+                        if self._is_markup_node_class(node_class):
+                            interaction_kind = "markup_placement"
+                        elif node_class:
+                            interaction_kind = "view_adjustment"
+                        step["interaction_kind"] = interaction_kind
+
+                    is_view_adjustment = interaction_kind == "view_adjustment"
+                    is_markup_placement = interaction_kind == "markup_placement"
+
                     if (
-                        node_class
+                        is_markup_placement
+                        and node_class
                         and self._is_markup_node_class(node_class)
                         and not placement_starter_method
                     ):
@@ -356,7 +396,7 @@ class AnalyzerWorkflowTemplatesMixin:
                         ])
                         interaction_block = "\n".join(block_lines)
                         auto_parts.append(interaction_block)
-                    elif node_class and not self._is_markup_node_class(node_class):
+                    elif is_view_adjustment:
                         step["interaction_kind"] = "view_adjustment"
                         instructions = iso.get(
                             "placement_instructions",
@@ -559,6 +599,7 @@ class AnalyzerWorkflowTemplatesMixin:
             "import slicer",
             f"from {module_name} import {logic_class_name}",
             "",
+            *self._emit_module_enter_precondition(module_name),
             "try:",
             f"    logic = {logic_var}",
             "except NameError:",
@@ -650,8 +691,10 @@ class AnalyzerWorkflowTemplatesMixin:
             return self._generate_unknown_op_template(step)
         lines = [
             *self._template_header_lines(extension_name, step, ""),
+            "import slicer",
             f"from {module_name} import {function_name}",
             "",
+            *self._emit_module_enter_precondition(module_name),
             f"{function_name}()",
             "",
             f"print(\"[{extension_name}] Step '{step_id}' completed.\")",
@@ -727,6 +770,7 @@ class AnalyzerWorkflowTemplatesMixin:
                 "except ImportError:",
                 f"    raise RuntimeError(\"{extension_name} extension is not installed.\")",
                 "",
+                *self._emit_module_enter_precondition(module_name),
                 "try:",
                 f"    logic = _{extension_name.lower()}_logic",
                 "except NameError:",
@@ -833,10 +877,21 @@ class AnalyzerWorkflowTemplatesMixin:
 
             The code must:
             1. Import the logic class from `{module_name}`
-            2. Reuse the existing logic instance `_{extension_name.lower()}_logic` if it exists, otherwise create a new `{logic_class_name}()`
-            3. Set up any required state on the logic instance BEFORE calling the method (e.g., if the method reads `self.mandibleSegmentationNode`, find the node in the scene and assign it)
+            2. Ensure the extension module is active so module.enter() has run (extension methods may depend on parameter-node init, observers, and UI bindings set up by the widget's enter() method). Emit (include the marker comments exactly):
+               ```
+               # precondition:begin
+               _active_module = slicer.app.moduleManager().activeModule()
+               if _active_module is None or _active_module.name != "{module_name}":
+                   try:
+                       slicer.util.selectModule("{module_name}")
+                   except Exception as _module_enter_error:
+                       print(f"Warning: could not activate module '{module_name}': {{_module_enter_error}}")
+               # precondition:end
+               ```
+            3. Reuse the existing logic instance `_{extension_name.lower()}_logic` if it exists, otherwise create a new `{logic_class_name}()`
+            4. Set up any required state on the logic instance BEFORE calling the method (e.g., if the method reads `self.mandibleSegmentationNode`, find the node in the scene and assign it)
                If the method or its helper methods read scalar values from `parameterNode.GetParameter(...)`, initialize missing values using the provided source-derived defaults with `parameterNode.SetParameter(...)` before calling the method. Never overwrite a non-empty parameter value.
-            4. To find scene nodes, use robust fuzzy matching — NEVER rely on exact node names. Use this pattern:
+            5. To find scene nodes, use robust fuzzy matching — NEVER rely on exact node names. Use this pattern:
                ```python
                nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
                for i in range(nodes.GetNumberOfItems()):
@@ -846,9 +901,9 @@ class AnalyzerWorkflowTemplatesMixin:
                        break
                ```
                Or for parameter node references: first check `parameterNode.GetNodeReference("refName")`, and if None, search the scene by class + name substring, then set via `parameterNode.SetNodeReferenceID("refName", node.GetID())`.
-            5. Call the method with correct arguments
-            6. Store the logic instance as `_{extension_name.lower()}_logic` for subsequent steps
-            7. Print a completion message
+            6. Call the method with correct arguments
+            7. Store the logic instance as `_{extension_name.lower()}_logic` for subsequent steps
+            8. Print a completion message
 
             IMPORTANT restrictions:
             - Do NOT use `dir()`, `eval()`, `exec()`, `globals()`, or `locals()` — these are blocked in the execution sandbox.
@@ -964,6 +1019,7 @@ class AnalyzerWorkflowTemplatesMixin:
             "from SlicerAIAgentLib.workflow_state import remember_interaction_node",
             f"from {module_name} import {logic_class_name}",
             "",
+            *self._emit_module_enter_precondition(module_name),
             "try:",
             f"    logic = _{extension_name.lower()}_logic",
             "except NameError:",

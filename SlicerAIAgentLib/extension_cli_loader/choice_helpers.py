@@ -363,7 +363,14 @@ def _try_auto_select_choice(ctx: _WorkflowContext, choice_desc: Dict) -> Optiona
 
 
 def _build_choice_prelude(ctx: _WorkflowContext) -> str:
-    """Build code that applies metadata defaults and stored user choices."""
+    """Emit a tiny shim that imports and invokes the metadata-application helper.
+
+    The choices/bindings/defaults dicts are passed as Python objects via the
+    executor namespace (see _build_prelude_globals); the prelude only needs
+    to import the helper and call it. This collapses ~60 lines of inlined
+    Python source per dispatch into ~10, and eliminates the json.dumps-vs-Python
+    literal class of bugs (booleans like ``false`` are not Python literals).
+    """
     choices = _workflow_choices.get(ctx.ext_name, {})
     bindings = ctx.metadata.get("parameter_bindings", {}) or {}
     defaults = ctx.metadata.get("parameter_defaults", {}) or {}
@@ -373,71 +380,17 @@ def _build_choice_prelude(ctx: _WorkflowContext) -> str:
         return ""
 
     logic_var = f"_{ctx.ext_name.lower()}_logic"
-    choices_json = json.dumps(choices)
-    bindings_json = json.dumps(bindings)
-    defaults_json = json.dumps(defaults)
     return (
         "# [Workflow metadata] Apply source-derived defaults and stored user choices\n"
         "import slicer\n"
         f"from {module_name} import {logic_class_name}\n"
+        "from SlicerAIAgentLib.workflow_state import apply_workflow_metadata\n"
         "try:\n"
         f"    logic = {logic_var}\n"
         "except NameError:\n"
         f"    logic = {logic_class_name}()\n"
         "parameterNode = logic.getParameterNode()\n"
-        f"_workflow_choices = {choices_json}\n"
-        f"_workflow_bindings = {bindings_json}\n"
-        f"_workflow_defaults = {defaults_json}\n"
-        "def _workflow_tokens(text):\n"
-        "    import re\n"
-        "    text = re.sub(r'([a-z0-9])([A-Z])', r'\\1 \\2', str(text or ''))\n"
-        "    return set(re.findall(r'[A-Za-z][A-Za-z0-9]+', text.lower()))\n"
-        "def _workflow_find_node(value, node_class, keywords):\n"
-        "    if not node_class:\n"
-        "        return None\n"
-        "    value = str(value or '')\n"
-        "    try:\n"
-        "        node = slicer.util.getNode(value)\n"
-        "        if node and node.IsA(node_class):\n"
-        "            return node\n"
-        "    except Exception:\n"
-        "        pass\n"
-        "    target_tokens = _workflow_tokens(value) | set(keywords or [])\n"
-        "    nodes = slicer.mrmlScene.GetNodesByClass(node_class)\n"
-        "    best_node = None\n"
-        "    best_score = -1\n"
-        "    for _i in range(nodes.GetNumberOfItems()):\n"
-        "        candidate = nodes.GetItemAsObject(_i)\n"
-        "        if candidate is None:\n"
-        "            continue\n"
-        "        score = len(target_tokens & _workflow_tokens(candidate.GetName()))\n"
-        "        if candidate.GetName() == value:\n"
-        "            score += 10\n"
-        "        if score > best_score:\n"
-        "            best_score = score\n"
-        "            best_node = candidate\n"
-        "    return best_node if best_score > 0 else None\n"
-        "for _role, _default in _workflow_defaults.items():\n"
-        "    _binding = _workflow_bindings.get(_role, {})\n"
-        "    if _binding.get('node_class', ''):\n"
-        "        continue\n"
-        "    try:\n"
-        "        _current = parameterNode.GetParameter(_role)\n"
-        "    except Exception:\n"
-        "        _current = ''\n"
-        "    if _current in (None, ''):\n"
-        "        parameterNode.SetParameter(_role, str(_default.get('value', '')))\n"
-        "for _role, _binding in _workflow_bindings.items():\n"
-        "    _value = _workflow_choices.get(_role)\n"
-        "    if _value is None:\n"
-        "        continue\n"
-        "    _node_class = _binding.get('node_class', '')\n"
-        "    if _node_class:\n"
-        "        _node = _workflow_find_node(_value, _node_class, _binding.get('keywords', []))\n"
-        "        if _node is not None:\n"
-        "            parameterNode.SetNodeReferenceID(_role, _node.GetID())\n"
-        "    else:\n"
-        "        parameterNode.SetParameter(_role, 'True' if _value is True else 'False' if _value is False else str(_value))\n"
+        "apply_workflow_metadata(parameterNode, _workflow_choices, _workflow_bindings, _workflow_defaults)\n"
         f"{logic_var} = logic\n\n"
     )
 
@@ -472,30 +425,20 @@ def _method_name_for_context(ctx: _WorkflowContext) -> str:
 
 
 def _build_runtime_prelude(ctx: _WorkflowContext) -> str:
-    """Build hidden runtime context and generic method precondition checks."""
+    """Build hidden runtime context and an import shim for precondition checks.
+
+    The validator function itself lives in SlicerAIAgentLib.workflow_state —
+    the prelude just imports it and resolves the per-step ``_workflow_logic``
+    instance. ``_workflow_required_bindings`` and ``_workflow_method_name``
+    are passed as Python objects via the _prelude_globals side channel; the
+    injected precondition call before each ``logic.<method>()`` site reads
+    them from the executor namespace.
+    """
     workflow_id = str(ctx.arguments.get("_workflow_id") or ctx.arguments.get("workflow_id") or "")
     repeat_index = _repeat_index_for_context(ctx)
     step_id = ctx.workflow_step
     method_name = _method_name_for_context(ctx)
     metadata = ctx.metadata or {}
-    bindings = metadata.get("parameter_bindings", {}) or {}
-    deps = (metadata.get("parameter_method_dependencies", {}) or {}).get(method_name, {}) if method_name else {}
-    role_names = sorted(set((deps.get("parameter_roles") or []) + (deps.get("node_roles") or [])))
-    node_requirements = deps.get("node_requirements") or {}
-    required_bindings = {
-        role: {
-            **bindings.get(role, {}),
-            "_workflow_requirement": node_requirements.get(
-                role, {
-                    "requirement": "optional_unknown",
-                    "conditions": [],
-                    "condition_groups": [],
-                }
-            ),
-        }
-        for role in role_names
-        if isinstance(bindings.get(role), dict)
-    }
     module_name = metadata.get("extension_module_name", "")
     logic_class_name = metadata.get("logic_class_name", "")
 
@@ -508,84 +451,40 @@ def _build_runtime_prelude(ctx: _WorkflowContext) -> str:
         "from SlicerAIAgentLib.workflow_state import remember_interaction_node, resolve_interaction_node",
         "",
     ]
-    if not (method_name and module_name and logic_class_name and required_bindings):
+    if not (method_name and module_name and logic_class_name):
         return "\n".join(lines) + "\n"
 
     lines.extend([
         "# [Workflow preconditions] Validate source-derived node references before extension logic calls",
-        f"_workflow_method_name = {method_name!r}",
-        f"_workflow_required_bindings = {repr(required_bindings)}",
-        "def _workflow_validate_polydata(_node, _role):",
-        "    if not hasattr(_node, 'GetPolyData'):",
-        "        return",
-        "    _poly = _node.GetPolyData()",
-        "    if _poly is None:",
-        "        raise RuntimeError(\"Model node has no polydata: %s\" % _role)",
-        "    try:",
-        "        if _poly.GetNumberOfPoints() <= 0:",
-        "            raise RuntimeError(\"Model node has empty polydata: %s\" % _role)",
-        "    except AttributeError:",
-        "        pass",
-        "def _workflow_validate_markups(_node, _role, _min_points):",
-        "    if _min_points <= 0 or not hasattr(_node, 'GetNumberOfControlPoints'):",
-        "        return",
-        "    _count = _node.GetNumberOfControlPoints()",
-        "    if _count < _min_points:",
-        "        raise RuntimeError(\"Markup node %s needs at least %d control points, got %d\" % (_role, _min_points, _count))",
-        "def _workflow_condition_is_active(_parameter_node, _condition):",
-        "    _parameter = _condition.get('parameter', '')",
-        "    if not _parameter:",
-        "        return False",
-        "    _actual = _parameter_node.GetParameter(_parameter)",
-        "    _expected = str(_condition.get('value', ''))",
-        "    if _condition.get('operator') == 'not_equals':",
-        "        return str(_actual) != _expected",
-        "    return str(_actual) == _expected",
-        "def _workflow_node_is_required(_parameter_node, _binding):",
-        "    _requirement = _binding.get('_workflow_requirement') or {'requirement': 'optional_unknown'}",
-        "    _kind = _requirement.get('requirement', 'optional_unknown')",
-        "    if _kind == 'required':",
-        "        return True",
-        "    if _kind == 'conditional':",
-        "        _groups = _requirement.get('condition_groups') or []",
-        "        if _groups:",
-        "            return any(all(_workflow_condition_is_active(_parameter_node, _c) for _c in _group) for _group in _groups)",
-        "        return any(_workflow_condition_is_active(_parameter_node, _c) for _c in (_requirement.get('conditions') or []))",
-        "    return False",
+        "from SlicerAIAgentLib.workflow_state import validate_method_preconditions",
         f"try:\n    _workflow_logic = _{ctx.ext_name.lower()}_logic\nexcept NameError:\n    from {module_name} import {logic_class_name}\n    _workflow_logic = {logic_class_name}()",
-        "def _workflow_validate_method_preconditions():",
-        "    _workflow_parameter_node = _workflow_logic.getParameterNode()",
-        "    for _role, _binding in _workflow_required_bindings.items():",
-        "        _node_class = _binding.get('node_class', '')",
-        "        if not _node_class:",
-        "            continue",
-        "        _accesses = set(_binding.get('accesses') or [])",
-        "        if 'node_reference_read' not in _accesses:",
-        "            continue",
-        "        _node = _workflow_parameter_node.GetNodeReference(_role)",
-        "        if _node is None:",
-        "            if _workflow_node_is_required(_workflow_parameter_node, _binding):",
-        "                _requirement = _binding.get('_workflow_requirement') or {}",
-        "                _conditions = _requirement.get('conditions') or []",
-        "                if _conditions:",
-        "                    raise RuntimeError(\"[GeneratedWorkflowPrecondition] Missing conditional node reference: %s; active condition: %s\" % (_role, _conditions))",
-        "                raise RuntimeError(\"[GeneratedWorkflowPrecondition] Missing required node reference: %s\" % _role)",
-        "            continue",
-        "        if hasattr(_node, 'IsA') and not _node.IsA(_node_class):",
-        "            raise RuntimeError(\"Node reference %s has wrong type: expected %s\" % (_role, _node_class))",
-        "        if _node_class == 'vtkMRMLModelNode':",
-        "            _workflow_validate_polydata(_node, _role)",
-        "        if 'Markups' in _node_class:",
-        "            _workflow_validate_markups(_node, _role, int(_binding.get('min_control_points', 0) or 0))",
         f"_{ctx.ext_name.lower()}_logic = _workflow_logic",
         "",
     ])
     return "\n".join(lines) + "\n"
 
 
+def _has_method_preconditions(ctx: _WorkflowContext) -> bool:
+    """True iff this step will emit method-precondition metadata.
+
+    Cheap structural check — only depends on whether the step has a method
+    name AND parameter bindings referenced by that method's dependencies.
+    Used by _inject_method_precondition_call to avoid rebuilding the entire
+    prelude just to test membership.
+    """
+    method_name = _method_name_for_context(ctx)
+    if not method_name:
+        return False
+    metadata = ctx.metadata or {}
+    bindings = metadata.get("parameter_bindings", {}) or {}
+    method_deps = (metadata.get("parameter_method_dependencies", {}) or {}).get(method_name, {}) or {}
+    role_names = list(method_deps.get("parameter_roles") or []) + list(method_deps.get("node_roles") or [])
+    return any(isinstance(bindings.get(role), dict) for role in role_names)
+
+
 def _inject_method_precondition_call(ctx: _WorkflowContext, code: str) -> str:
     method_name = _method_name_for_context(ctx)
-    if not method_name or "_workflow_validate_method_preconditions" not in _build_runtime_prelude(ctx):
+    if not method_name or not _has_method_preconditions(ctx):
         return code
     pattern = re.compile(
         rf"^(?P<indent>[ \t]*)logic\.{re.escape(method_name)}\s*\(",
@@ -594,8 +493,57 @@ def _inject_method_precondition_call(ctx: _WorkflowContext, code: str) -> str:
     match = pattern.search(code)
     if not match:
         return code
-    insertion = f"{match.group('indent')}_workflow_validate_method_preconditions()\n"
+    insertion = (
+        f"{match.group('indent')}"
+        "validate_method_preconditions(_workflow_logic, _workflow_required_bindings)\n"
+    )
     return code[:match.start()] + insertion + code[match.start():]
+
+
+def _build_prelude_globals(ctx: _WorkflowContext) -> Dict[str, Any]:
+    """Return the Python-object side channel for the prelude.
+
+    The dispatch result attaches this dict under ``_prelude_globals``; the
+    executor registers each key as a ``__main__`` global before exec, so the
+    prelude can reference choices/bindings/defaults directly without
+    serializing them to source text. Always emits all-or-nothing per group
+    (choice metadata vs precondition metadata) so the prelude never sees a
+    missing global it would otherwise reference.
+    """
+    globals_dict: Dict[str, Any] = {}
+    choices = _workflow_choices.get(ctx.ext_name, {})
+    bindings = ctx.metadata.get("parameter_bindings", {}) or {}
+    defaults = ctx.metadata.get("parameter_defaults", {}) or {}
+    module_name = ctx.metadata.get("extension_module_name", "")
+    logic_class_name = ctx.metadata.get("logic_class_name", "")
+    if (choices or defaults) and bindings and module_name and logic_class_name:
+        globals_dict["_workflow_choices"] = dict(choices)
+        globals_dict["_workflow_bindings"] = dict(bindings)
+        globals_dict["_workflow_defaults"] = dict(defaults)
+
+    method_name = _method_name_for_context(ctx)
+    if method_name:
+        method_deps = (ctx.metadata.get("parameter_method_dependencies", {}) or {}).get(method_name, {}) or {}
+        role_names = list(method_deps.get("parameter_roles") or []) + list(method_deps.get("node_roles") or [])
+        node_requirements = method_deps.get("node_requirements") or {}
+        required_bindings = {
+            role: {
+                **bindings.get(role, {}),
+                "_workflow_requirement": node_requirements.get(
+                    role, {
+                        "requirement": "optional_unknown",
+                        "conditions": [],
+                        "condition_groups": [],
+                    }
+                ),
+            }
+            for role in role_names
+            if isinstance(bindings.get(role), dict)
+        }
+        if required_bindings and module_name and logic_class_name:
+            globals_dict["_workflow_required_bindings"] = required_bindings
+            globals_dict["_workflow_method_name"] = method_name
+    return globals_dict
 
 
 def _prepend_choice_prelude(ctx: _WorkflowContext, code: Optional[str]) -> Optional[str]:
@@ -605,6 +553,61 @@ def _prepend_choice_prelude(ctx: _WorkflowContext, code: Optional[str]) -> Optio
     prelude = _build_choice_prelude(ctx)
     code = _inject_method_precondition_call(ctx, code)
     return (prelude or "") + runtime_prelude + code
+
+
+def build_assembled_code_for_validation(
+    ext_name: str,
+    metadata: Dict[str, Any],
+    generator: Dict[str, Any],
+    template_code: str,
+) -> str:
+    """Assemble prelude + filled template for offline dry-validation.
+
+    Mirrors what ``dispatch_workflow_step`` produces at runtime, minus the
+    actual choice values (which are runtime state). Used by Stage 9 to
+    validate the *assembled* artifact (template + prelude) at generation
+    time, so generator-side prelude bugs surface here instead of at every
+    runtime step.
+
+    Args:
+        ext_name: Extension name (e.g., "BoneReconstructionPlanner").
+        metadata: workflow_metadata.json contents (parameter_bindings, etc.).
+        generator: Generator entry from code_generators.json.
+        template_code: Template file content with all format-kwargs already
+            filled by the caller.
+
+    Returns:
+        Assembled code string (prelude + template) ready for ``ast.parse``
+        and ``CodeValidator.validate``.
+    """
+    workflow_step = (
+        (generator.get("param_signature") or {}).get("workflow_step")
+        or generator.get("workflow_step")
+        or "validation_sample_step"
+    )
+    target_step = {
+        "step_id": workflow_step,
+        "method_name": generator.get("method_name", ""),
+        "sub_operations": generator.get("sub_operations", []),
+        "repeat_block": generator.get("repeat_block"),
+        "repeat_group": generator.get("repeat_group"),
+        "interaction_descriptor": generator.get("interaction_descriptor", {}),
+        "choice_descriptor": generator.get("choice_descriptor", {}),
+    }
+    ctx = _WorkflowContext(
+        ext_name=ext_name,
+        ext_dir="",
+        tool_name=f"{ext_name}_validation",
+        workflow_graph={"steps": []},
+        target_step=target_step,
+        target_gen=generator,
+        arguments={"_workflow_id": "validation"},
+        user_action="start",
+        done=set(),
+        metadata=metadata or {},
+    )
+    assembled = _prepend_choice_prelude(ctx, template_code)
+    return assembled if assembled is not None else template_code
 
 
 def _store_generated_interaction_node_code(

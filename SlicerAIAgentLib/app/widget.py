@@ -64,3 +64,4 @@ class SlicerAIAgentWidget(
         self._taskWorkflowPanelActive = False
         self._announcedWorkflowIds = set()
         self._currentWorkflowStepInfo = None
+        self._lastInjectedPreludeKeys = []

@@ -1,4 +1,4 @@
-# Hide slice in 3D view for Red slice
+# Toggle off slice visibility in 3D view for the Red slice view
 layoutManager = slicer.app.layoutManager()
-redWidget = layoutManager.sliceWidget("Red")
-redWidget.sliceController().setSliceVisible(False)
+controller = layoutManager.sliceWidget("Red").sliceController()
+controller.setSliceVisible(False)

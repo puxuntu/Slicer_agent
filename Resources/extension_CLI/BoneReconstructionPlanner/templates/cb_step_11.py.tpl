@@ -1,7 +1,15 @@
-# --- BoneReconstructionPlanner: Click the "Add mandibular curve" button. (Setup) ---
+# --- BoneReconstructionPlanner: Click the "Add mandibular curve" button. ---
 import slicer
 from SlicerAIAgentLib.workflow_state import remember_interaction_node
 from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
+
+# precondition:begin
+# Ensure the extension module is active so module.enter() has run.
+try:
+    slicer.util.selectModule('BoneReconstructionPlanner')
+except Exception as _module_enter_error:
+    print(f"Warning: could not activate module 'BoneReconstructionPlanner': {_module_enter_error}")
+# precondition:end
 
 try:
     logic = _bonereconstructionplanner_logic

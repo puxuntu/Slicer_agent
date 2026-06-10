@@ -232,6 +232,7 @@ Return ONLY the sentence, nothing else.""")
         generators: List[Dict],
         logic_analysis: Optional[Dict] = None,
         api_probe_result: Optional[Dict] = None,
+        extension_name: str = "",
     ) -> Dict:
         """Validate all templates with CodeValidator + semantic checks."""
         self.on_progress(9, "Validating templates", "Running CodeValidator...")
@@ -239,6 +240,11 @@ Return ONLY the sentence, nothing else.""")
         if not self.code_validator:
             from ..CodeValidator import CodeValidator
             self.code_validator = CodeValidator()
+
+        # Stash extension name for the prelude dry-validation pass (used by
+        # build_assembled_code_for_validation to derive the per-extension
+        # logic variable name).
+        self._prelude_validation_ext_name = extension_name or ""
 
         results = {
             "valid": True,
@@ -405,6 +411,22 @@ Return ONLY the sentence, nothing else.""")
                         f"{template}: Unresolved live API probe failure for '{chain}': {error}"
                     )
 
+        # Prelude dry-validation: assemble prelude + filled template for each
+        # generator and run ast.parse + CodeValidator. This catches generator-
+        # side prelude bugs (e.g., bad f-string formatting, missing imports,
+        # json.dumps-vs-Python-literal issues) at generation time rather than
+        # at every runtime step.
+        prelude_results = self._validate_assembled_preludes(generators, templates)
+        for entry in prelude_results.get("failures", []):
+            results["valid"] = False
+            results["errors"].append(
+                f"{entry['template']}: {entry['error']}"
+            )
+        for entry in prelude_results.get("warnings", []):
+            results["warnings"].append(
+                f"{entry['template']}: {entry['warning']}"
+            )
+
         if isinstance(self._workflow_metadata, dict):
             static_valid = all(
                 item.get("valid", True)
@@ -433,6 +455,8 @@ Return ONLY the sentence, nothing else.""")
                         for e in results.get("errors", [])
                     )
                 ),
+                "prelude_valid": prelude_results.get("valid", True),
+                "prelude_bytes_max": prelude_results.get("bytes_max", 0),
                 "overall_valid": bool(results.get("valid")),
             }
 
@@ -442,6 +466,137 @@ Return ONLY the sentence, nothing else.""")
         )
 
         return results
+
+    # Soft size budget for assembled prelude + template. Anything above this
+    # suggests the generator is re-emitting constant metadata as source text
+    # (the regression Revision A is designed to prevent).
+    _PRELUDE_SIZE_BUDGET_BYTES = 5120
+
+    def _validate_assembled_preludes(
+        self,
+        generators: List[Dict],
+        templates: Dict[str, str],
+    ) -> Dict:
+        """Dry-validate prelude + filled template for each generator.
+
+        For each generator's template_file / pre_template_file / post_template_file,
+        fill placeholders, prepend the assembled prelude (via the loader's
+        ``build_assembled_code_for_validation`` helper), and run ``ast.parse``
+        plus ``CodeValidator.validate``. This catches generator-side prelude
+        bugs (bad f-string formatting, missing imports, source-text metadata
+        serialization) at generation time instead of at every runtime step.
+
+        Returns:
+            Dict with ``valid`` (bool), ``failures`` (List[{template, error}]),
+            ``warnings`` (List[{template, warning}]), and ``bytes_max`` (int).
+        """
+        result = {"valid": True, "failures": [], "warnings": [], "bytes_max": 0}
+        if not generators or not templates:
+            return result
+
+        # Lazy import so the analyzer can run without the loader's runtime deps.
+        try:
+            from ..extension_cli_loader.choice_helpers import (
+                build_assembled_code_for_validation,
+            )
+        except ImportError:
+            # Loader unavailable; skip prelude validation. ``prelude_valid``
+            # stays True so the pipeline isn't blocked when the loader can't
+            # be loaded (e.g., running the analyzer outside Slicer without
+            # the extension_cli_loader package importable).
+            return result
+
+        if not self.code_validator:
+            try:
+                from ..CodeValidator import CodeValidator
+                self.code_validator = CodeValidator()
+            except ImportError:
+                return result
+
+        ext_name = getattr(self, "_prelude_validation_ext_name", "") or ""
+        metadata = self._workflow_metadata if isinstance(self._workflow_metadata, dict) else {}
+
+        for gen in generators or []:
+            for key in ("template_file", "pre_template_file", "post_template_file"):
+                tpl_name = gen.get(key)
+                if not tpl_name:
+                    continue
+                tpl_content = templates.get(tpl_name)
+                if tpl_content is None:
+                    # Templates may be keyed by basename when the analyzer
+                    # stored them without the leading directory prefix.
+                    base = os.path.basename(tpl_name)
+                    for k, v in templates.items():
+                        if os.path.basename(k) == base:
+                            tpl_content = v
+                            break
+                if tpl_content is None:
+                    continue
+
+                sample_code = self._fill_remaining_placeholders(
+                    tpl_content.replace(
+                        "{vol_lookup}",
+                        "inputVolume = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLScalarVolumeNode')",
+                    )
+                )
+
+                try:
+                    assembled = build_assembled_code_for_validation(
+                        ext_name, metadata, gen, sample_code,
+                    )
+                except Exception as exc:
+                    result["valid"] = False
+                    result["failures"].append({
+                        "template": tpl_name,
+                        "error": f"Prelude assembly failed: {exc}",
+                    })
+                    continue
+
+                code_bytes = len(assembled.encode("utf-8"))
+                if code_bytes > result["bytes_max"]:
+                    result["bytes_max"] = code_bytes
+
+                # Revision E: soft size warning for assembled prelude+template.
+                if code_bytes > self._PRELUDE_SIZE_BUDGET_BYTES:
+                    result["warnings"].append({
+                        "template": tpl_name,
+                        "warning": (
+                            f"Assembled prelude+template is {code_bytes}B — exceeds "
+                            f"{self._PRELUDE_SIZE_BUDGET_BYTES // 1024}KB budget. The "
+                            f"generator may be re-emitting constant metadata as source text."
+                        ),
+                    })
+
+                try:
+                    ast.parse(assembled)
+                except SyntaxError as exc:
+                    result["valid"] = False
+                    result["failures"].append({
+                        "template": tpl_name,
+                        "error": f"Assembled prelude+template syntax error: {exc}",
+                    })
+                    continue
+
+                try:
+                    validation = self.code_validator.validate(assembled)
+                except Exception as exc:
+                    result["valid"] = False
+                    result["failures"].append({
+                        "template": tpl_name,
+                        "error": f"CodeValidator raised on assembled code: {exc}",
+                    })
+                    continue
+                if not validation.get("valid", True):
+                    result["valid"] = False
+                    result["failures"].append({
+                        "template": tpl_name,
+                        "error": (
+                            "CodeValidator rejected assembled code: "
+                            f"{validation.get('reason', 'unknown')}"
+                        ),
+                    })
+
+        return result
 
     def _validate_final_state_contract(
         self,

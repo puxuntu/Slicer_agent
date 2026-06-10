@@ -1,5 +1,20 @@
 from .common import *
 
+# CJK fullwidth ASCII range (U+FF01–U+FF5E) → ASCII (U+0021–U+007E)
+_FULLWIDTH_TO_ASCII = str.maketrans(
+    {chr(i): chr(i - 0xFEE0) for i in range(0xFF01, 0xFF5F)}
+)
+
+_GETATTR_LITERAL_RE = _re.compile(
+    r'\bgetattr\s*\(\s*([^,]+?)\s*,\s*([\'"])([A-Za-z_]\w*)\2\s*\)'
+)
+# Matches setattr(obj, 'attr', <simple_value>) where the value has no
+# nested parentheses.  Complex expressions like setattr(o, 'a', f(x))
+# are left for the auto-revise LLM to handle.
+_SETATTR_LITERAL_RE = _re.compile(
+    r'\bsetattr\s*\(\s*([^,]+?)\s*,\s*([\'"])([A-Za-z_]\w*)\2\s*,\s*([^)]+?)\s*\)'
+)
+
 
 class AnalyzerTemplateHelpersMixin:
     @staticmethod
@@ -23,6 +38,32 @@ class AnalyzerTemplateHelpersMixin:
         suffix = f" ({phase})" if phase else ""
         header_text = f"--- {extension_name}: {description}{suffix} ---"
         return self._python_comment_block(header_text)
+
+    @staticmethod
+    def _emit_module_enter_precondition(module_name: str) -> List[str]:
+        """Emit Python lines that ensure the extension's Slicer module is active.
+
+        Why: extension logic methods assume module.enter() has run (parameter
+        node init, observers, UI bindings). The agent runtime imports the
+        Logic class and calls methods directly, bypassing the module widget
+        lifecycle, so enter() never fires. slicer.util.selectModule() triggers
+        the full lifecycle (instantiate widget, call enter()). The guard is
+        idempotent — cheap name check skips the call when already active.
+        """
+        if not module_name:
+            return []
+        return [
+            "# precondition:begin",
+            "# Ensure the extension module is active so module.enter() has run.",
+            "_active_module = slicer.app.moduleManager().activeModule()",
+            f"if _active_module is None or _active_module.name != {module_name!r}:",
+            "    try:",
+            f"        slicer.util.selectModule({module_name!r})",
+            "    except Exception as _module_enter_error:",
+            f"        print(f\"Warning: could not activate module {module_name!r}: {{_module_enter_error}}\")",
+            "# precondition:end",
+            "",
+        ]
 
     @staticmethod
     def _repair_multiline_comment_headers(code: str) -> str:
@@ -337,6 +378,7 @@ class AnalyzerTemplateHelpersMixin:
             lines += [
                 "# Store the placed node on the extension parameter node for later steps",
                 f"from {module_name} import {logic_class_name}",
+                *self._emit_module_enter_precondition(module_name),
                 "try:",
                 f"    logic = _{extension_name.lower()}_logic",
                 "except NameError:",
@@ -438,13 +480,24 @@ class AnalyzerTemplateHelpersMixin:
                `node = resolve_interaction_node(_workflow_runtime_extension, _workflow_runtime_id, "{step.get('step_id', '')}", "{node_class}", _workflow_runtime_repeat_index)`.
                If that returns None, fall back to `slicer.mrmlScene.GetNodeByID({node_var})`.
             3. Validate the user placed enough control points ({min_points} minimum)
-            4. Reuse the existing logic instance `_{extension_name.lower()}_logic` if it exists in `dir()`, otherwise create a new `{logic_class_name}()`
-            5. Set up any required state on the logic instance BEFORE calling the method (e.g., if the method reads `self.inputMarkupNode`, assign the retrieved node to it)
-            6. Call the method `{method_name}()` with correct arguments — pass the markup node if the method expects it
-            7. Exit placement mode: `interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")` then `interactionNode.SwitchToViewTransformMode()`
-            8. Store the logic instance as `_{extension_name.lower()}_logic` for subsequent steps
-            9. Print a completion message with the number of control points
-            10. If a non-empty parameter-node role is listed above, call `logic.getParameterNode().SetNodeReferenceID(role, node.GetID())` before later steps need that node.
+            4. Ensure the extension module is active so module.enter() has run (extension methods may depend on parameter-node init, observers, and UI bindings set up by the widget's enter() method). Emit (include the marker comments exactly):
+               ```
+               # precondition:begin
+               _active_module = slicer.app.moduleManager().activeModule()
+               if _active_module is None or _active_module.name != "{module_name}":
+                   try:
+                       slicer.util.selectModule("{module_name}")
+                   except Exception as _module_enter_error:
+                       print(f"Warning: could not activate module '{module_name}': {{_module_enter_error}}")
+               # precondition:end
+               ```
+            5. Reuse the existing logic instance `_{extension_name.lower()}_logic` if it exists in `dir()`, otherwise create a new `{logic_class_name}()`
+            6. Set up any required state on the logic instance BEFORE calling the method (e.g., if the method reads `self.inputMarkupNode`, assign the retrieved node to it)
+            7. Call the method `{method_name}()` with correct arguments — pass the markup node if the method expects it
+            8. Exit placement mode: `interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")` then `interactionNode.SwitchToViewTransformMode()`
+            9. Store the logic instance as `_{extension_name.lower()}_logic` for subsequent steps
+            10. Print a completion message with the number of control points
+            11. If a non-empty parameter-node role is listed above, call `logic.getParameterNode().SetNodeReferenceID(role, node.GetID())` before later steps need that node.
 
             IMPORTANT restrictions:
             - Do NOT use `dir()`, `eval()`, `exec()`, `globals()`, or `locals()` — these are blocked in the execution sandbox.
@@ -539,6 +592,11 @@ class AnalyzerTemplateHelpersMixin:
             # 1. Strip null bytes
             code = code.replace("\x00", "")
 
+            # 1b. Normalize CJK fullwidth ASCII characters (U+FF01–U+FF5E)
+            # Multilingual LLMs occasionally emit fullwidth variants like
+            # ｜ (U+FF5C) instead of |, （ instead of (, etc.
+            code = code.translate(_FULLWIDTH_TO_ASCII)
+
             # 2. Normalize line endings
             code = code.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -553,6 +611,16 @@ class AnalyzerTemplateHelpersMixin:
             code = _BLOCKED_IMPORT_RE.sub(
                 lambda m: f"{m.group(1)}# [removed blocked import: {m.group(0).strip()}]",
                 code,
+            )
+
+            # 4b. Replace getattr(obj, 'attr') / setattr(obj, 'attr', value)
+            # with obj.attr / obj.attr = value when the attribute is a string
+            # literal containing a valid Python identifier.  The CodeValidator
+            # blocks getattr/setattr entirely; this rewrite is safe only when
+            # the attribute name is a compile-time constant.
+            code = _GETATTR_LITERAL_RE.sub(lambda m: f"{m.group(1).strip()}.{m.group(3)}", code)
+            code = _SETATTR_LITERAL_RE.sub(
+                lambda m: f"{m.group(1).strip()}.{m.group(3)} = {m.group(4).strip()}", code,
             )
 
             # 5. Fix indentation: try ast.parse, on failure try dedent

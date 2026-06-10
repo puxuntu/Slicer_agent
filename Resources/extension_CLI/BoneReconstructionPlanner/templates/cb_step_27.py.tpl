@@ -2,6 +2,14 @@
 import slicer
 from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
 
+# precondition:begin
+# Ensure the extension module is active so module.enter() has run.
+try:
+    slicer.util.selectModule('BoneReconstructionPlanner')
+except Exception:
+    pass
+# precondition:end
+
 try:
     logic = _bonereconstructionplanner_logic
 except NameError:

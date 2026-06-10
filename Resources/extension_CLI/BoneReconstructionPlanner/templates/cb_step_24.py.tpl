@@ -1,14 +1,39 @@
-import logging
+try:
+    from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
+except ImportError:
+    slicer.util.pip_install("BoneReconstructionPlanner")
+    from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
+# precondition:begin
+try:
+    slicer.util.selectModule("BoneReconstructionPlanner")
+except Exception as _module_enter_error:
+    print(f"Warning: could not activate module 'BoneReconstructionPlanner': {_module_enter_error}")
+# precondition:end
+
 try:
     _bonereconstructionplanner_logic
 except NameError:
-    from BoneReconstructionPlanner import BoneReconstructionPlannerLogic
     _bonereconstructionplanner_logic = BoneReconstructionPlannerLogic()
 
-parameterNode = _bonereconstructionplanner_logic.getParameterNode()
+# Get or create the parameter node
+_parameterNode = None
+try:
+    _parameterNode = _bonereconstructionplanner_logic.parameterNode
+except AttributeError:
+    pass
+if _parameterNode is None:
+    _nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLScriptedModuleNode")
+    for i in range(_nodes.GetNumberOfItems()):
+        n = _nodes.GetItemAsObject(i)
+        if "BoneReconstructionPlanner" in n.GetName():
+            _parameterNode = n
+            break
+if _parameterNode is None:
+    _parameterNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScriptedModuleNode", "BoneReconstructionPlannerParameters")
+    _bonereconstructionplanner_logic.parameterNode = _parameterNode
 
-# Set default parameter values without overwriting existing non-empty values
-defaults = {
+# Set default parameters if not already present
+_defaults = {
     "additionalBetweenSpaceOfFibulaPlanes": "1.5",
     "fibulaCentroidX": "0.0",
     "fibulaCentroidY": "0.0",
@@ -27,38 +52,38 @@ defaults = {
     "mandibleSideToRemove": "Removing right side",
     "rightSideLegFibula": "False",
     "useMoreExactVersionOfPositioningAlgorithm": "False",
-    "useNonDecimatedBoneModelsForPreview": "True"
+    "useNonDecimatedBoneModelsForPreview": "True",
 }
-for param, default in defaults.items():
-    if not parameterNode.GetParameter(param):
-        parameterNode.SetParameter(param, default)
+for param, value in _defaults.items():
+    existing = _parameterNode.GetParameter(param)
+    if existing == "" or existing is None:
+        _parameterNode.SetParameter(param, value)
 
-# Ensure expected internal state exists (e.g., observer list)
-if not hasattr(_bonereconstructionplanner_logic, "mandiblePlaneObserversAndNodeIDList"):
-    _bonereconstructionplanner_logic.mandiblePlaneObserversAndNodeIDList = []
-
-# Resolve node references if not already set
-if parameterNode.GetNodeReference("mandiblePlaneOfRotation") is None:
-    planeNodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsPlaneNode")
-    for i in range(planeNodes.GetNumberOfItems()):
-        node = planeNodes.GetItemAsObject(i)
-        if "mandibleplaneofrotation" in node.GetName().lower():
-            parameterNode.SetNodeReferenceID("mandiblePlaneOfRotation", node.GetID())
+# Set up node references (fuzzy matching)
+# Mandible segmentation node
+_mandibleSegmentationNode = _parameterNode.GetNodeReference("mandibleSegmentationNode")
+if _mandibleSegmentationNode is None:
+    _nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
+    for i in range(_nodes.GetNumberOfItems()):
+        n = _nodes.GetItemAsObject(i)
+        if "mandible" in n.GetName().lower():
+            _parameterNode.SetNodeReferenceID("mandibleSegmentationNode", n.GetID())
             break
-    else:
-        logging.warning("mandiblePlaneOfRotation not found in scene")
 
-if parameterNode.GetNodeReference("fibulaLine") is None:
-    lineNodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsLineNode")
-    for i in range(lineNodes.GetNumberOfItems()):
-        node = lineNodes.GetItemAsObject(i)
-        if "fibulaline" in node.GetName().lower():
-            parameterNode.SetNodeReferenceID("fibulaLine", node.GetID())
-            break
-    else:
-        logging.warning("fibulaLine not found in scene")
+# Fibula segmentation nodes (may be multiple)
+_fibulaSegmentationNodes = []
+_nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLSegmentationNode")
+for i in range(_nodes.GetNumberOfItems()):
+    n = _nodes.GetItemAsObject(i)
+    if "fibula" in n.GetName().lower():
+        _fibulaSegmentationNodes.append(n)
+if _fibulaSegmentationNodes:
+    _parameterNode.SetNodeReferenceID("fibulaSegmentationNode", _fibulaSegmentationNodes[0].GetID())
+
+# Attach parameter node to logic if not already
+if not hasattr(_bonereconstructionplanner_logic, "parameterNode") or _bonereconstructionplanner_logic.parameterNode != _parameterNode:
+    _bonereconstructionplanner_logic.parameterNode = _parameterNode
 
 # Call the method
-_bonereconstructionplanner_logic.onGenerateFibulaPlanesTimerTimeout()
-
-print("[BoneReconstructionPlanner] Step cb_step_24 completed.")
+_bonereconstructionplanner_logic.hardVSPUpdate()
+print("[BoneReconstructionPlanner] hardVSPUpdate completed successfully.")

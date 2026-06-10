@@ -398,6 +398,9 @@ class AnalyzerCookbookMappingMixin:
                         "interaction_type": _derive_interaction_type(node_cls),
                         "interaction_kind": so.get("interaction_kind") or "none",
                         "node_class": node_cls or "",
+                        "creates_node": bool(so.get("creates_node", False)),
+                        "requires_place_mode": bool(so.get("requires_place_mode", False)),
+                        "setup_dependencies": list(so.get("setup_dependencies") or []),
                         "placement_instructions": so.get("placement_instructions", ""),
                         "min_control_points": so.get("min_control_points", 0),
                     }

@@ -19,5 +19,5 @@ if displayNode is not None:
 _bonereconstructionplanner_cb_step_20_id = node.GetID()
 remember_interaction_node(_workflow_runtime_extension, _workflow_runtime_id, "cb_step_20", _bonereconstructionplanner_cb_step_20_id, _workflow_runtime_repeat_index)
 
-print("[BoneReconstructionPlanner] Please Draw a line over the fibula in 3D View 2, first point distally, last proximally")
+print("[BoneReconstructionPlanner] Please Place first point distally, last point proximally on the fibula in 3D View 2")
 print("When finished, press the 'Done' button in the workflow panel.")

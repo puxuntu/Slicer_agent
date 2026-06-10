@@ -7,6 +7,26 @@ class WidgetCorrectionMixin:
         if not self.currentCode:
             return
 
+        # Revision D (belt-and-suspenders): the caller in widget_execution_flow
+        # is supposed to triage generated-template syntax errors before getting
+        # here. As a defensive check, refuse to enter the LLM repair loop if
+        # the current step is a generated template whose error classifies as
+        # syntax/name-level — those indicate a generator bug the LLM can't fix.
+        try:
+            step_info = getattr(self, '_currentWorkflowStepInfo', None) or {}
+            if (
+                isinstance(step_info, dict)
+                and step_info.get("origin") == "generated_template"
+                and hasattr(self, "_classifyExecutionError")
+                and self._classifyExecutionError(error_msg or "", self.currentCode or "")
+                == "syntax_or_name"
+            ):
+                if hasattr(self, "_handleGeneratedTemplateGeneratorBug"):
+                    self._handleGeneratedTemplateGeneratorBug(step_info, error_msg)
+                    return
+        except Exception:
+            pass
+
         import time
         if self._timing:
             corrections = self._timing.setdefault('corrections', [])

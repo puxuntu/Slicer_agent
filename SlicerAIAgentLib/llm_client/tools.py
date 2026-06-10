@@ -190,16 +190,27 @@ class LLMClientToolsMixin:
                         tool_args = {}
                     try:
                         result = tool_executor(tool_name, tool_args)
+                        # Strip the _prelude_globals side channel before LLM
+                        # serialization. The widget-side executor consumes it
+                        # via _lastWorkflowStep (see _executeTool in logic_core);
+                        # the LLM only needs the small ``code`` string, not the
+                        # multi-KB metadata dicts the prelude references.
+                        llm_result = result
+                        if isinstance(result, dict) and "_prelude_globals" in result:
+                            llm_result = {
+                                k: v for k, v in result.items()
+                                if k != "_prelude_globals"
+                            }
                         return {
                             "tool_result": {
                                 "role": "tool",
                                 "tool_call_id": tool_id,
-                                "content": json.dumps(result, ensure_ascii=False, default=str),
+                                "content": json.dumps(llm_result, ensure_ascii=False, default=str),
                             },
                             "history_entry": {
                                 "tool": tool_name,
                                 "args": tool_args,
-                                "result": result,
+                                "result": llm_result,
                             },
                             "name": tool_name,
                         }
