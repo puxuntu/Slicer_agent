@@ -120,6 +120,53 @@ class AnalyzerContractsMixin:
         self.assertFalse(any("target_value_mode" in e for e in errors), errors)
         self.delayDisplay("Invalid target_value_mode coerced, not rejected")
 
+    def test_Stage4NodePickChoicesCleared(self):
+        """A value_kind==node user_choice has its literal choices stripped.
+
+        Regression for PelvicFracturePlanning cb_step_1: the LLM emitted a node
+        pick (value_kind=node) but ALSO a literal choices=[{"label":"Pelvic
+        Volume"}] echoed from the cookbook text. Those labels shadow the scene
+        node tree at runtime, so normalization now clears them for node picks
+        while genuine boolean choices are preserved (matching the bound BRP
+        node-selection shape: empty choices).
+        """
+        from SlicerAIAgentLib.ExtensionCLIAnalyzer import ExtensionCLIAnalyzer
+        from SlicerAIAgentLib.CodeValidator import CodeValidator
+
+        analyzer = ExtensionCLIAnalyzer(llm_client=None, code_validator=CodeValidator())
+        context = {
+            "steps": [
+                {"step_number": 1, "operation_type": "user_choice", "description": "Choose the input volume"},
+                {"step_number": 2, "operation_type": "user_choice", "description": "Manually adjust a fragment?"},
+            ],
+            "logic_methods": [], "extension_functions": [],
+            "widgets": [], "ui_parameter_bindings": [], "parameter_roles": [],
+            "allowed_slicer_op_categories": [], "allowed_interaction_kinds": ["none"],
+            "allowed_node_classes": ["vtkMRMLScalarVolumeNode"], "allowed_operation_intents": [],
+            "allowed_node_role_kinds": ["choice_input"],
+        }
+        base = {"confidence": "high", "interaction_kind": "none", "node_roles": []}
+        result = {"steps": [
+            {**base, "step_number": 1, "operation_type": "user_choice",
+             "choice": {"question": "Choose the input volume", "parameter_name": "inputVolume",
+                        "value_kind": "node",
+                        "choices": [{"label": "Pelvic Volume", "value": "inputVolume"}]}},
+            {**base, "step_number": 2, "operation_type": "user_choice",
+             "choice": {"question": "Manually adjust a fragment?", "parameter_name": "manualAdjust",
+                        "value_kind": "bool",
+                        "choices": [{"label": "Yes", "value": True}, {"label": "No", "value": False}]}},
+        ], "repeat_blocks": []}
+
+        normalized, _notes = analyzer._normalize_stage4_semantic_result(result, context)
+        by_num = {s["step_number"]: s for s in normalized["steps"]}
+        # Node pick: literal choices stripped, value_kind retained.
+        self.assertEqual(by_num[1]["choice"]["choices"], [])
+        self.assertEqual(by_num[1]["choice"]["value_kind"], "node")
+        # Boolean choice: choices preserved.
+        self.assertEqual(len(by_num[2]["choice"]["choices"]), 2)
+
+        self.delayDisplay("Stage 4 node-pick choices cleared, boolean preserved")
+
     def test_ModuleLevelSelfRejected(self):
         """Generated templates run at module level — a module-level `self` is a bug.
 

@@ -1002,6 +1002,126 @@ class WorkflowTestsMixin:
 
         self.delayDisplay("Node-selection fallback node class resolves correctly")
 
+    def test_IsNodeSelectionStep(self):
+        """_is_node_selection_step flags node picks, excludes bool/enum/segments."""
+        from SlicerAIAgentLib.WorkflowRuntime import WorkflowRuntime
+
+        fn = WorkflowRuntime._is_node_selection_step
+
+        # Node pick via the sub-op value_kind.
+        self.assertTrue(fn({"sub_operations": [
+            {"value_kind": "node", "node_class": "vtkMRMLScalarVolumeNode"}]}))
+        # Node pick via a choice_input node-role alone (older artifacts).
+        self.assertTrue(fn({"node_roles": [
+            {"role_kind": "choice_input", "node_class": "vtkMRMLModelNode"}]}))
+        # Boolean checkbox: no node class -> keeps its buttons, not a node pick.
+        self.assertFalse(fn({
+            "sub_operations": [{"value_kind": "bool", "node_class": None}],
+            "node_roles": [{"role_kind": "choice_input", "node_class": ""}]}))
+        # Segment-visibility selection is routed separately -> excluded even when
+        # a choice_input node-role carries a segmentation class.
+        self.assertFalse(fn({
+            "sub_operations": [{"value_kind": "segment_visibility_selection",
+                                "node_class": "vtkMRMLSegmentationNode"}],
+            "node_roles": [{"role_kind": "choice_input",
+                            "node_class": "vtkMRMLSegmentationNode"}]}))
+        # Defensive: malformed input never raises.
+        self.assertFalse(fn(None))
+        self.assertFalse(fn({}))
+
+        self.delayDisplay("_is_node_selection_step classifies node picks correctly")
+
+    def test_NodePickDropsLiteralChoices(self):
+        """A node-pick user_choice drops literal cookbook labels -> node tree.
+
+        Regression for PelvicFracturePlanning cb_step_1 ("choose the Pelvic
+        Volume"): the LLM tagged the step value_kind=node + node_class but ALSO
+        emitted a literal choices=[{"label":"Pelvic Volume"}]. A non-empty
+        choices array short-circuited needs_choice_input, so the panel rendered
+        one button instead of the scene node tree. Node picks now drop the
+        literal choices in both the live and replay paths; genuine boolean/loop
+        decisions keep their buttons.
+        """
+        import importlib
+        wf_mod = importlib.import_module("SlicerAIAgentLib.WorkflowRuntime")
+        WorkflowRuntime = wf_mod.WorkflowRuntime
+        WorkflowSession = wf_mod.WorkflowSession
+        WorkflowCheckpoint = wf_mod.WorkflowCheckpoint
+        from SlicerAIAgentLib.ExtensionCLILoader import reset_workflow_session
+
+        node_choices = [{"label": "Pelvic Volume", "value": "inputVolume"}]
+        graph = {"step_count": 2, "steps": [
+            {"step_id": "cb_step_1", "operation_type": "user_choice", "step_type": "user_choice",
+             "description": "In the \"Input CT Volume\" option, choose the Pelvic Volume.",
+             "choice_info": {"parameter_name": "inputVolume", "choices": node_choices},
+             "node_roles": [{"role_kind": "choice_input", "node_class": "vtkMRMLScalarVolumeNode",
+                             "parameter_name": "inputVolume"}],
+             "sub_operations": [{"value_kind": "node", "node_class": "vtkMRMLScalarVolumeNode"}]},
+            {"step_id": "cb_step_8", "operation_type": "user_choice", "step_type": "user_choice",
+             "description": "Manually adjust a fragment?",
+             "choice_info": {"parameter_name": "manualAdjust",
+                             "choices": [{"label": "Yes", "value": True}, {"label": "No", "value": False}]},
+             "node_roles": [{"role_kind": "choice_input", "node_class": "", "parameter_name": "manualAdjust"}],
+             "sub_operations": [{"value_kind": "bool", "node_class": None}]}]}
+        # Empty parameter_bindings mirrors Pelvic (binding inference found nothing).
+        meta = {"PelvicFracturePlanning": {"workflow_metadata": {"parameter_bindings": {}}}}
+        orig_graph = wf_mod.get_workflow_graph
+        orig_ext = wf_mod.get_validated_extensions
+        wf_mod.get_workflow_graph = lambda extension_name: graph
+        wf_mod.get_validated_extensions = lambda: meta
+        try:
+            reset_workflow_session("PelvicFracturePlanning")
+            runtime = WorkflowRuntime()
+            runtime.session = WorkflowSession(
+                extension_name="PelvicFracturePlanning", tool_name="PelvicFracturePlanning",
+                workflow_id="pelvic_1", current_step="cb_step_1")
+
+            # Live path: node-pick step drops the literal choice -> node tree.
+            st = runtime.state_for_ui({"type": "user_choice", "step_id": "cb_step_1",
+                                       "parameter_name": "inputVolume", "choices": list(node_choices)})
+            self.assertEqual(st["choices"], [])
+            self.assertTrue(st["needs_choice_input"])
+            self.assertEqual(st["node_class"], "vtkMRMLScalarVolumeNode")
+
+            # Live path control: a boolean step keeps its Yes/No buttons.
+            st_bool = runtime.state_for_ui({"type": "user_choice", "step_id": "cb_step_8",
+                                            "parameter_name": "manualAdjust",
+                                            "choices": [{"label": "Yes", "value": True},
+                                                        {"label": "No", "value": False}]})
+            self.assertEqual(len(st_bool["choices"]), 2)
+            self.assertFalse(st_bool["needs_choice_input"])
+            self.assertEqual(st_bool["node_class"], "")
+
+            # Replay path: a recorded node-pick checkpoint also drops the literal
+            # choice and recovers the node class from the step graph.
+            cp = WorkflowCheckpoint(index=0, step_id="cb_step_1", kind="choice",
+                                    action="choice_made", args={"choice_value": "PelvicCT"},
+                                    recorded_value="PelvicCT", parameter_name="inputVolume",
+                                    editable=True, choices=list(node_choices))
+            runtime.session.checkpoints = [cp]
+            runtime.session.preview_index = 0
+            pv = runtime._preview_ui_state()
+            self.assertEqual(pv["choices"], [])
+            self.assertTrue(pv["needs_choice_input"])
+            self.assertEqual(pv["node_class"], "vtkMRMLScalarVolumeNode")
+
+            # Replay control: a loop decision on the same step keeps its Yes/No.
+            cp_loop = WorkflowCheckpoint(index=0, step_id="cb_step_1", kind="loop_decision",
+                                         action="repeat_decision", args={}, recorded_value="Yes",
+                                         parameter_name="inputVolume", editable=True,
+                                         choices=[{"label": "Yes", "value": "yes"},
+                                                  {"label": "No", "value": "no"}])
+            runtime.session.checkpoints = [cp_loop]
+            runtime.session.preview_index = 0
+            pv_loop = runtime._preview_ui_state()
+            self.assertEqual(len(pv_loop["choices"]), 2)
+        finally:
+            wf_mod.get_workflow_graph = orig_graph
+            wf_mod.get_validated_extensions = orig_ext
+            reset_workflow_session("PelvicFracturePlanning")
+
+        self.delayDisplay("Node-pick steps drop literal choices in live + replay")
+
     def test_UnboundNodeChoiceMaterialization(self):
         """Unbound node choices are materialized into the globals templates read.
 

@@ -198,6 +198,15 @@ class WorkflowRuntime:
             )
             instructions = guidance_instruction or self._instructions_from_result(source)
         choices = self._choices_from_result(source, current_meta)
+        # A node-pick user_choice must drive the scene node tree, not literal
+        # cookbook-label buttons. Dropping stray literal choices flips
+        # needs_choice_input True (below) so the panel reaches
+        # _renderWorkflowNodeTree. Loop (repeat) decisions keep their synthetic
+        # Yes/No buttons.
+        if (result_type == "user_choice"
+                and not is_repeat_decision
+                and self._is_node_selection_step(current_meta)):
+            choices = []
         is_optional = bool(source.get("is_optional") or current_meta.get("is_optional"))
         choice_info = current_meta.get("choice_info", {}) if isinstance(current_meta, dict) else {}
         default_value = source.get("default_value")
@@ -1347,6 +1356,11 @@ class WorkflowRuntime:
         meta = self._step_meta(cp.step_id)
         guidance = (meta.get("ui_guidance") or {}) if isinstance(meta, dict) else {}
         choices = list(cp.choices or [])
+        # Mirror the live path: a node-pick step drives the scene node tree,
+        # never the recorded literal buttons. Loop decisions (Yes/No) are left
+        # untouched.
+        if cp.kind != "loop_decision" and self._is_node_selection_step(meta):
+            choices = []
         needs_input = bool(cp.editable) and not choices
         binding = self._node_binding_for_param(cp.parameter_name)
         node_class = binding.get("node_class", "")
@@ -1523,6 +1537,33 @@ class WorkflowRuntime:
                 if nc:
                     return nc
         return ""
+
+    @staticmethod
+    def _is_node_selection_step(meta: Dict[str, Any]) -> bool:
+        """True when a user_choice step's selection is an MRML node pick.
+
+        A node pick must drive the scene node tree, never literal cookbook-label
+        buttons. The authoritative signal is a user_choice sub-op with
+        ``value_kind == "node"``; a ``choice_input`` node-role carrying a
+        ``node_class`` is accepted as a fallback for older artifacts. Segment-
+        visibility steps (``value_kind == "segment_visibility_selection"``) are
+        routed separately and excluded. Returns False for boolean / enum /
+        numeric choices (no node_class) so those keep their buttons.
+        """
+        if not isinstance(meta, dict):
+            return False
+        sub_ops = [s for s in (meta.get("sub_operations") or []) if isinstance(s, dict)]
+        kinds = {str(s.get("value_kind") or "").strip() for s in sub_ops}
+        if "segment_visibility_selection" in kinds:
+            return False
+        if "node" in kinds:
+            return True
+        for role in meta.get("node_roles") or []:
+            if (isinstance(role, dict)
+                    and role.get("role_kind") == "choice_input"
+                    and str(role.get("node_class") or "").strip()):
+                return True
+        return False
 
     def _node_binding_for_param(self, parameter_name: str) -> Dict[str, Any]:
         """Return the parameter binding ({node_class, keywords, ...}) from metadata.

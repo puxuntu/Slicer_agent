@@ -806,6 +806,14 @@ class AnalyzerStage4DecompositionMixin:
                 if not isinstance(choice.get("choices"), list):
                     choice["choices"] = []
                     notes.append(f"step {number} restored choice choices list")
+                elif choice.get("value_kind") == "node" and choice.get("choices"):
+                    # Node picks resolve from the live scene (node tree), so any
+                    # literal cookbook-label choices are spurious; clear them so
+                    # the persisted artifact matches the bound node-selection shape.
+                    choice["choices"] = []
+                    notes.append(
+                        f"step {number} cleared literal choices for node-pick value_kind"
+                    )
 
             roles = item.get("node_roles")
             if not isinstance(roles, list):
@@ -1097,6 +1105,12 @@ class AnalyzerStage4DecompositionMixin:
                     "default_value": choice.get("default_value"),
                     "value_kind": choice.get("value_kind", ""),
                 })
+                # A node-pick choice is resolved from the live scene via the
+                # node tree, not from literal cookbook labels; clear any choices
+                # the LLM emitted alongside value_kind == "node" so the artifact
+                # matches the bound (BRP) node-selection shape.
+                if sub_op.get("value_kind") == "node":
+                    sub_op["choices"] = []
             method_name = semantic.get("extension_method_hint")
             method_details = [all_methods[method_name]] if method_name else []
             stages.append({
