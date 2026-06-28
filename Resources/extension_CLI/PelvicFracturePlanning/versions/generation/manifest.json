@@ -5,7 +5,7 @@
   "extension_module_name": "PelvicFracturePlanning",
   "logic_class_name": "PelvicFracturePlanningLogic",
   "version": "1.0.0",
-  "status": "validation_failed",
+  "status": "validated_with_warnings",
   "workflow_type": "interactive",
   "workflow_graph_file": "workflow.json",
   "workflow_metadata_file": "workflow_metadata.json",
@@ -68,11 +68,8 @@
       "issues": []
     },
     "cb_step_12": {
-      "valid": false,
-      "issues": [
-        "templates/cb_step_12.py.tpl: logic.plan_screws() called with 0 args, expected 2",
-        "validation_failure"
-      ]
+      "valid": true,
+      "issues": []
     },
     "cb_step_14": {
       "valid": true,
@@ -87,16 +84,16 @@
       "issues": []
     }
   },
-  "partial_valid_step_count": 11,
+  "partial_valid_step_count": 12,
   "validation_state": {
-    "static_valid": false,
+    "static_valid": true,
     "api_probe_valid": true,
     "contract_valid": true,
     "prelude_valid": true,
     "contract_audit_valid": true,
     "workflow_state_valid": true,
     "prelude_bytes_max": 7419,
-    "overall_valid": false,
+    "overall_valid": true,
     "api_proof_valid": true,
     "api_inventory_complete": true,
     "generate_syntax_valid_at_generate": true,
@@ -105,9 +102,9 @@
     "generator_template_sync_valid": true
   },
   "api_proof_coverage": {
-    "total_calls": 120,
-    "state_changing_calls": 34,
-    "proven_calls": 118,
+    "total_calls": 117,
+    "state_changing_calls": 33,
+    "proven_calls": 115,
     "invalid_calls": 0,
     "blocking_unproven_calls": 0,
     "warning_unproven_reads": 2,

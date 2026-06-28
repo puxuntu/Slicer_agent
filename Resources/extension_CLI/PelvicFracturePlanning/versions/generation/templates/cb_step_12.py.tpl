@@ -11,7 +11,6 @@ if _active_module_name != 'PelvicFracturePlanning':
         print(f"Warning: could not activate module 'PelvicFracturePlanning': {_module_enter_error}")
 # precondition:end
 
-# Retrieve logic instance
 try:
     logic = _pelvicfractureplanning_logic
 except NameError:
@@ -19,10 +18,10 @@ except NameError:
     logic = PelvicFracturePlanningLogic()
     _pelvicfractureplanning_logic = logic
 
-# Create output screw model node
-_screwNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLModelNode')
-_screwNode.SetName('PelvicScrews')
+# Create a new model node for the screw plan output (parent folder for individual screws)
+_outputScrew = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLModelNode', 'ScrewPlan')
+_screw_id = _outputScrew.GetID()
 
-# Call the proven method logic.plan_screws
-logic.plan_screws(OutputScrew=_screwNode, progressDiag=None)
-print("[PelvicFracturePlanning] Step 'cb_step_12': planned screw trajectories.")
+logic.plan_screws(_outputScrew, None)
+
+print("[PelvicFracturePlanning] Step 'cb_step_12' completed.")

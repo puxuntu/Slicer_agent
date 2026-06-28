@@ -12,7 +12,6 @@ if _active_module_name != 'PelvicFracturePlanning':
         print(f"Warning: could not activate module 'PelvicFracturePlanning': {_module_enter_error}")
 # precondition:end
 
-# Retrieve logic instance
 try:
     logic = _pelvicfractureplanning_logic
 except NameError:
@@ -20,37 +19,13 @@ except NameError:
     logic = PelvicFracturePlanningLogic()
     _pelvicfractureplanning_logic = logic
 
-# Retrieve cross-step cached node IDs (set by previous steps)
-_fragmentModelId = None
-try:
-    _fragmentModelId = _pelvicfractureplanning_fragmentModelId
-except NameError:
-    pass
-_adjustTransformId = None
-try:
-    _adjustTransformId = _pelvicfractureplanning_adjustTransformId
-except NameError:
-    pass
-_adjustedModelId = None
-try:
-    _adjustedModelId = _pelvicfractureplanning_adjustedModelId
-except NameError:
-    pass
-
-# Resolve nodes from IDs or fallback to name search
-_fragmentModelNode = slicer.mrmlScene.GetNodeByID(_fragmentModelId) if _fragmentModelId else None
-_adjustTransformNode = slicer.mrmlScene.GetNodeByID(_adjustTransformId) if _adjustTransformId else None
-_adjustedModelNode = slicer.mrmlScene.GetNodeByID(_adjustedModelId) if _adjustedModelId else None
-
-if _fragmentModelNode is None:
-    _fragmentModelNode = slicer.mrmlScene.GetFirstNodeByName('FragmentModel')
-if _adjustTransformNode is None:
-    _adjustTransformNode = slicer.mrmlScene.GetFirstNodeByName('AdjustTransform')
-if _adjustedModelNode is None:
-    _adjustedModelNode = slicer.mrmlScene.GetFirstNodeByName('AdjustedModel')
-
+# Retrieve required nodes from the scene by known names
+_fragmentModelNode = slicer.util.getFirstNodeByName('FragmentModel')
+_adjustTransformNode = slicer.util.getFirstNodeByName('AdjustTransform')
+_adjustedModelNode = slicer.util.getFirstNodeByName('AdjustedModel')
 if _fragmentModelNode is None or _adjustTransformNode is None or _adjustedModelNode is None:
-    raise RuntimeError("Required nodes (FragmentModel, AdjustTransform, AdjustedModel) not found. Ensure previous steps have cached their IDs.")
+    raise RuntimeError("Could not find required nodes (FragmentModel, AdjustTransform, AdjustedModel) in the scene. Ensure previous steps are completed.")
 
 Apply_transform_to_polydata(_fragmentModelNode, _adjustTransformNode, _adjustedModelNode)
+
 print("[PelvicFracturePlanning] Step 'cb_step_11' completed.")

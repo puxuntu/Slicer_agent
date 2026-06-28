@@ -12,7 +12,6 @@ if _active_module_name != 'PelvicFracturePlanning':
         print(f"Warning: could not activate module 'PelvicFracturePlanning': {_module_enter_error}")
 # precondition:end
 
-# Retrieve logic instance
 try:
     logic = _pelvicfractureplanning_logic
 except NameError:
@@ -20,18 +19,11 @@ except NameError:
     logic = PelvicFracturePlanningLogic()
     _pelvicfractureplanning_logic = logic
 
-# Retrieve fragment segmentation node from cross-step cache or scene search
-_fragmentNode = None
-try:
-    _fragmentNodeId = _pelvicfractureplanning_fragmentSegmentationId
-    _fragmentNode = slicer.mrmlScene.GetNodeByID(_fragmentNodeId)
-except NameError:
-    pass
-if _fragmentNode is None:
-    # Fallback: search for a segmentation node with expected name
-    _fragmentNode = slicer.mrmlScene.GetFirstNodeByName('FragmentSegmentation')
-if _fragmentNode is None:
-    raise RuntimeError("FragmentSegmentation node not found. Ensure previous steps have defined it and cached its ID as _pelvicfractureplanning_fragmentSegmentationId")
+# Use the reduction segmentation node produced by previous reduction step
+_fragmentSegNode = logic._reductionNode if hasattr(logic, '_reductionNode') else None
+if _fragmentSegNode is None:
+    raise RuntimeError("No reduction segmentation node found. Ensure reduction step (cb_step_8) has been completed.")
 
-cal_BBox(_fragmentNode)
+cal_BBox(_fragmentSegNode)
+
 print("[PelvicFracturePlanning] Step 'cb_step_9' completed.")
