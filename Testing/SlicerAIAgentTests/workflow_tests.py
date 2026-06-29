@@ -392,6 +392,64 @@ class WorkflowTestsMixin:
 
         self.delayDisplay("branch_op routes through the pre-guard like user_choice")
 
+    def test_BranchOpBodyRunsOnceNoLoopAgain(self):
+        """A branch_op conditional is single-pass: after the body's terminal step
+        the workflow continues at the natural next step -- NO loop-again "repeat?"
+        decision. A user_choice-sourced block still loops (do-while)."""
+        import importlib
+        wf_mod = importlib.import_module("SlicerAIAgentLib.WorkflowRuntime")
+        WorkflowRuntime = wf_mod.WorkflowRuntime
+        WorkflowSession = wf_mod.WorkflowSession
+
+        ci = {"choices": [{"label": "Yes", "value": True}, {"label": "No", "value": False}],
+              "default_value": False}
+
+        def make_graph(source_op):
+            return {"steps": [
+                {"step_id": "cb_step_1", "operation_type": source_op,
+                 "choice_info": dict(ci), "depends_on": []},
+                {"step_id": "cb_step_2", "step_type": "extension_op", "depends_on": ["cb_step_1"]},
+                {"step_id": "cb_step_3", "step_type": "extension_op", "depends_on": ["cb_step_2"]},
+                {"step_id": "cb_step_4", "step_type": "extension_op", "depends_on": ["cb_step_3"]},
+            ], "repeat_blocks": [
+                {"repeat_id": "b", "body_steps": ["cb_step_2", "cb_step_3"],
+                 "entry_step": "cb_step_2", "terminal_step": "cb_step_3", "exit_step": "cb_step_4",
+                 "controller": {"kind": "until_choice", "source_step": "cb_step_1",
+                                "prompt": "Edit?", "exit_value": False}, "max_iterations": 20}]}
+
+        orig_graph = wf_mod.get_workflow_graph
+        orig_next = wf_mod.find_next_workflow_step
+        try:
+            # branch_op source -> single pass: continue at the natural next step,
+            # no loop-again decision.
+            graph = make_graph("branch_op")
+            wf_mod.get_workflow_graph = lambda e: graph
+            wf_mod.find_next_workflow_step = lambda e, completed: {"step_id": "cb_step_4"}
+            r = WorkflowRuntime()
+            r.session = WorkflowSession(extension_name="FB", tool_name="FB",
+                                        workflow_id="b", current_step="cb_step_3")
+            t = r._repeat_transition_after_completion(
+                "cb_step_3", {"type": "automated", "step_id": "cb_step_3"})
+            self.assertNotIn("repeat_decision", t)
+            self.assertNotEqual(t.get("type"), "user_choice")
+            self.assertEqual((t.get("next_step") or {}).get("step_id"), "cb_step_4")
+
+            # user_choice source -> still a do-while: loop-again decision raised.
+            graph2 = make_graph("user_choice")
+            wf_mod.get_workflow_graph = lambda e: graph2
+            r2 = WorkflowRuntime()
+            r2.session = WorkflowSession(extension_name="FB", tool_name="FB",
+                                         workflow_id="b2", current_step="cb_step_3")
+            t2 = r2._repeat_transition_after_completion(
+                "cb_step_3", {"type": "automated", "step_id": "cb_step_3"})
+            self.assertEqual(t2.get("repeat_decision"), "b")
+            self.assertEqual(t2.get("type"), "user_choice")
+        finally:
+            wf_mod.get_workflow_graph = orig_graph
+            wf_mod.find_next_workflow_step = orig_next
+
+        self.delayDisplay("branch_op body runs once (no loop-again); user_choice still loops")
+
     def test_VolLookupPlaceholderFills(self):
         """A generated template's {vol_lookup} structural placeholder fills at
         runtime with CodeValidator-safe code (no blocked globals())."""

@@ -766,7 +766,9 @@ class WorkflowRuntime:
                 # Pre-guard: the optional body is gated by the guard step's own
                 # choice, evaluated BEFORE the body. Decline -> skip the body and
                 # jump to the exit target (or stop when empty); accept -> enter the
-                # body (the terminal step then offers the loop-again decision).
+                # body. A branch_op guard is a ONE-TIME conditional (body runs
+                # once, then continues at the natural next step -- see the terminal
+                # branch); a user_choice guard offers a loop-again decision there.
                 if self._loop_should_exit(controller, result.get("choice_value")):
                     self._mark_skip_range(
                         controller.get("source_step"), block.get("exit_step"), block
@@ -822,6 +824,31 @@ class WorkflowRuntime:
                 }
 
             if kind in {"until_choice", "while_choice"}:
+                # One-time conditional: a branch_op guard already decided (at the
+                # source step) whether to run this body, and the body's own action
+                # (e.g. unticking the checkbox) ends the section -- so it runs ONCE.
+                # Do NOT re-ask a loop-again decision at the terminal; continue at
+                # the natural next step. A user_choice-sourced or source-less
+                # do-while block still loops (below).
+                _src = controller.get("source_step")
+                _src_meta = self._step_meta(_src) if _src else {}
+                _src_op = (
+                    (_src_meta or {}).get("operation_type")
+                    or (_src_meta or {}).get("op_type")
+                    or ""
+                )
+                if _src_op == "branch_op":
+                    state.update({"iteration": 0, "waiting_for_decision": False})
+                    self._sync_repeat_state(repeat_id)
+                    return {
+                        "next_step": self._next_step(),
+                        "repeat_progress": {
+                            "repeat_id": repeat_id,
+                            "current": iteration,
+                            "completed": iteration,
+                            "total": 0,
+                        },
+                    }
                 state["waiting_for_decision"] = True
                 self._sync_repeat_state(repeat_id)
                 prompt = controller.get("prompt") or "Continue the repeated workflow?"
