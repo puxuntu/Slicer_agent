@@ -1893,6 +1893,19 @@ class WorkflowRuntime:
                     and role.get("role_kind") == "choice_input"
                     and str(role.get("node_class") or "").strip() == "vtkMRMLSegmentationNode"):
                 return True
+        # Deterministic fallback (the LLM's segmentation role is non-deterministic
+        # across regens): a NAMED content combobox -- a plain combobox with no
+        # static/literal choices whose name yields a distinctive token -- is
+        # populated dynamically at runtime (e.g. a "Fragment" selector), unlike a
+        # static enum combobox (which carries its items as choices). Surface it so
+        # the renderer can resolve the segmentation by those name keywords; it falls
+        # back to free-text when none matches, so a non-segment content combobox
+        # degrades safely rather than guessing.
+        for so in sub_ops:
+            if (str(so.get("widget_class") or "").strip() in ("QComboBox", "ctkComboBox")
+                    and not (so.get("choices") or [])
+                    and WorkflowRuntime._keywords_from_widget_name(so.get("widget_name") or "")):
+                return True
         return False
 
     @staticmethod

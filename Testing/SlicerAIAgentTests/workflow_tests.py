@@ -466,7 +466,12 @@ class WorkflowTestsMixin:
         meta_vk = {"sub_operations": [
             {"widget_class": "QComboBox", "value_kind": "segment_name_selection",
              "widget_name": "fragmentSelector"}]}
-        for meta in (meta_dual, meta_vk):
+        # Role-LESS named content combobox (the LLM may drop the segmentation role):
+        # the deterministic widget-name signal still routes it to the picker.
+        meta_content = {"sub_operations": [
+            {"widget_class": "QComboBox", "value_kind": "", "widget_name": "fragmentSelector",
+             "choices": [], "node_roles": []}]}
+        for meta in (meta_dual, meta_vk, meta_content):
             self.assertTrue(WorkflowRuntime._is_segment_name_selection(meta))
             self.assertEqual(WorkflowRuntime._node_class_from_step_meta(meta), "")
             self.assertFalse(WorkflowRuntime._is_node_selection_step(meta))
@@ -481,6 +486,12 @@ class WorkflowTestsMixin:
         self.assertFalse(WorkflowRuntime._is_segment_name_selection(node_meta))
         self.assertTrue(WorkflowRuntime._is_node_selection_step(node_meta))
         self.assertEqual(WorkflowRuntime._node_class_from_step_meta(node_meta), "vtkMRMLScalarVolumeNode")
+        # Regression: a STATIC enum combobox (items carried as choices) is not a
+        # content picker -- it keeps its literal-choice buttons.
+        enum_meta = {"sub_operations": [
+            {"widget_class": "QComboBox", "value_kind": "", "widget_name": "unitsCombo",
+             "choices": ["mm", "cm"]}]}
+        self.assertFalse(WorkflowRuntime._is_segment_name_selection(enum_meta))
 
         self.delayDisplay("Segment-name selection routes to its picker; node pick unaffected")
 

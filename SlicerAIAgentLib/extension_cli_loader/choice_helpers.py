@@ -394,6 +394,23 @@ def _choice_selector_widget(ctx: _WorkflowContext, param_name: str) -> str:
     return ""
 
 
+def _content_combo_has_keyword(widget_name: str) -> bool:
+    """Whether a widget name yields a distinctive token (mirrors the stop set in
+    WorkflowRuntime._keywords_from_widget_name) -- gates the content-combobox
+    segment-name fallback so generically-named combos don't trip it."""
+    stop = {
+        "segments", "segment", "seg", "table", "view", "selector", "widget",
+        "combo", "combobox", "node", "nodes", "mrml", "qmrml", "list", "tree",
+        "box", "panel", "frame", "output", "input", "the", "for",
+    }
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", str(widget_name or ""))
+    for tok in re.split(r"[^A-Za-z0-9]+", spaced):
+        t = tok.strip().lower()
+        if len(t) >= 3 and t not in stop:
+            return True
+    return False
+
+
 def _is_segment_name_choice(ctx: _WorkflowContext, param_name: str) -> bool:
     """True when this choice reproduces a content combobox of a segmentation's
     segment NAMES (e.g. the 'Fragment' box), mirroring
@@ -421,6 +438,16 @@ def _is_segment_name_choice(ctx: _WorkflowContext, param_name: str) -> bool:
             if (isinstance(role, dict)
                     and role.get("role_kind") == "choice_input"
                     and str(role.get("node_class") or "").strip() == "vtkMRMLSegmentationNode"):
+                return True
+    # Deterministic fallback (matches WorkflowRuntime._is_segment_name_selection):
+    # a named content combobox -- a plain combobox with no static choices whose name
+    # yields a distinctive token. Mirroring the pick onto it is fail-soft anyway.
+    for src in srcs:
+        for so in src.get("sub_operations") or []:
+            if (isinstance(so, dict)
+                    and str(so.get("widget_class") or "").strip() in ("QComboBox", "ctkComboBox")
+                    and not (so.get("choices") or [])
+                    and _content_combo_has_keyword(so.get("widget_name") or "")):
                 return True
     return False
 

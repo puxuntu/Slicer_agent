@@ -968,6 +968,21 @@ class WidgetWorkflowMixin:
             candidates = []
         if not candidates:
             return False
+        # Safety for the deterministic content-combobox signal: with more than one
+        # segmentation and no way to pick the right one (no bound target field and
+        # no widget-name keyword match), do NOT guess -- fall through to the
+        # free-text box so a non-segment content combobox isn't shown a random
+        # segmentation's segments.
+        if len(candidates) > 1:
+            target = str(state.get("segmentation_target_param") or "").strip()
+            kws = [str(k).lower() for k in (state.get("segmentation_keywords") or []) if len(str(k)) >= 3]
+            resolved = bool(target and self._resolveParamNodeFieldNodeID(target))
+            if not resolved and kws:
+                resolved = any(
+                    any(k in str(c.get("name") or "").lower() for k in kws) for c in candidates
+                )
+            if not resolved:
+                return False
         idx = self._preferredSegmentationIndex(candidates, state)
         if not (0 <= idx < len(candidates)):
             idx = 0

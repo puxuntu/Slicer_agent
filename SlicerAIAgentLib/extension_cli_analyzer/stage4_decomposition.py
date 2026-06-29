@@ -1264,7 +1264,30 @@ class AnalyzerStage4DecompositionMixin:
                 and str(r.get("node_class") or "").strip() == "vtkMRMLSegmentationNode"
                 for r in (sub_op.get("node_roles") or [])
             )
-            if has_seg_role:
+            # Deterministic fallback when the LLM omits the segmentation role (it is
+            # non-deterministic across regens): a NAMED content combobox -- no static
+            # choices + a distinctive widget-name token -- is dynamically populated
+            # at runtime (e.g. a "Fragment" selector), unlike a static enum combobox.
+            _stop = {
+                "segments", "segment", "seg", "table", "view", "selector", "widget",
+                "combo", "combobox", "node", "nodes", "mrml", "qmrml", "list", "tree",
+                "box", "panel", "frame", "output", "input", "the", "for",
+            }
+            # camelCase + non-alphanumeric split WITHOUT regex (``re`` is not in
+            # this module's namespace): insert a break before an uppercase that
+            # follows a lowercase, and treat any non-alnum char as a separator.
+            _name = str(widget_name or "")
+            _norm = []
+            for _i, _ch in enumerate(_name):
+                if _ch.isupper() and _i > 0 and _name[_i - 1].islower():
+                    _norm.append(" ")
+                _norm.append(_ch if _ch.isalnum() else " ")
+            _has_token = any(
+                len(_t) >= 3 and _t not in _stop
+                for _t in "".join(_norm).lower().split()
+            )
+            content_combo = (not (sub_op.get("choices") or [])) and _has_token
+            if has_seg_role or content_combo:
                 sub_op["widget_class"] = widget_class
                 sub_op["node_class"] = "vtkMRMLSegmentationNode"
                 sub_op["value_kind"] = "segment_name_selection"

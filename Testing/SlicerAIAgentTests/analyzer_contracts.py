@@ -725,6 +725,7 @@ class AnalyzerContractsMixin:
         comboboxes/node selectors are untouched."""
         from SlicerAIAgentLib.ExtensionCLIAnalyzer import ExtensionCLIAnalyzer
 
+        # Strong signal: a segmentation choice_input role.
         so = {"op_type": "user_choice", "widget_name": "fragmentSelector",
               "node_roles": [{"role_kind": "choice_input", "node_class": "vtkMRMLSegmentationNode"}],
               "choices": ["stray"]}
@@ -733,8 +734,16 @@ class AnalyzerContractsMixin:
         self.assertEqual(so.get("node_class"), "vtkMRMLSegmentationNode")
         self.assertEqual(so.get("choices"), [])
 
-        # Control: a plain combobox with NO segmentation role (e.g. a units dropdown).
-        so2 = {"op_type": "user_choice", "widget_name": "unitsCombo", "node_roles": []}
+        # Deterministic fallback: a role-LESS named content combobox (empty choices)
+        # is still captured (the LLM segmentation role is non-deterministic).
+        so_c = {"op_type": "user_choice", "widget_name": "fragmentSelector", "node_roles": [], "choices": []}
+        ExtensionCLIAnalyzer._record_source_widget(so_c, {"fragmentSelector": "QComboBox"}, {})
+        self.assertEqual(so_c.get("value_kind"), "segment_name_selection")
+
+        # Control: a STATIC enum combobox (carries its items as choices) is NOT a
+        # content/segment picker.
+        so2 = {"op_type": "user_choice", "widget_name": "unitsCombo",
+               "node_roles": [], "choices": ["mm", "cm"]}
         ExtensionCLIAnalyzer._record_source_widget(so2, {"unitsCombo": "QComboBox"}, {})
         self.assertNotEqual(so2.get("value_kind"), "segment_name_selection")
         # Control: a node combobox is a node pick, not a segment-name selection.
@@ -743,7 +752,7 @@ class AnalyzerContractsMixin:
         ExtensionCLIAnalyzer._record_source_widget(so3, {"inputSelector": "qMRMLNodeComboBox"}, {})
         self.assertNotEqual(so3.get("value_kind"), "segment_name_selection")
 
-        self.delayDisplay("Segment-name selection captured for content combobox")
+        self.delayDisplay("Segment-name selection captured (role + content-combobox fallback)")
 
     def test_GetNodesByClassReceiverTyping(self):
         """A receiver bound by a `GetNodesByClass` loop is typed and provable.
