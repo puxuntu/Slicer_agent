@@ -5,6 +5,33 @@ from .templates import _workflow_choices, _workflow_repeat_state
 from .workflow_state import _find_next_step_local
 
 
+# ``{vol_lookup}`` is a structural placeholder some generated templates emit (see
+# extension_cli_analyzer/template_generation.py) to stand in for "resolve the
+# workflow's input scalar volume into ``inputVolume``". Generation-side validation
+# expands it (live_revision._live_fill_template) and notes it "mirrors the
+# generated runtime fill" -- this is that runtime fill, which the per-step path
+# otherwise lacked. Generic snippet (no extension/param-specific names): reuse a
+# volume an earlier step already resolved, else a scalar volume cached by a prior
+# choice step (any ``*_id`` global pointing at a scalar volume), else the first
+# scalar volume in the scene. Placed at column 0 (every generator emits the
+# placeholder at top level).
+_VOL_LOOKUP_SNIPPET = (
+    "try:\n"
+    "    inputVolume  # reuse a volume an earlier step already resolved\n"
+    "except NameError:\n"
+    "    inputVolume = None\n"
+    "if inputVolume is None:\n"
+    "    for _wf_vid_name in list(globals()):\n"
+    "        if _wf_vid_name.endswith('_id') and isinstance(globals().get(_wf_vid_name), str):\n"
+    "            _wf_vid_node = slicer.mrmlScene.GetNodeByID(globals()[_wf_vid_name])\n"
+    "            if _wf_vid_node is not None and _wf_vid_node.IsA('vtkMRMLScalarVolumeNode'):\n"
+    "                inputVolume = _wf_vid_node\n"
+    "                break\n"
+    "if inputVolume is None:\n"
+    "    inputVolume = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLScalarVolumeNode')"
+)
+
+
 def _build_format_kwargs(arguments: Dict) -> Dict[str, str]:
     """Convert tool arguments to template format kwargs (repr-wrapped)."""
     format_kwargs = {}
@@ -15,6 +42,10 @@ def _build_format_kwargs(arguments: Dict) -> Dict[str, str]:
             format_kwargs[key] = "None"
         else:
             format_kwargs[key] = repr(value)
+    # Provide the structural vol_lookup expansion (raw code, not repr-wrapped) so
+    # a template's bare {vol_lookup} fills instead of raising "placeholder not
+    # filled". Harmless when the template has no such placeholder.
+    format_kwargs.setdefault("vol_lookup", _VOL_LOOKUP_SNIPPET)
     return format_kwargs
 
 

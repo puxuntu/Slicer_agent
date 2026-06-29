@@ -392,6 +392,22 @@ class WorkflowTestsMixin:
 
         self.delayDisplay("branch_op routes through the pre-guard like user_choice")
 
+    def test_VolLookupPlaceholderFills(self):
+        """A generated template's {vol_lookup} structural placeholder fills at
+        runtime instead of raising 'Template placeholder not filled'."""
+        import ast
+        from SlicerAIAgentLib.extension_cli_loader import _build_format_kwargs, _fill_template
+
+        kw = _build_format_kwargs({})
+        self.assertIn("vol_lookup", kw)
+        template = "import slicer\n{vol_lookup}\nif inputVolume is None:\n    pass\n"
+        out = _fill_template(template, kw)
+        self.assertNotIn("{vol_lookup}", out)
+        self.assertIn("GetFirstNodeByClass", out)
+        ast.parse(out)  # the expansion produces valid Python defining inputVolume
+
+        self.delayDisplay("{vol_lookup} placeholder fills at runtime")
+
     def test_WorkflowReplayCheckpoints(self):
         """Replay timeline: live checkpoint recording, rewind truncation, loop resume."""
         import importlib
