@@ -1,4 +1,4 @@
-# --- PelvicFracturePlanning: If further adjustments are required, tick the "Manually adjust a fragment" checkbox. If not, jump to step 12. ---
+# --- PelvicFracturePlanning: If further adjustments are required, tick the "Edit Screw trajectories" checkbox. If not, stop here. ---
 import slicer
 # precondition:begin
 # Ensure the extension module is active so module.enter() has run.
@@ -24,15 +24,15 @@ if _widget is None:
     except Exception:
         _widget = None
 if _widget is None:
-    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'chkManualAdjust'.")
-if not hasattr(_widget, 'onManualAdjustToggled'):
-    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onManualAdjustToggled' for 'chkManualAdjust'; regenerate the CLI.")
+    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'chkEditScrews'.")
+if not hasattr(_widget, 'onEditScrewsToggled'):
+    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onEditScrewsToggled' for 'chkEditScrews'; regenerate the CLI.")
 # Set the control's checked state (signals blocked to avoid a
 # double-fire), then invoke the handler once. The handler may read
 # the widget state (no arg) or accept the new bool — try the bool.
 _ctrl = None
 try:
-    _ctrl = _widget.ui.chkManualAdjust
+    _ctrl = _widget.ui.chkEditScrews
 except Exception:
     _ctrl = None
 if _ctrl is not None:
@@ -43,8 +43,8 @@ if _ctrl is not None:
     except Exception:
         pass
 try:
-    _widget.onManualAdjustToggled(True)
+    _widget.onEditScrewsToggled(True)
 except TypeError:
-    _widget.onManualAdjustToggled()
-print("[PelvicFracturePlanning] Step 'cb_step_7': set 'chkManualAdjust' = True via onManualAdjustToggled.")
+    _widget.onEditScrewsToggled()
+print("[PelvicFracturePlanning] Step 'cb_step_13': set 'chkEditScrews' = True via onEditScrewsToggled.")
 

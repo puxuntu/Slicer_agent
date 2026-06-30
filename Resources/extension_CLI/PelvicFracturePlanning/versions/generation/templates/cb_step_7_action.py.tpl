@@ -1,4 +1,4 @@
-# --- PelvicFracturePlanning: If further adjustments are required, tick the "Manually adjust a fragment" checkbox. If not, jump to step 11. ---
+# --- PelvicFracturePlanning: If further adjustments are required, tick the "Manually adjust a fragment" checkbox. If not, jump to step 12. ---
 import slicer
 # precondition:begin
 # Ensure the extension module is active so module.enter() has run.

@@ -1,4 +1,4 @@
-# --- PelvicFracturePlanning: Untick the "Edit Screw trajectories" checkbox. ---
+# --- PelvicFracturePlanning: Click the "Regenerate screws from edited lines" button. ---
 import slicer
 # precondition:begin
 # Ensure the extension module is active so module.enter() has run.
@@ -24,27 +24,9 @@ if _widget is None:
     except Exception:
         _widget = None
 if _widget is None:
-    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'chkEditScrews'.")
-if not hasattr(_widget, 'onEditScrewsToggled'):
-    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onEditScrewsToggled' for 'chkEditScrews'; regenerate the CLI.")
-# Set the control's checked state (signals blocked to avoid a
-# double-fire), then invoke the handler once. The handler may read
-# the widget state (no arg) or accept the new bool — try the bool.
-_ctrl = None
-try:
-    _ctrl = _widget.ui.chkEditScrews
-except Exception:
-    _ctrl = None
-if _ctrl is not None:
-    try:
-        _ctrl.blockSignals(True)
-        _ctrl.checked = False
-        _ctrl.blockSignals(False)
-    except Exception:
-        pass
-try:
-    _widget.onEditScrewsToggled(False)
-except TypeError:
-    _widget.onEditScrewsToggled()
-print("[PelvicFracturePlanning] Step 'cb_step_15': set 'chkEditScrews' = False via onEditScrewsToggled.")
+    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'btnRegenScrews'.")
+if not hasattr(_widget, 'onRegenScrews'):
+    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onRegenScrews' for 'btnRegenScrews'; regenerate the CLI.")
+_widget.onRegenScrews()
+print("[PelvicFracturePlanning] Step 'cb_step_15': clicked 'btnRegenScrews' via onRegenScrews().")
 

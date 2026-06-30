@@ -24,7 +24,8 @@
     "cb_step_12",
     "cb_step_13",
     "cb_step_14",
-    "cb_step_15"
+    "cb_step_15",
+    "cb_step_16"
   ],
   "cookbook_driven": true,
   "cookbook_file": "PelvicFracturePlanning.md",
@@ -55,15 +56,11 @@
       "valid": true,
       "issues": []
     },
-    "cb_step_10": {
-      "valid": true,
-      "issues": []
-    },
     "cb_step_11": {
       "valid": true,
       "issues": []
     },
-    "cb_step_13": {
+    "cb_step_12": {
       "valid": true,
       "issues": []
     },
@@ -72,6 +69,10 @@
       "issues": []
     },
     "cb_step_15": {
+      "valid": true,
+      "issues": []
+    },
+    "cb_step_16": {
       "valid": true,
       "issues": []
     }

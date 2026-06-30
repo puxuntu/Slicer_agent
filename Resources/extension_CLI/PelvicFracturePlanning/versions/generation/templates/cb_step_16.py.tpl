@@ -1,4 +1,4 @@
-# --- PelvicFracturePlanning: If further adjustments are required, tick the "Edit Screw trajectories" checkbox. If not, stop here. ---
+# --- PelvicFracturePlanning: Untick the "Edit Screw trajectories" checkbox. ---
 import slicer
 # precondition:begin
 # Ensure the extension module is active so module.enter() has run.
@@ -38,13 +38,13 @@ except Exception:
 if _ctrl is not None:
     try:
         _ctrl.blockSignals(True)
-        _ctrl.checked = True
+        _ctrl.checked = False
         _ctrl.blockSignals(False)
     except Exception:
         pass
 try:
-    _widget.onEditScrewsToggled(True)
+    _widget.onEditScrewsToggled(False)
 except TypeError:
     _widget.onEditScrewsToggled()
-print("[PelvicFracturePlanning] Step 'cb_step_12': set 'chkEditScrews' = True via onEditScrewsToggled.")
+print("[PelvicFracturePlanning] Step 'cb_step_16': set 'chkEditScrews' = False via onEditScrewsToggled.")
 

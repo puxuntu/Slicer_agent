@@ -1,4 +1,4 @@
-# --- PelvicFracturePlanning: Click the "Run Step 5: Plan Screws" button. ---
+# --- PelvicFracturePlanning: Click the "Apply adjustments" button. ---
 import slicer
 # precondition:begin
 # Ensure the extension module is active so module.enter() has run.
@@ -24,9 +24,9 @@ if _widget is None:
     except Exception:
         _widget = None
 if _widget is None:
-    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'btnPlanScrews'.")
-if not hasattr(_widget, 'onPlanScrews'):
-    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onPlanScrews' for 'btnPlanScrews'; regenerate the CLI.")
-_widget.onPlanScrews()
-print("[PelvicFracturePlanning] Step 'cb_step_11': clicked 'btnPlanScrews' via onPlanScrews().")
+    raise RuntimeError("Could not obtain the PelvicFracturePlanning module widget for 'btnApplyAdjust'.")
+if not hasattr(_widget, 'onApplyAdjust'):
+    raise RuntimeError("PelvicFracturePlanning widget has no handler 'onApplyAdjust' for 'btnApplyAdjust'; regenerate the CLI.")
+_widget.onApplyAdjust()
+print("[PelvicFracturePlanning] Step 'cb_step_11': clicked 'btnApplyAdjust' via onApplyAdjust().")
 
