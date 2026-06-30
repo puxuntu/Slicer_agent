@@ -315,7 +315,7 @@
       {
         "role_kind": "choice_input",
         "node_class": "vtkMRMLScalarVolumeNode",
-        "parameter_name": null,
+        "parameter_name": "inputVolume",
         "step_id": "cb_step_1"
       }
     ],
@@ -351,7 +351,7 @@
       {
         "role_kind": "choice_input",
         "node_class": "vtkMRMLSegmentationNode",
-        "parameter_name": "outputFrac",
+        "parameter_name": "",
         "step_id": "cb_step_4"
       }
     ],
@@ -366,6 +366,12 @@
         "role_kind": "extension_input",
         "node_class": "vtkMRMLSegmentationNode",
         "parameter_name": "OutputPelvisSeg",
+        "step_id": "cb_step_5"
+      },
+      {
+        "role_kind": "extension_output",
+        "node_class": "vtkMRMLModelNode",
+        "parameter_name": "",
         "step_id": "cb_step_5"
       }
     ],
@@ -395,6 +401,14 @@
         "step_id": "cb_step_6"
       }
     ],
+    "cb_step_8": [
+      {
+        "role_kind": "choice_input",
+        "node_class": "vtkMRMLSegmentationNode",
+        "parameter_name": "",
+        "step_id": "cb_step_8"
+      }
+    ],
     "cb_step_12": [
       {
         "role_kind": "extension_output",
@@ -402,12 +416,20 @@
         "parameter_name": "OutputScrew",
         "step_id": "cb_step_12"
       }
+    ],
+    "cb_step_15": [
+      {
+        "role_kind": "extension_output",
+        "node_class": "vtkMRMLModelNode",
+        "parameter_name": "OutputScrew",
+        "step_id": "cb_step_15"
+      }
     ]
   },
   "repeat_groups": {},
   "repeat_blocks": {
-    "manual_adjustment_check": {
-      "repeat_id": "manual_adjustment_check",
+    "manual_adjust_outer": {
+      "repeat_id": "manual_adjust_outer",
       "body_steps": [
         "cb_step_8",
         "cb_step_9",
@@ -420,7 +442,7 @@
       "controller": {
         "kind": "until_choice",
         "source_step": "cb_step_7",
-        "prompt": "Decide whether to enter manual adjustment mode.",
+        "prompt": "Would you like to manually adjust a fragment? If not, skip to step 12.",
         "exit_value": false,
         "exit_target": 12
       },
@@ -428,13 +450,14 @@
       "inference": {
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
-          7
+          7,
+          11
         ],
         "confidence": "high"
       }
     },
-    "screw_editing_check": {
-      "repeat_id": "screw_editing_check",
+    "screw_edit_outer": {
+      "repeat_id": "screw_edit_outer",
       "body_steps": [
         "cb_step_14",
         "cb_step_15",
@@ -446,7 +469,7 @@
       "controller": {
         "kind": "until_choice",
         "source_step": "cb_step_13",
-        "prompt": "Decide whether to enter screw editing mode.",
+        "prompt": "Would you like to edit screw trajectories? If not, stop here.",
         "exit_value": false,
         "exit_target": "stop"
       },
@@ -454,8 +477,33 @@
       "inference": {
         "source": "llm_semantic_decomposition",
         "evidence_step_ids": [
-          13
+          13,
+          16
         ],
+        "confidence": "high"
+      }
+    },
+    "loop_back_step_10": {
+      "repeat_id": "loop_back_step_10",
+      "body_steps": [
+        "cb_step_8",
+        "cb_step_9",
+        "cb_step_10"
+      ],
+      "entry_step": "cb_step_8",
+      "terminal_step": "cb_step_10",
+      "exit_step": "cb_step_11",
+      "controller": {
+        "kind": "until_choice",
+        "source_step": "cb_step_10",
+        "loop_back": true,
+        "prompt": "If further adjustments are required, jump to step 8. If not, jump to step 11.",
+        "exit_value": false,
+        "exit_target": 11
+      },
+      "max_iterations": 20,
+      "inference": {
+        "source": "backward_jump_loop_synthesis",
         "confidence": "high"
       }
     }
@@ -952,16 +1000,16 @@
   },
   "ui_guidance": {
     "cb_step_1": {
-      "title": "Select Pelvic Volume",
-      "instruction": "In the Input CT Volume option, choose the Pelvic Volume.",
+      "title": "Select the input CT volume",
+      "instruction": "Choose the pelvic volume from the list.",
       "done_label": "Done",
-      "choice_label": "Choice",
+      "choice_label": "Volume",
       "input_label": "Choice",
       "object_label": "volume",
       "repeat": {}
     },
     "cb_step_2": {
-      "title": "Segment Pelvis",
+      "title": "Run Step 1: Segment Pelvis",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -970,7 +1018,7 @@
       "repeat": {}
     },
     "cb_step_3": {
-      "title": "Segment Fractures",
+      "title": "Run Step 2: Segment Fractures",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -979,16 +1027,16 @@
       "repeat": {}
     },
     "cb_step_4": {
-      "title": "Exclude Fragments",
-      "instruction": "Untick any fragments to exclude from planning.",
+      "title": "Untick fragments to exclude from planning",
+      "instruction": "Untick any fragments you want to exclude.",
       "done_label": "Done",
       "choice_label": "Choice",
       "input_label": "Choice",
-      "object_label": "segment",
+      "object_label": "fragment",
       "repeat": {}
     },
     "cb_step_5": {
-      "title": "Generate Template",
+      "title": "Run Step 3: Generate Template",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -997,7 +1045,7 @@
       "repeat": {}
     },
     "cb_step_6": {
-      "title": "Register and Reduce",
+      "title": "Run Step 4: Register _Reduce",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -1006,26 +1054,26 @@
       "repeat": {}
     },
     "cb_step_7": {
-      "title": "Manual Adjustment Needed?",
-      "instruction": "Tick 'Manually adjust a fragment' if needed.",
+      "title": "Manually adjust a fragment?",
+      "instruction": "Choose one option.",
       "done_label": "Done",
       "choice_label": "Choice",
       "input_label": "Choice",
-      "object_label": "checkbox",
+      "object_label": "interaction",
       "repeat": {}
     },
     "cb_step_8": {
-      "title": "Select Fragment",
-      "instruction": "Choose which fragment to adjust.",
+      "title": "Choose fragment to adjust",
+      "instruction": "Select a fragment from the list.",
       "done_label": "Done",
-      "choice_label": "Choice",
+      "choice_label": "Fragment",
       "input_label": "Choice",
       "object_label": "fragment",
       "repeat": {}
     },
     "cb_step_9": {
-      "title": "Adjust Fragment",
-      "instruction": "Manually adjust the position and rotation of the selected fragment.",
+      "title": "Adjust fragment position and rotation",
+      "instruction": "Use the transform controls to adjust the fragment.",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1033,8 +1081,8 @@
       "repeat": {}
     },
     "cb_step_10": {
-      "title": "More Adjustments?",
-      "instruction": "Choose if further adjustments are needed.",
+      "title": "Further adjustments to this fragment?",
+      "instruction": "Choose one option.",
       "done_label": "Done",
       "choice_label": "Choice",
       "input_label": "Choice",
@@ -1042,7 +1090,7 @@
       "repeat": {}
     },
     "cb_step_11": {
-      "title": "Apply Adjustments",
+      "title": "Apply adjustments",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -1051,7 +1099,7 @@
       "repeat": {}
     },
     "cb_step_12": {
-      "title": "Plan Screws",
+      "title": "Run Step 5: Plan Screws",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -1060,16 +1108,16 @@
       "repeat": {}
     },
     "cb_step_13": {
-      "title": "Edit Screw Trajectories?",
-      "instruction": "Tick 'Edit Screw trajectories' if needed.",
+      "title": "Edit screw trajectories?",
+      "instruction": "Choose one option.",
       "done_label": "Done",
       "choice_label": "Choice",
       "input_label": "Choice",
-      "object_label": "checkbox",
+      "object_label": "interaction",
       "repeat": {}
     },
     "cb_step_14": {
-      "title": "Adjust Screw Trajectories",
+      "title": "Adjust screw trajectories",
       "instruction": "Manually adjust the position and rotation of the screw trajectories.",
       "done_label": "Done",
       "choice_label": "",
@@ -1078,7 +1126,7 @@
       "repeat": {}
     },
     "cb_step_15": {
-      "title": "Regenerate Screws",
+      "title": "Regenerate screws from edited lines",
       "instruction": "",
       "done_label": "Done",
       "choice_label": "",
@@ -1087,8 +1135,8 @@
       "repeat": {}
     },
     "cb_step_16": {
-      "title": "Disable Edit Mode",
-      "instruction": "Untick the 'Edit Screw trajectories' checkbox.",
+      "title": "Untick 'Edit Screw trajectories' checkbox",
+      "instruction": "",
       "done_label": "Done",
       "choice_label": "",
       "input_label": "",
@@ -1167,13 +1215,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Segment pelvis from CT volume"
+        "segment pelvis from input volume"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "segment_pelvis",
         "vtkMRMLSegmentationNode",
-        "inputVolume"
+        "segmentation"
       ]
     },
     "templates/cb_step_3.py.tpl": {
@@ -1198,13 +1246,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Segment fractures from CT volume"
+        "segment fractures from pelvis"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "segment_fractures",
         "vtkMRMLSegmentationNode",
-        "inputVolume"
+        "fracture"
       ]
     },
     "templates/cb_step_5.py.tpl": {
@@ -1229,14 +1277,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Generate reduction template from pelvis and fracture segmentations"
+        "generate pelvic template model"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "plan_generate_template",
-        "template",
-        "pelvis",
-        "fracture"
+        "vtkMRMLModelNode",
+        "template"
       ]
     },
     "templates/cb_step_6.py.tpl": {
@@ -1261,13 +1308,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Register and reduce fracture fragments"
+        "register and reduce fractures"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "plan_register_reduce",
-        "reduction",
-        "vtkMRMLSegmentationNode"
+        "vtkMRMLSegmentationNode",
+        "reduction"
       ]
     },
     "templates/cb_step_9_post.py.tpl": {
@@ -1311,13 +1358,12 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Apply manual adjustments to fragment"
+        "apply manual adjustments to fragment"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
-        "apply",
-        "adjustment",
-        "transform"
+        "btnApplyAdjust",
+        "apply"
       ]
     },
     "templates/cb_step_12.py.tpl": {
@@ -1342,13 +1388,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Plan screw trajectories for reduced fragments"
+        "plan screw trajectories"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "plan_screws",
-        "screw",
-        "vtkMRMLModelNode"
+        "vtkMRMLModelNode",
+        "screw"
       ]
     },
     "templates/cb_step_14_post.py.tpl": {
@@ -1392,13 +1438,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Regenerate screw model from edited trajectories"
+        "regenerate screw trajectories from edited lines"
       ],
       "slicer_op_categories": [],
       "slicer_api_keywords": [
         "_buildScrewNodes",
-        "screw",
-        "rebuild"
+        "vtkMRMLModelNode",
+        "regen"
       ]
     },
     "templates/cb_step_16.py.tpl": {
@@ -1428,10 +1474,13 @@
         "slicer.util.selectedModule"
       ],
       "operation_descriptions": [
-        "Untick screw editing checkbox to finish editing"
+        "untick edit screw trajectories checkbox"
       ],
       "slicer_op_categories": [],
-      "slicer_api_keywords": []
+      "slicer_api_keywords": [
+        "chkEditScrews",
+        "uncheck"
+      ]
     }
   },
   "ground_api_evidence_note": "ground_api_evidence is pre-revision retrieval evidence; final_api_evidence reflects the current validated templates.",

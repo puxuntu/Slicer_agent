@@ -12,21 +12,21 @@ and wait for them to complete the interaction before proceeding.
 
 **Workflow Steps:**
 1. `cb_step_1` [user_choice] — In the "Input CT Volume" option, choose the Pelvic Volume.
-   - Ask user: In the "Input CT Volume" option, choose the Pelvic Volume.
+   - Ask user: Select the input CT volume
 2. `cb_step_2` [extension_op] — Click "Run Step 1: Segment Pelvis" button.
 3. `cb_step_3` [extension_op] — Click "Run Step 2: Segment Fractures" button.
 4. `cb_step_4` [user_choice] — In the "Untick any fragments to exclude it from planning" section, untick these segments.
-   - Ask user: In the "Untick any fragments to exclude it from planning" section, untick these segments.
+   - Ask user: Untick any fragments to exclude from planning
 5. `cb_step_5` [extension_op] — Click "Run Step 3: Generate Template" button.
 6. `cb_step_6` [extension_op] — Click "Run Step 4: Register _Reduce" button.
 7. `cb_step_7` [branch_op] — If further adjustments are required, tick the "Manually adjust a fragment" checkbox. If not, jump to step 12.
-   - Ask user: Further adjustments required?
+   - Ask user: Manually adjust a fragment?
 8. `cb_step_8` [user_choice] — In the "Fragment" option, Choose which fragment needs adjustment in the "Fragment" selection box.
-   - Ask user: Which fragment needs adjustment?
+   - Ask user: Choose fragment to adjust
 9. `cb_step_9` [user_interaction] — Manually adjust the position and rotation of the selected fragment.
    - Interaction: generic
 10. `cb_step_10` [branch_op] — If further adjustments are required, jump to step 8. If not, jump to step 11.
-   - Ask user: Further adjustments required?
+   - Ask user: Further adjustments to this fragment?
 11. `cb_step_11` [extension_op] — Click the "Apply adjustments" button.
 12. `cb_step_12` [extension_op] — Click the "Run Step 5: Plan Screws" button.
 13. `cb_step_13` [branch_op] — If further adjustments are required, tick the "Edit Screw trajectories" checkbox. If not, stop here.

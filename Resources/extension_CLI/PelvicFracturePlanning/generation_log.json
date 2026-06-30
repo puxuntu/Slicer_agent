@@ -1,7 +1,7 @@
 [
   {
     "attempt": 1,
-    "timestamp": "2026-06-29T21:14:43.267135",
+    "timestamp": "2026-06-29T22:50:14.637907",
     "phase": "package",
     "trigger": "user_request",
     "phases_completed": [
@@ -128,8 +128,8 @@
       "valid": true,
       "errors": [],
       "warnings": [
-        "cb_step_1: user choice 'choice_step_1' has no source-derived parameter binding",
-        "cb_step_4: user choice 'choice_step_4' has no source-derived parameter binding",
+        "cb_step_1: user choice 'inputVolume' has no source-derived parameter binding",
+        "cb_step_4: user choice 'excluded_segments' has no source-derived parameter binding",
         "cb_step_8: user choice 'selected_fragment' has no source-derived parameter binding",
         "templates/cb_step_7_action.py.tpl: UnprovenApiCall: method_unproven for '_ctrl.blockSignals' (line 40, effect=read_only)",
         "templates/cb_step_7_action.py.tpl: UnprovenApiCall: method_unproven for '_ctrl.blockSignals' (line 42, effect=read_only)",
@@ -392,8 +392,8 @@
           "blocking": false,
           "template": "",
           "diagnosis": "validation_warning",
-          "message": "cb_step_1: user choice 'choice_step_1' has no source-derived parameter binding",
-          "rendered_message": "cb_step_1: user choice 'choice_step_1' has no source-derived parameter binding",
+          "message": "cb_step_1: user choice 'inputVolume' has no source-derived parameter binding",
+          "rendered_message": "cb_step_1: user choice 'inputVolume' has no source-derived parameter binding",
           "evidence_sources": [],
           "minimal_repair": null
         },
@@ -404,8 +404,8 @@
           "blocking": false,
           "template": "",
           "diagnosis": "validation_warning",
-          "message": "cb_step_4: user choice 'choice_step_4' has no source-derived parameter binding",
-          "rendered_message": "cb_step_4: user choice 'choice_step_4' has no source-derived parameter binding",
+          "message": "cb_step_4: user choice 'excluded_segments' has no source-derived parameter binding",
+          "rendered_message": "cb_step_4: user choice 'excluded_segments' has no source-derived parameter binding",
           "evidence_sources": [],
           "minimal_repair": null
         },
